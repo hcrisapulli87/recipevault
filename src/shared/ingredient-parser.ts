@@ -1,4 +1,4 @@
-import type { ParsedIngredient } from '../shared/types'
+import type { ParsedIngredient } from './types'
 
 const FRACTIONS: Record<string, number> = {
   '½': 0.5,

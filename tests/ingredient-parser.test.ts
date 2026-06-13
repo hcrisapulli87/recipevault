@@ -3,7 +3,7 @@ import {
   parseIngredient,
   scaleIngredient,
   formatQuantity
-} from '../src/main/ingredient-parser'
+} from '../src/shared/ingredient-parser'
 
 describe('parseIngredient', () => {
   it('parses qty + unit + name', () =>

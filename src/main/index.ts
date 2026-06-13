@@ -4,6 +4,8 @@ import * as fs from 'fs'
 import initSqlJs from 'sql.js'
 import { createSchema } from './db'
 import { registerIpcHandlers } from './ipc'
+import { initGoogleTasks } from './google-tasks'
+import { initSettings } from './settings'
 
 async function createWindow(): Promise<void> {
   const win = new BrowserWindow({
@@ -58,6 +60,8 @@ app.whenReady().then(async () => {
     return result
   }
 
+  initSettings(app.getPath('userData'))
+  initGoogleTasks(app.getPath('userData'))
   registerIpcHandlers(db)
   await createWindow()
 
