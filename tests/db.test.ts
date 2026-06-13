@@ -70,6 +70,23 @@ describe('recipes', () => {
     expect(all.map((r) => r.title).sort()).toEqual(['Pancakes', 'Spaghetti Bolognese'])
   })
 
+  it('saves children under the right recipe even when db.export() runs after each write', () => {
+    // Regression: the app wraps db.run to db.export() after every write, which resets
+    // sqlite's last_insert_rowid(). saveRecipe must not depend on that surviving.
+    const originalRun = db.run.bind(db)
+    // @ts-expect-error mirror the app's runtime persistence wrapper
+    db.run = (...args) => {
+      const result = originalRun(...args)
+      db.export()
+      return result
+    }
+    const id = saveRecipe(db, draft())
+    expect(id).toBeGreaterThan(0)
+    const r = getRecipe(db, id)
+    expect(r!.ingredients).toHaveLength(2)
+    expect(r!.steps).toHaveLength(2)
+  })
+
   it('deletes recipe and children', () => {
     const id = saveRecipe(db, draft())
     deleteRecipe(db, id)

@@ -52,17 +52,16 @@ async function initDatabase(): Promise<{ db: import('sql.js').Database; dbPath: 
 app.whenReady().then(async () => {
   const { db, dbPath } = await initDatabase()
 
-  // Wrap db.run to auto-persist after every write
-  const originalRun = db.run.bind(db)
-  db.run = (...args: Parameters<typeof db.run>) => {
-    const result = originalRun(...args)
+  // Persist the whole database to disk once per logical mutation. (Persisting after
+  // every individual db.run was both slow — 30+ serializations to save one recipe —
+  // and broke saveRecipe, because db.export() resets sqlite's last_insert_rowid().)
+  const persist = (): void => {
     fs.writeFileSync(dbPath, Buffer.from(db.export()))
-    return result
   }
 
   initSettings(app.getPath('userData'))
   initGoogleTasks(app.getPath('userData'))
-  registerIpcHandlers(db)
+  registerIpcHandlers(db, persist)
   await createWindow()
 
   app.on('activate', async () => {

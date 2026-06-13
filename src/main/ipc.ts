@@ -22,7 +22,7 @@ import { getSettings, setSettings } from './settings'
 const BOT_WRITE_WARNING =
   'Could not write to the Discord bot folder — the plan is saved here, but !mealplan won’t see it. Check the folder path in Settings.'
 
-export function registerIpcHandlers(db: Database): void {
+export function registerIpcHandlers(db: Database, persist: () => void): void {
   const titleOf = (id: number): string => getRecipe(db, id)?.title ?? ''
 
   /** Pull bot-side !setmeal/!clearmeal changes in, persisting any differences. */
@@ -31,9 +31,14 @@ export function registerIpcHandlers(db: Database): void {
     const botMap = readBotPlan(getSettings().botFolder)
     if (!botMap) return local
     const merged = mergeBotPlan(local, botMap, titleOf)
+    let changed = false
     for (let i = 0; i < merged.length; i++) {
-      if (merged[i] !== local[i]) setMeal(db, merged[i].day, merged[i].recipeId, merged[i].freeText)
+      if (merged[i] !== local[i]) {
+        setMeal(db, merged[i].day, merged[i].recipeId, merged[i].freeText)
+        changed = true
+      }
     }
+    if (changed) persist()
     return merged
   }
 
@@ -53,11 +58,16 @@ export function registerIpcHandlers(db: Database): void {
 
   ipcMain.handle(IPC.GET_RECIPE, (_e, id: number) => getRecipe(db, id))
 
-  ipcMain.handle(IPC.SAVE_RECIPE, (_e, draft: DraftRecipe) => saveRecipe(db, draft))
+  ipcMain.handle(IPC.SAVE_RECIPE, (_e, draft: DraftRecipe) => {
+    const id = saveRecipe(db, draft)
+    persist()
+    return id
+  })
 
   ipcMain.handle(IPC.DELETE_RECIPE, (_e, id: number) => {
     mealPlanWithBotChanges() // merge bot edits first so the export below can't clobber them
     deleteRecipe(db, id)
+    persist()
     exportPlanToBot() // a deleted recipe may have been on the plan
   })
 
@@ -81,12 +91,14 @@ export function registerIpcHandlers(db: Database): void {
     (_e, args: { day: Day; recipeId: number | null; freeText: string | null }) => {
       mealPlanWithBotChanges() // merge bot edits first so we don't clobber them
       setMeal(db, args.day, args.recipeId, args.freeText)
+      persist()
       return { ok: true, warning: exportPlanToBot() }
     }
   )
 
   ipcMain.handle(IPC.CLEAR_WEEK, () => {
     clearWeek(db)
+    persist()
     return { ok: true, warning: exportPlanToBot() }
   })
 

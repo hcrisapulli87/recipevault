@@ -133,22 +133,23 @@ export function getRecipe(db: Database, id: number): Recipe | null {
 }
 
 export function saveRecipe(db: Database, draft: DraftRecipe): number {
-  db.run(
+  // RETURNING reads the new id from the INSERT itself, so it can't be lost to a
+  // db.export() / persistence step between the insert and a separate rowid query.
+  const stmt = db.prepare(
     `INSERT INTO recipes (title, source_url, image_url, description, servings, prep_min, cook_min, total_min, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      draft.title,
-      draft.sourceUrl,
-      draft.imageUrl,
-      draft.description,
-      draft.servings,
-      draft.prepMin,
-      draft.cookMin,
-      draft.totalMin,
-      new Date().toISOString()
-    ]
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id`
   )
-  const stmt = db.prepare('SELECT last_insert_rowid() AS id')
+  stmt.bind([
+    draft.title,
+    draft.sourceUrl,
+    draft.imageUrl,
+    draft.description,
+    draft.servings,
+    draft.prepMin,
+    draft.cookMin,
+    draft.totalMin,
+    new Date().toISOString()
+  ])
   stmt.step()
   const id = Number(stmt.getAsObject()['id'])
   stmt.free()
