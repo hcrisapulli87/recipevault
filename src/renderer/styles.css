@@ -1,0 +1,24 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg-base: #16181d;
+  --bg-surface: #1e2128;
+  --bg-elevated: #262a33;
+  --border: #333845;
+  --accent: #e8943a;
+  --accent-bright: #f5a94e;
+  --text-primary: #e6e2da;
+  --text-secondary: #a8a499;
+  --text-muted: #6b6860;
+  --green: #4ade80;
+  --red: #ef4444;
+  --amber: #f59e0b;
+}
+
+body { background: var(--bg-base); color: var(--text-primary); font-family: system-ui, sans-serif; }
+
+.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+.app__header { padding: 14px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 24px; }
+.app__title { font-size: 18px; font-weight: 700; color: var(--accent-bright); flex-shrink: 0; }
+.app__body { display: flex; flex: 1; overflow: hidden; }
+.app__main { flex: 1; overflow-y: auto; padding: 20px; }
