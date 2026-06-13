@@ -11,6 +11,7 @@ import {
   setMeal,
   clearWeek
 } from './db'
+import { fetchAndExtract, ScrapeError } from './recipe-scraper'
 
 export function registerIpcHandlers(db: Database): void {
   ipcMain.handle(IPC.GET_RECIPES, () => getRecipes(db))
@@ -30,6 +31,17 @@ export function registerIpcHandlers(db: Database): void {
   )
 
   ipcMain.handle(IPC.CLEAR_WEEK, () => clearWeek(db))
+
+  ipcMain.handle(IPC.SCRAPE_URL, async (_e, url: string) => {
+    try {
+      return { ok: true, data: await fetchAndExtract(url) }
+    } catch (e) {
+      return {
+        ok: false,
+        message: e instanceof ScrapeError ? e.message : 'Something went wrong fetching that page.'
+      }
+    }
+  })
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, (_e, url: string) => shell.openExternal(url))
 }

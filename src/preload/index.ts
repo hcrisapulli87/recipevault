@@ -11,5 +11,6 @@ contextBridge.exposeInMainWorld('api', {
   setMeal: (args: { day: Day; recipeId: number | null; freeText: string | null }) =>
     ipcRenderer.invoke(IPC.SET_MEAL, args),
   clearWeek: () => ipcRenderer.invoke(IPC.CLEAR_WEEK),
+  scrapeUrl: (url: string) => ipcRenderer.invoke(IPC.SCRAPE_URL, url),
   openExternal: (url: string) => ipcRenderer.invoke(IPC.OPEN_EXTERNAL, url)
 })

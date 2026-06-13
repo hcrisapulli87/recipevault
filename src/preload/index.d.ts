@@ -1,4 +1,11 @@
-import type { Day, DraftRecipe, MealPlanEntry, Recipe, RecipeSummary } from '../shared/types'
+import type {
+  Day,
+  DraftRecipe,
+  IpcResult,
+  MealPlanEntry,
+  Recipe,
+  RecipeSummary
+} from '../shared/types'
 
 declare global {
   interface Window {
@@ -14,6 +21,7 @@ declare global {
         freeText: string | null
       }) => Promise<void>
       clearWeek: () => Promise<void>
+      scrapeUrl: (url: string) => Promise<IpcResult<DraftRecipe>>
       openExternal: (url: string) => Promise<void>
     }
   }
