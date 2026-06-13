@@ -30,6 +30,9 @@ const UNITS: Record<string, string[]> = {
   slice: ['slice', 'slices'],
   pinch: ['pinch', 'pinches'],
   handful: ['handful', 'handfuls'],
+  pack: ['pack', 'packs', 'packet', 'packets'],
+  jar: ['jar', 'jars'],
+  bottle: ['bottle', 'bottles'],
   bunch: ['bunch', 'bunches'],
   sprig: ['sprig', 'sprigs'],
   stick: ['stick', 'sticks'],
@@ -66,6 +69,7 @@ export function parseIngredient(raw: string): ParsedIngredient {
 
   const first = readNumber(s)
   if (!first) return base
+  let quantity = first.value
   s = first.rest
 
   // range: "1-2", "1–2", "1 to 2" — only commit if a second number follows
@@ -79,15 +83,29 @@ export function parseIngredient(raw: string): ParsedIngredient {
     }
   }
 
-  const unitMatch = s.match(/^([a-zA-Z]+)\.?(?:\s+|$)/)
+  // multiplied packs: "2 x 400g tins …" — only commit if a second number follows
+  if (quantityMax === null) {
+    const mulSep = s.match(/^(?:x|×)\s*/i)
+    if (mulSep) {
+      const second = readNumber(s.slice(mulSep[0].length))
+      if (second) {
+        quantity *= second.value
+        s = second.rest
+      }
+    }
+  }
+
+  // unit, then any trailing container words ("400g tins of …" → unit g, container tins)
   let unit: string | null = null
-  if (unitMatch && UNIT_LOOKUP.has(unitMatch[1].toLowerCase())) {
-    unit = UNIT_LOOKUP.get(unitMatch[1].toLowerCase())!
-    s = s.slice(unitMatch[0].length)
+  for (;;) {
+    const word = s.match(/^([a-zA-Z]+)\.?(?:\s+|$)/)
+    if (!word || !UNIT_LOOKUP.has(word[1].toLowerCase())) break
+    if (unit === null) unit = UNIT_LOOKUP.get(word[1].toLowerCase())!
+    s = s.slice(word[0].length).replace(/^of\s+/i, '')
   }
 
   const name = s.replace(/^of\s+/i, '').trim()
-  return { raw, quantity: first.value, quantityMax, unit, name: name || base.name }
+  return { raw, quantity, quantityMax, unit, name: name || base.name }
 }
 
 export function scaleIngredient(ing: ParsedIngredient, factor: number): ParsedIngredient {

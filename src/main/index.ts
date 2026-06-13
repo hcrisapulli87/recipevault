@@ -34,7 +34,7 @@ async function createWindow(): Promise<void> {
   }
 }
 
-async function initDatabase() {
+async function initDatabase(): Promise<{ db: import('sql.js').Database; dbPath: string }> {
   const SQL = await initSqlJs({
     locateFile: (file: string) =>
       app.isPackaged

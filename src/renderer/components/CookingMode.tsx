@@ -17,6 +17,17 @@ export function CookingMode(props: { recipe: Recipe; onClose: () => void }): JSX
     return () => window.removeEventListener('keydown', onKey)
   }, [props, steps.length])
 
+  if (steps.length === 0) {
+    return (
+      <div className="cooking">
+        <button className="cooking__close" onClick={props.onClose} title="Exit (Esc)">
+          ✕
+        </button>
+        <p className="empty-note">This recipe has no steps yet — edit it to add some.</p>
+      </div>
+    )
+  }
+
   const toggleDone = (idx: number): void => {
     const next = new Set(done)
     if (next.has(idx)) {
@@ -51,11 +62,7 @@ export function CookingMode(props: { recipe: Recipe; onClose: () => void }): JSX
       </button>
 
       <footer className="cooking__nav">
-        <button
-          className="btn"
-          onClick={() => setCurrent(current - 1)}
-          disabled={current === 0}
-        >
+        <button className="btn" onClick={() => setCurrent(current - 1)} disabled={current === 0}>
           ← Previous
         </button>
         <div className="cooking__dots">

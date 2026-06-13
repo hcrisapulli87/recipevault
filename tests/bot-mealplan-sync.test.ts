@@ -37,7 +37,11 @@ function entries(overrides: Partial<Record<string, Partial<MealPlanEntry>>> = {}
 
 describe('writeBotPlan', () => {
   it('writes the bot meal_plan.json format', () => {
-    writeBotPlan(dir, entries({ monday: { recipeId: 1 }, tuesday: { freeText: 'Leftovers' } }), titleOf)
+    writeBotPlan(
+      dir,
+      entries({ monday: { recipeId: 1 }, tuesday: { freeText: 'Leftovers' } }),
+      titleOf
+    )
     const written = JSON.parse(readFileSync(join(dir, 'meal_plan.json'), 'utf-8'))
     expect(written).toEqual({
       monday: 'Spaghetti Bolognese',

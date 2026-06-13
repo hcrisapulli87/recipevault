@@ -42,14 +42,7 @@ export type ScrapeConfidence = 'structured' | 'heuristic' | 'manual'
 
 export type DraftRecipe = Omit<Recipe, 'id' | 'createdAt'> & { confidence: ScrapeConfidence }
 
-export type Day =
-  | 'monday'
-  | 'tuesday'
-  | 'wednesday'
-  | 'thursday'
-  | 'friday'
-  | 'saturday'
-  | 'sunday'
+export type Day = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 
 export const DAYS: Day[] = [
   'monday',

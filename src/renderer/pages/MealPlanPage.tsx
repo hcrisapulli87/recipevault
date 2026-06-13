@@ -72,7 +72,10 @@ function DayRow(props: {
       ) : (
         <div className="plan-row__content">
           {recipe ? (
-            <button className="link-btn plan-row__meal" onClick={() => props.onOpenRecipe(recipe.id)}>
+            <button
+              className="link-btn plan-row__meal"
+              onClick={() => props.onOpenRecipe(recipe.id)}
+            >
               📖 {recipe.title}
             </button>
           ) : entry.freeText ? (

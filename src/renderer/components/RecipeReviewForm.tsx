@@ -51,6 +51,9 @@ export function RecipeReviewForm(props: {
     const num = (s: string): number | null => (s.trim() === '' ? null : Number(s))
     const prep = num(prepMin)
     const cook = num(cookMin)
+    // the scraped total may include resting/chilling time, so keep it — but only
+    // while prep/cook are untouched; once the user edits them it's stale
+    const timesUntouched = prep === props.draft.prepMin && cook === props.draft.cookMin
     const draft: DraftRecipe = {
       ...props.draft,
       title: title.trim(),
@@ -59,7 +62,11 @@ export function RecipeReviewForm(props: {
       prepMin: prep,
       cookMin: cook,
       totalMin:
-        props.draft.totalMin ?? (prep !== null || cook !== null ? (prep ?? 0) + (cook ?? 0) : null),
+        timesUntouched && props.draft.totalMin !== null
+          ? props.draft.totalMin
+          : prep !== null || cook !== null
+            ? (prep ?? 0) + (cook ?? 0)
+            : null,
       ingredients: ingredientText
         .split('\n')
         .map((l) => l.trim())
@@ -172,11 +179,7 @@ export function RecipeReviewForm(props: {
         <button className="btn" onClick={props.onCancel} disabled={saving}>
           Back
         </button>
-        <button
-          className="btn btn--primary"
-          onClick={save}
-          disabled={saving || !title.trim()}
-        >
+        <button className="btn btn--primary" onClick={save} disabled={saving || !title.trim()}>
           {saving ? 'Saving…' : 'Save recipe'}
         </button>
       </div>

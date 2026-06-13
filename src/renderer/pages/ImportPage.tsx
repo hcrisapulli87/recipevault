@@ -38,11 +38,7 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
 
   if (draft) {
     return (
-      <RecipeReviewForm
-        draft={draft}
-        onCancel={() => setDraft(null)}
-        onSaved={props.onSaved}
-      />
+      <RecipeReviewForm draft={draft} onCancel={() => setDraft(null)} onSaved={props.onSaved} />
     )
   }
 
@@ -62,7 +58,11 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
           onKeyDown={(e) => e.key === 'Enter' && fetchRecipe()}
           disabled={loading}
         />
-        <button className="btn btn--primary" onClick={fetchRecipe} disabled={loading || !url.trim()}>
+        <button
+          className="btn btn--primary"
+          onClick={fetchRecipe}
+          disabled={loading || !url.trim()}
+        >
           {loading ? 'Fetching…' : 'Fetch recipe'}
         </button>
       </div>

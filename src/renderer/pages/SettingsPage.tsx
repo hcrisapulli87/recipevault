@@ -46,12 +46,13 @@ export function SettingsPage(): JSX.Element {
         {!google.credentials ? (
           <div className="banner banner--warn">
             <code>google-credentials.json</code> not found. Copy the same OAuth client file the
-            nanoblock tracker uses into RecipeVault’s data folder
-            (<code>%APPDATA%\recipe-vault\</code>), then restart the app.
+            nanoblock tracker uses into RecipeVault’s data folder (
+            <code>%APPDATA%\recipe-vault\</code>), then restart the app.
           </div>
         ) : google.signedIn ? (
-          <p className="settings__status">✓ Signed in — ingredients go to your “
-            {settings.groceriesList}” list.</p>
+          <p className="settings__status">
+            ✓ Signed in — ingredients go to your “{settings.groceriesList}” list.
+          </p>
         ) : (
           <button className="btn btn--primary" onClick={signIn} disabled={signingIn}>
             {signingIn ? 'Waiting for browser…' : 'Sign in to Google'}
@@ -83,8 +84,8 @@ export function SettingsPage(): JSX.Element {
           <p className="settings__status">✓ Folder found — the weekly plan syncs to !mealplan.</p>
         ) : (
           <div className="banner banner--warn">
-            Folder not found. Meal planning still works in the app; it just won’t reach the
-            Discord bot.
+            Folder not found. Meal planning still works in the app; it just won’t reach the Discord
+            bot.
           </div>
         )}
       </section>

@@ -56,6 +56,7 @@ export function registerIpcHandlers(db: Database): void {
   ipcMain.handle(IPC.SAVE_RECIPE, (_e, draft: DraftRecipe) => saveRecipe(db, draft))
 
   ipcMain.handle(IPC.DELETE_RECIPE, (_e, id: number) => {
+    mealPlanWithBotChanges() // merge bot edits first so the export below can't clobber them
     deleteRecipe(db, id)
     exportPlanToBot() // a deleted recipe may have been on the plan
   })

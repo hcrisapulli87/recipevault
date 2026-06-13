@@ -13,6 +13,9 @@ export function GroceryPreviewModal(props: {
   const [signedIn, setSignedIn] = useState(true)
   const [message, setMessage] = useState('')
 
+  // The modal is mounted fresh each time it opens, so its inputs never change mid-life:
+  // fetch the preview exactly once rather than re-running when the parent re-renders
+  // (recipeIds/scales are recreated object literals on every parent render).
   useEffect(() => {
     Promise.all([
       window.api.previewGroceries({ recipeIds: props.recipeIds, scales: props.scales }),
@@ -22,7 +25,8 @@ export function GroceryPreviewModal(props: {
       setSignedIn(status.signedIn)
       setPhase('review')
     })
-  }, [props.recipeIds, props.scales])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const toggle = (idx: number): void =>
     setItems(items.map((it, i) => (i === idx ? { ...it, checked: !it.checked } : it)))

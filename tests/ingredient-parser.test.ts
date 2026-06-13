@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  parseIngredient,
-  scaleIngredient,
-  formatQuantity
-} from '../src/shared/ingredient-parser'
+import { parseIngredient, scaleIngredient, formatQuantity } from '../src/shared/ingredient-parser'
 
 describe('parseIngredient', () => {
   it('parses qty + unit + name', () =>
@@ -52,6 +48,16 @@ describe('parseIngredient', () => {
       unit: 'can',
       name: 'chopped tomatoes'
     }))
+
+  it('parses multiplied pack quantities ("2 x 400g tins")', () =>
+    expect(parseIngredient('2 x 400g tins plum tomatoes')).toMatchObject({
+      quantity: 800,
+      unit: 'g',
+      name: 'plum tomatoes'
+    }))
+
+  it('parses multiplied counts without inner unit ("2 x 400g" style with bare unit)', () =>
+    expect(parseIngredient('3 x 2 eggs')).toMatchObject({ quantity: 6, name: 'eggs' }))
 
   it('returns null quantity when unparseable', () =>
     expect(parseIngredient('salt and pepper to taste')).toMatchObject({

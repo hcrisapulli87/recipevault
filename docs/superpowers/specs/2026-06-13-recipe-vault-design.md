@@ -9,12 +9,12 @@ A desktop app for recipes and meal planning. Paste any recipe URL and the app st
 
 ### Decisions made during brainstorming
 
-| Decision | Choice | Why |
-|---|---|---|
-| Groceries integration | Direct to Google Tasks "Groceries" list | The bot's groceries are already backed by that list (`google_tasks.py`, `GROCERIES_LIST = "Groceries"`); writing to it directly means items appear in `!groceries` and on phones with no bot coupling. Matches the app-native sync rule. |
-| Meal plan shape | Mon–Sun weekly grid, one active week | Matches the bot's existing model; household-scale simplicity. |
-| Scrape fallback | JSON-LD first, heuristic HTML second, always a review screen | ~90% of recipe sites embed schema.org/Recipe JSON-LD for Google search cards. No API keys, works offline once fetched. |
-| v1 extras | Serving scaler, cooking mode, smart grocery merge, bot meal-plan sync | All selected. |
+| Decision              | Choice                                                                | Why                                                                                                                                                                                                                                      |
+| --------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Groceries integration | Direct to Google Tasks "Groceries" list                               | The bot's groceries are already backed by that list (`google_tasks.py`, `GROCERIES_LIST = "Groceries"`); writing to it directly means items appear in `!groceries` and on phones with no bot coupling. Matches the app-native sync rule. |
+| Meal plan shape       | Mon–Sun weekly grid, one active week                                  | Matches the bot's existing model; household-scale simplicity.                                                                                                                                                                            |
+| Scrape fallback       | JSON-LD first, heuristic HTML second, always a review screen          | ~90% of recipe sites embed schema.org/Recipe JSON-LD for Google search cards. No API keys, works offline once fetched.                                                                                                                   |
+| v1 extras             | Serving scaler, cooking mode, smart grocery merge, bot meal-plan sync | All selected.                                                                                                                                                                                                                            |
 
 ## Project
 

@@ -211,7 +211,8 @@ function extractHeuristic(html: string): DraftRecipe | null {
 
   const title =
     metaContent(html, 'og:title') ??
-    (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? 'Untitled recipe')
+    html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ??
+    'Untitled recipe'
 
   return {
     title: stripTags(title),

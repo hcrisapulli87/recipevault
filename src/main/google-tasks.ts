@@ -24,7 +24,7 @@ interface StoredToken {
 let userDataPath = ''
 let authInFlight: Promise<string> | null = null
 
-const log = (...args: unknown[]) => console.log('[google-tasks]', ...args)
+const log = (...args: unknown[]): void => console.log('[google-tasks]', ...args)
 
 export function initGoogleTasks(userData: string): void {
   userDataPath = userData

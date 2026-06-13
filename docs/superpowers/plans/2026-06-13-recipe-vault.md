@@ -75,20 +75,42 @@ export interface Recipe {
   steps: { position: number; section: string | null; text: string }[]
 }
 
-export type DraftRecipe = Omit<Recipe, 'id' | 'createdAt'> & { confidence: 'structured' | 'heuristic' | 'manual' }
+export type DraftRecipe = Omit<Recipe, 'id' | 'createdAt'> & {
+  confidence: 'structured' | 'heuristic' | 'manual'
+}
 
 export type Day = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
-export const DAYS: Day[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+export const DAYS: Day[] = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday'
+]
 
-export interface MealPlanEntry { day: Day; recipeId: number | null; freeText: string | null }
+export interface MealPlanEntry {
+  day: Day
+  recipeId: number | null
+  freeText: string | null
+}
 
 export const IPC = {
-  GET_RECIPES: 'get-recipes', GET_RECIPE: 'get-recipe', SAVE_RECIPE: 'save-recipe',
-  DELETE_RECIPE: 'delete-recipe', SCRAPE_URL: 'scrape-url',
-  GET_MEAL_PLAN: 'get-meal-plan', SET_MEAL: 'set-meal', CLEAR_WEEK: 'clear-week',
-  PREVIEW_GROCERIES: 'preview-groceries', SEND_GROCERIES: 'send-groceries',
-  GOOGLE_STATUS: 'google-status', GOOGLE_SIGN_IN: 'google-sign-in',
-  GET_SETTINGS: 'get-settings', SET_SETTINGS: 'set-settings',
+  GET_RECIPES: 'get-recipes',
+  GET_RECIPE: 'get-recipe',
+  SAVE_RECIPE: 'save-recipe',
+  DELETE_RECIPE: 'delete-recipe',
+  SCRAPE_URL: 'scrape-url',
+  GET_MEAL_PLAN: 'get-meal-plan',
+  SET_MEAL: 'set-meal',
+  CLEAR_WEEK: 'clear-week',
+  PREVIEW_GROCERIES: 'preview-groceries',
+  SEND_GROCERIES: 'send-groceries',
+  GOOGLE_STATUS: 'google-status',
+  GOOGLE_SIGN_IN: 'google-sign-in',
+  GET_SETTINGS: 'get-settings',
+  SET_SETTINGS: 'set-settings'
 } as const
 ```
 
@@ -111,20 +133,34 @@ import { parseIngredient, scaleIngredient, formatQuantity } from '../src/main/in
 
 describe('parseIngredient', () => {
   it('parses qty + unit + name', () =>
-    expect(parseIngredient('2 cups flour')).toEqual(
-      { raw: '2 cups flour', quantity: 2, quantityMax: null, unit: 'cup', name: 'flour' }))
-  it('parses metric', () =>
-    expect(parseIngredient('400g chopped tomatoes').unit).toBe('g'))
+    expect(parseIngredient('2 cups flour')).toEqual({
+      raw: '2 cups flour',
+      quantity: 2,
+      quantityMax: null,
+      unit: 'cup',
+      name: 'flour'
+    }))
+  it('parses metric', () => expect(parseIngredient('400g chopped tomatoes').unit).toBe('g'))
   it('parses unicode fraction', () =>
-    expect(parseIngredient('½ onion, diced')).toMatchObject({ quantity: 0.5, unit: null, name: 'onion, diced' }))
-  it('parses mixed number', () =>
-    expect(parseIngredient('1 ½ tbsp olive oil').quantity).toBe(1.5))
+    expect(parseIngredient('½ onion, diced')).toMatchObject({
+      quantity: 0.5,
+      unit: null,
+      name: 'onion, diced'
+    }))
+  it('parses mixed number', () => expect(parseIngredient('1 ½ tbsp olive oil').quantity).toBe(1.5))
   it('parses range', () =>
-    expect(parseIngredient('1-2 cloves garlic')).toMatchObject({ quantity: 1, quantityMax: 2, unit: 'clove' }))
+    expect(parseIngredient('1-2 cloves garlic')).toMatchObject({
+      quantity: 1,
+      quantityMax: 2,
+      unit: 'clove'
+    }))
   it('handles unitless count', () =>
     expect(parseIngredient('3 eggs')).toMatchObject({ quantity: 3, unit: null, name: 'eggs' }))
   it('returns null quantity when unparseable', () =>
-    expect(parseIngredient('salt and pepper to taste')).toMatchObject({ quantity: null, name: 'salt and pepper to taste' }))
+    expect(parseIngredient('salt and pepper to taste')).toMatchObject({
+      quantity: null,
+      name: 'salt and pepper to taste'
+    }))
 })
 
 describe('scaling + formatting', () => {
@@ -145,16 +181,39 @@ describe('scaling + formatting', () => {
 ```ts
 import type { ParsedIngredient } from '../shared/types'
 
-const FRACTIONS: Record<string, number> = { '½': 0.5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 0.25, '¾': 0.75, '⅕': 0.2, '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875 }
+const FRACTIONS: Record<string, number> = {
+  '½': 0.5,
+  '⅓': 1 / 3,
+  '⅔': 2 / 3,
+  '¼': 0.25,
+  '¾': 0.75,
+  '⅕': 0.2,
+  '⅛': 0.125,
+  '⅜': 0.375,
+  '⅝': 0.625,
+  '⅞': 0.875
+}
 // singular canonical unit ← accepted variants
 const UNITS: Record<string, string[]> = {
-  g: ['g', 'gram', 'grams'], kg: ['kg'], ml: ['ml'], l: ['l', 'litre', 'litres', 'liter', 'liters'],
-  tsp: ['tsp', 'teaspoon', 'teaspoons'], tbsp: ['tbsp', 'tablespoon', 'tablespoons'],
-  cup: ['cup', 'cups'], oz: ['oz', 'ounce', 'ounces'], lb: ['lb', 'lbs', 'pound', 'pounds'],
-  clove: ['clove', 'cloves'], can: ['can', 'cans'], tin: ['tin', 'tins'],
-  slice: ['slice', 'slices'], pinch: ['pinch', 'pinches'], handful: ['handful', 'handfuls'],
+  g: ['g', 'gram', 'grams'],
+  kg: ['kg'],
+  ml: ['ml'],
+  l: ['l', 'litre', 'litres', 'liter', 'liters'],
+  tsp: ['tsp', 'teaspoon', 'teaspoons'],
+  tbsp: ['tbsp', 'tablespoon', 'tablespoons'],
+  cup: ['cup', 'cups'],
+  oz: ['oz', 'ounce', 'ounces'],
+  lb: ['lb', 'lbs', 'pound', 'pounds'],
+  clove: ['clove', 'cloves'],
+  can: ['can', 'cans'],
+  tin: ['tin', 'tins'],
+  slice: ['slice', 'slices'],
+  pinch: ['pinch', 'pinches'],
+  handful: ['handful', 'handfuls']
 }
-const UNIT_LOOKUP = new Map(Object.entries(UNITS).flatMap(([c, vs]) => vs.map(v => [v, c] as const)))
+const UNIT_LOOKUP = new Map(
+  Object.entries(UNITS).flatMap(([c, vs]) => vs.map((v) => [v, c] as const))
+)
 
 function readNumber(s: string): { value: number; rest: string } | null {
   // "1 ½", "½", "1.5", "2"
@@ -168,7 +227,13 @@ function readNumber(s: string): { value: number; rest: string } | null {
 }
 
 export function parseIngredient(raw: string): ParsedIngredient {
-  const base: ParsedIngredient = { raw, quantity: null, quantityMax: null, unit: null, name: raw.trim() }
+  const base: ParsedIngredient = {
+    raw,
+    quantity: null,
+    quantityMax: null,
+    unit: null,
+    name: raw.trim()
+  }
   let s = raw.trim()
   const first = readNumber(s)
   if (!first) return base
@@ -177,7 +242,10 @@ export function parseIngredient(raw: string): ParsedIngredient {
   const range = s.match(/^[-–to]+\s*/)
   if (range) {
     const second = readNumber(s.slice(range[0].length))
-    if (second) { quantityMax = second.value; s = second.rest }
+    if (second) {
+      quantityMax = second.value
+      s = second.rest
+    }
   }
   const unitMatch = s.match(/^([a-zA-Z]+)\.?\s+/)
   let unit: string | null = null
@@ -191,10 +259,24 @@ export function parseIngredient(raw: string): ParsedIngredient {
 
 export function scaleIngredient(ing: ParsedIngredient, factor: number): ParsedIngredient {
   if (ing.quantity === null) return ing
-  return { ...ing, quantity: ing.quantity * factor, quantityMax: ing.quantityMax === null ? null : ing.quantityMax * factor }
+  return {
+    ...ing,
+    quantity: ing.quantity * factor,
+    quantityMax: ing.quantityMax === null ? null : ing.quantityMax * factor
+  }
 }
 
-const NICE: [number, string][] = [[1 / 8, '⅛'], [1 / 4, '¼'], [1 / 3, '⅓'], [3 / 8, '⅜'], [1 / 2, '½'], [5 / 8, '⅝'], [2 / 3, '⅔'], [3 / 4, '¾'], [7 / 8, '⅞']]
+const NICE: [number, string][] = [
+  [1 / 8, '⅛'],
+  [1 / 4, '¼'],
+  [1 / 3, '⅓'],
+  [3 / 8, '⅜'],
+  [1 / 2, '½'],
+  [5 / 8, '⅝'],
+  [2 / 3, '⅔'],
+  [3 / 4, '¾'],
+  [7 / 8, '⅞']
+]
 export function formatQuantity(n: number): string {
   const whole = Math.floor(n)
   const frac = n - whole
@@ -242,7 +324,7 @@ describe('extractRecipeFromHtml', () => {
   it('extracts from @graph with sections', () => {
     const r = extractRecipeFromHtml(fix('jsonld-graph.html'))!
     expect(r.confidence).toBe('structured')
-    expect(r.steps.some(s => s.section !== null)).toBe(true)
+    expect(r.steps.some((s) => s.section !== null)).toBe(true)
     expect(r.imageUrl).toMatch(/^https?:/)
   })
   it('falls back to heuristics', () => {
@@ -279,7 +361,13 @@ export class ScrapeError extends Error {}
 export async function fetchAndExtract(url: string): Promise<DraftRecipe> {
   let res: Response
   try {
-    res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36', Accept: 'text/html' } })
+    res = await fetch(url, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        Accept: 'text/html'
+      }
+    })
   } catch {
     throw new ScrapeError('Could not reach that site. Check the URL and your connection.')
   }
@@ -354,7 +442,15 @@ it('passes through unparseable lines', () => {
 })
 it('builds titles', () => {
   expect(groceryTitle({ name: 'onion', parts: [{ quantity: 3, unit: null }] })).toBe('Onion (3)')
-  expect(groceryTitle({ name: 'flour', parts: [{ quantity: 200, unit: 'g' }, { quantity: 1, unit: 'cup' }] })).toBe('Flour (200 g + 1 cup)')
+  expect(
+    groceryTitle({
+      name: 'flour',
+      parts: [
+        { quantity: 200, unit: 'g' },
+        { quantity: 1, unit: 'cup' }
+      ]
+    })
+  ).toBe('Flour (200 g + 1 cup)')
   expect(groceryTitle({ name: 'salt to taste', parts: [] })).toBe('Salt to taste')
 })
 it('normalises for dedup', () => {
@@ -375,7 +471,10 @@ it('normalises for dedup', () => {
 
 ```ts
 export async function listPending(listTitle: string): Promise<{ id: string; title: string }[]>
-export async function addGroceries(listTitle: string, titles: string[]): Promise<{ added: number; skipped: number }>
+export async function addGroceries(
+  listTitle: string,
+  titles: string[]
+): Promise<{ added: number; skipped: number }>
 // addGroceries: fetch pending once; skip any title whose normaliseName(name-part) — text before " (" —
 // matches a pending task's normalised name-part; POST the rest.
 ```

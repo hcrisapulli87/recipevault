@@ -1,54 +1,57 @@
 <!doctype html>
 <html>
-<head>
-  <title>Slow-Cooked Ragu</title>
-  <script type="application/ld+json">
-  {
-    "@context": "https://schema.org",
-    "@graph": [
+  <head>
+    <title>Slow-Cooked Ragu</title>
+    <script type="application/ld+json">
       {
-        "@type": "WebSite",
-        "name": "Example Food Blog"
-      },
-      {
-        "@type": ["Recipe", "NewsArticle"],
-        "name": "Slow-Cooked Ragu",
-        "image": { "@type": "ImageObject", "url": "https://example.com/images/ragu.jpg" },
-        "description": "Rich beef ragu.",
-        "recipeYield": 6,
-        "prepTime": "PT20M",
-        "cookTime": "PT3H",
-        "totalTime": "PT3H20M",
-        "recipeIngredient": [
-          "1 kg beef shin",
-          "2 onions",
-          "800g chopped tomatoes",
-          "250ml red wine"
-        ],
-        "recipeInstructions": [
+        "@context": "https://schema.org",
+        "@graph": [
           {
-            "@type": "HowToSection",
-            "name": "Prep",
-            "itemListElement": [
-              { "@type": "HowToStep", "text": "Dice the onions finely." },
-              { "@type": "HowToStep", "text": "Cut the beef into large chunks &amp; season." }
-            ]
+            "@type": "WebSite",
+            "name": "Example Food Blog"
           },
           {
-            "@type": "HowToSection",
-            "name": "Cooking",
-            "itemListElement": [
-              { "@type": "HowToStep", "text": "Brown the beef in batches." },
-              { "@type": "HowToStep", "text": "Add everything to the pot and simmer for 3 hours." }
+            "@type": ["Recipe", "NewsArticle"],
+            "name": "Slow-Cooked Ragu",
+            "image": { "@type": "ImageObject", "url": "https://example.com/images/ragu.jpg" },
+            "description": "Rich beef ragu.",
+            "recipeYield": 6,
+            "prepTime": "PT20M",
+            "cookTime": "PT3H",
+            "totalTime": "PT3H20M",
+            "recipeIngredient": [
+              "1 kg beef shin",
+              "2 onions",
+              "800g chopped tomatoes",
+              "250ml red wine"
+            ],
+            "recipeInstructions": [
+              {
+                "@type": "HowToSection",
+                "name": "Prep",
+                "itemListElement": [
+                  { "@type": "HowToStep", "text": "Dice the onions finely." },
+                  { "@type": "HowToStep", "text": "Cut the beef into large chunks &amp; season." }
+                ]
+              },
+              {
+                "@type": "HowToSection",
+                "name": "Cooking",
+                "itemListElement": [
+                  { "@type": "HowToStep", "text": "Brown the beef in batches." },
+                  {
+                    "@type": "HowToStep",
+                    "text": "Add everything to the pot and simmer for 3 hours."
+                  }
+                ]
+              }
             ]
           }
         ]
       }
-    ]
-  }
-  </script>
-</head>
-<body>
-  <h1>Slow-Cooked Ragu</h1>
-</body>
+    </script>
+  </head>
+  <body>
+    <h1>Slow-Cooked Ragu</h1>
+  </body>
 </html>

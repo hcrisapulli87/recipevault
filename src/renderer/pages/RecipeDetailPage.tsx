@@ -66,7 +66,12 @@ export function RecipeDetailPage(props: {
             )}
           </div>
           <div className="detail__actions">
-            <button className="btn btn--primary" onClick={() => setCooking(true)}>
+            <button
+              className="btn btn--primary"
+              onClick={() => setCooking(true)}
+              disabled={recipe.steps.length === 0}
+              title={recipe.steps.length === 0 ? 'This recipe has no steps' : undefined}
+            >
               🍳 Cook
             </button>
             <button className="btn" onClick={() => setGroceryOpen(true)}>

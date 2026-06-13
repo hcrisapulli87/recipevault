@@ -16,9 +16,7 @@ export function LibraryPage(props: {
   onImport: () => void
 }): JSX.Element {
   const [search, setSearch] = useState('')
-  const filtered = props.recipes.filter((r) =>
-    r.title.toLowerCase().includes(search.toLowerCase())
-  )
+  const filtered = props.recipes.filter((r) => r.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div>
