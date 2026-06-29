@@ -1,5 +1,5 @@
-import { formatQuantity } from '../shared/ingredient-parser'
-import type { MergedGroceryItem, ParsedIngredient } from '../shared/types'
+import { formatQuantity } from './ingredient-parser'
+import type { MergedGroceryItem, ParsedIngredient } from './types'
 
 // Combines a week's ingredients into one grocery line per distinct ingredient:
 // quantities sum when units match; mismatched units sit side by side on one line.

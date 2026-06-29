@@ -30,10 +30,10 @@ import {
   getCachedFood,
   upsertCachedFood
 } from './db'
-import { searchFoods, lookupBarcode } from './nutrition'
-import { fetchAndExtract, ScrapeError } from './recipe-scraper'
+import { searchFoods, lookupBarcode } from '../shared/nutrition'
+import { fetchAndExtract, ScrapeError } from '../shared/recipe-scraper'
 import { writeBotPlan, readBotPlan, mergeBotPlan } from './bot-mealplan-sync'
-import { mergeIngredients, groceryTitle } from './grocery-merge'
+import { mergeIngredients, groceryTitle } from '../shared/grocery-merge'
 import { addGroceries, googleStatus, signIn } from './google-tasks'
 import { getSettings, setSettings } from './settings'
 

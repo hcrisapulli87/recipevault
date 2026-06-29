@@ -1,5 +1,5 @@
-import type { DraftRecipe, RecipeIngredient, RecipeStep } from '../shared/types'
-import { parseIngredient } from '../shared/ingredient-parser'
+import type { DraftRecipe, RecipeIngredient, RecipeStep } from './types'
+import { parseIngredient } from './ingredient-parser'
 
 // Strips a recipe page down to ingredients + steps.
 // Pass 1: schema.org/Recipe JSON-LD (most recipe sites embed it for search cards).

@@ -10,9 +10,9 @@ import {
   addLogEntry,
   updateLogEntry,
   deleteLogEntry,
-  getDailyLog,
-  computeTotals
+  getDailyLog
 } from '../src/main/db'
+import { computeTotals } from '../src/shared/tracker-logic'
 import type { DraftLogEntry, LogEntry } from '../src/shared/types'
 
 const DATE = '2026-06-29'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mapOffProduct, searchStaples } from '../src/main/nutrition'
+import { mapOffProduct, searchStaples } from '../src/shared/nutrition'
 
 describe('mapOffProduct', () => {
   it('prefers per-serving macros when OpenFoodFacts supplies them', () => {

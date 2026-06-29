@@ -2,7 +2,7 @@ import { createServer } from 'http'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { shell } from 'electron'
-import { normaliseName } from './grocery-merge'
+import { normaliseName } from '../shared/grocery-merge'
 
 // Append-only client for the household "Groceries" Google Tasks list — the same list
 // the Discord bot's !groceries commands and the phones' Google Tasks app use.

@@ -1,8 +1,8 @@
 import type { Database } from 'sql.js'
 import { DAYS, MEAL_TYPES } from '../shared/types'
+import { computeTotals } from '../shared/tracker-logic'
 import type {
   DailyLog,
-  DailyTotals,
   Day,
   DraftLogEntry,
   DraftRecipe,
@@ -340,19 +340,6 @@ function rowToLogEntry(r: Record<string, unknown>): LogEntry {
     barcode: nullableStr(r['barcode']),
     source: String(r['source'])
   }
-}
-
-/** Sum the macros actually consumed (per-unit macros × amount) across entries. */
-export function computeTotals(entries: LogEntry[]): DailyTotals {
-  return entries.reduce(
-    (acc, e) => ({
-      calories: acc.calories + e.baseCalories * e.amount,
-      protein: acc.protein + e.baseProtein * e.amount,
-      carbs: acc.carbs + e.baseCarbs * e.amount,
-      fat: acc.fat + e.baseFat * e.amount
-    }),
-    { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  )
 }
 
 export function getDailyLog(db: Database, profileId: number, date: string): DailyLog {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { mergeIngredients, groceryTitle, normaliseName } from '../src/main/grocery-merge'
+import { mergeIngredients, groceryTitle, normaliseName } from '../src/shared/grocery-merge'
 import { parseIngredient } from '../src/shared/ingredient-parser'
 
 describe('mergeIngredients', () => {

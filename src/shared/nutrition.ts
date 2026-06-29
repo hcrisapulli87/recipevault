@@ -1,4 +1,4 @@
-import type { FoodItem } from '../shared/types'
+import type { FoodItem } from './types'
 import staplesData from './data/common-foods.json'
 
 // OpenFoodFacts asks every client to send an identifying User-Agent.

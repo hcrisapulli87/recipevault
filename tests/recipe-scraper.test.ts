@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, it, expect } from 'vitest'
-import { extractRecipeFromHtml, parseIsoDuration } from '../src/main/recipe-scraper'
+import { extractRecipeFromHtml, parseIsoDuration } from '../src/shared/recipe-scraper'
 
 const fix = (name: string): string => readFileSync(join(__dirname, 'fixtures', name), 'utf-8')
 
