@@ -1,13 +1,13 @@
 -- RecipeVault — database schema, Row-Level Security, and Realtime setup.
 -- Run this once in your Supabase project: Dashboard → SQL Editor → paste → Run.
 --
--- This app is SINGLE-USER (just you), but it's hosted, so auth still protects the data.
--- BEFORE running, lock the project down to only you:
---   Dashboard → Authentication → Providers → Email: keep enabled.
+-- This app is MULTI-USER but invite-only: each person signs in with a magic link and sees
+-- ONLY their own data. Set it up as:
+--   Dashboard → Authentication → Providers → Email: keep enabled (magic link).
 --   Dashboard → Authentication → Sign In / Up → DISABLE "Allow new users to sign up".
---   Then Dashboard → Authentication → Users → "Add user" → your email + a password,
---   tick "Auto Confirm User". With open sign-ups off, the only authenticated user is you,
---   so every policy below — `owner_id = auth.uid()` — resolves to "your rows only".
+--   Dashboard → Authentication → Users → "Add user" for each person (e.g. you + partner),
+--   tick "Auto Confirm User". Every owner-scoped policy below — `owner_id = auth.uid()` —
+--   resolves to "that signed-in user's rows only". (food_cache is shared on purpose.)
 --
 -- The script is idempotent / safe to re-run: create-if-not-exists tables, guarded column
 -- adds, drop-and-recreate policies (Postgres has no "create policy if not exists"), and a
@@ -118,6 +118,79 @@ create policy "grocery_items: own rows" on public.grocery_items
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Macro tracker
+-- profiles: one row per auth user (display name + daily goals). The app upserts the row
+-- on first sign-in. food_log: owner-scoped daily entries; macros are stored per ONE unit,
+-- so a day's total is base_* × amount. food_cache: a SHARED barcode→macros cache (the
+-- OpenFoodFacts data isn't private), so one person's scan benefits everyone.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.profiles (
+  id           uuid primary key references auth.users (id) on delete cascade,
+  display_name text,
+  cal_goal     real,
+  protein_goal real,
+  carbs_goal   real,
+  fat_goal     real
+);
+
+create table if not exists public.food_log (
+  id            bigint generated always as identity primary key,
+  owner_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  log_date      date not null,
+  meal_type     text not null check (meal_type in ('breakfast','lunch','dinner','snack')),
+  name          text not null,
+  brand         text,
+  amount        real not null default 1,
+  unit          text not null default 'serving',
+  base_calories real not null default 0,
+  base_protein  real not null default 0,
+  base_carbs    real not null default 0,
+  base_fat      real not null default 0,
+  barcode       text,
+  source        text not null default 'manual',
+  created_at    timestamptz not null default now()
+);
+create index if not exists food_log_owner_day_idx on public.food_log (owner_id, log_date);
+
+create table if not exists public.food_cache (
+  barcode          text primary key,
+  name             text not null,
+  brand            text,
+  serving_desc     text,
+  unit             text not null,
+  cal_per_unit     real not null default 0,
+  protein_per_unit real not null default 0,
+  carbs_per_unit   real not null default 0,
+  fat_per_unit     real not null default 0,
+  last_fetched     timestamptz not null default now()
+);
+
+alter table public.profiles   enable row level security;
+alter table public.food_log   enable row level security;
+alter table public.food_cache enable row level security;
+
+drop policy if exists "profiles: own row" on public.profiles;
+create policy "profiles: own row" on public.profiles
+  for all to authenticated
+  using (id = auth.uid()) with check (id = auth.uid());
+
+drop policy if exists "food_log: own rows" on public.food_log;
+create policy "food_log: own rows" on public.food_log
+  for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- food_cache is shared: any authenticated user may read, insert, and refresh entries.
+drop policy if exists "food_cache: shared read" on public.food_cache;
+create policy "food_cache: shared read" on public.food_cache
+  for select to authenticated using (true);
+drop policy if exists "food_cache: shared insert" on public.food_cache;
+create policy "food_cache: shared insert" on public.food_cache
+  for insert to authenticated with check (true);
+drop policy if exists "food_cache: shared update" on public.food_cache;
+create policy "food_cache: shared update" on public.food_cache
+  for update to authenticated using (true) with check (true);
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Realtime: broadcast changes so the PWA (phone) and the Electron app (desktop) update
 -- live off the same backend. Guarded so re-runs don't error.
 -- (The Discord bot does NOT use realtime — it reads meal_plan via REST on demand.)
@@ -126,7 +199,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items']
+  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log']
   loop
     if not exists (
       select 1 from pg_publication_tables
