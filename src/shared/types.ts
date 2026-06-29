@@ -65,6 +65,14 @@ export interface MergedGroceryItem {
   parts: { quantity: number; unit: string | null }[]
 }
 
+export interface GroceryItem {
+  id: string
+  name: string
+  qtyText: string | null
+  checked: boolean
+  sortOrder: number
+}
+
 // ── macro / meal tracker ──────────────────────────────────────────────────────
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
