@@ -1,8 +1,8 @@
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, session, shell } from 'electron'
 import { join } from 'path'
 import * as fs from 'fs'
 import initSqlJs from 'sql.js'
-import { createSchema } from './db'
+import { createSchema, ensureDefaultProfile } from './db'
 import { registerIpcHandlers } from './ipc'
 import { initGoogleTasks } from './google-tasks'
 import { initSettings } from './settings'
@@ -59,9 +59,18 @@ app.whenReady().then(async () => {
     fs.writeFileSync(dbPath, Buffer.from(db.export()))
   }
 
+  ensureDefaultProfile(db)
+  persist()
+
   initSettings(app.getPath('userData'))
   initGoogleTasks(app.getPath('userData'))
   registerIpcHandlers(db, persist)
+
+  // Allow the renderer to open the webcam for barcode scanning (local desktop app).
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
+    callback(permission === 'media')
+  })
+
   await createWindow()
 
   app.on('activate', async () => {

@@ -27,7 +27,8 @@
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
     "@electron-toolkit/utils": "^4.0.0",
-    "@supabase/supabase-js": "^2.108.2"
+    "@supabase/supabase-js": "^2.108.2",
+    "@zxing/library": "^0.21.3"
   },
   "build": {
     "appId": "com.harrisonc.recipe-vault",

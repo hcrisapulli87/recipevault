@@ -4,6 +4,7 @@ import type { Page } from '../App'
 const NAV: { page: Page; label: string; icon: string }[] = [
   { page: 'library', label: 'Recipes', icon: '📖' },
   { page: 'plan', label: 'Meal Plan', icon: '🗓️' },
+  { page: 'tracker', label: 'Tracker', icon: '🥗' },
   { page: 'import', label: 'Import', icon: '🔗' },
   { page: 'settings', label: 'Settings', icon: '⚙️' }
 ]

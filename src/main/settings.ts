@@ -4,7 +4,8 @@ import type { AppSettings } from '../shared/types'
 
 const DEFAULTS: AppSettings = {
   botFolder: 'C:\\Users\\Harrison Crisapulli\\Documents\\claudecode\\discord-household-bot',
-  groceriesList: 'Groceries'
+  groceriesList: 'Groceries',
+  activeProfileId: 1
 }
 
 let userDataPath = ''

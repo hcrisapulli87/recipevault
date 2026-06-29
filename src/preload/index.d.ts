@@ -1,9 +1,14 @@
 import type {
   AppSettings,
+  DailyLog,
   Day,
+  DraftLogEntry,
   DraftRecipe,
+  FoodItem,
   IpcResult,
   MealPlanEntry,
+  Profile,
+  ProfileGoals,
   Recipe,
   RecipeSummary
 } from '../shared/types'
@@ -42,6 +47,16 @@ declare global {
       getSettings: () => Promise<SettingsWithStatus>
       setSettings: (settings: AppSettings) => Promise<SettingsWithStatus>
       openExternal: (url: string) => Promise<void>
+      getProfiles: () => Promise<Profile[]>
+      addProfile: (name: string) => Promise<number>
+      updateProfile: (args: { id: number; name?: string; goals?: ProfileGoals }) => Promise<void>
+      deleteProfile: (id: number) => Promise<void>
+      getDailyLog: (args: { profileId: number; date: string }) => Promise<DailyLog>
+      addLogEntry: (entry: DraftLogEntry) => Promise<number>
+      updateLogEntry: (args: { id: number; amount: number }) => Promise<void>
+      deleteLogEntry: (id: number) => Promise<void>
+      searchFoods: (query: string) => Promise<IpcResult<FoodItem[]>>
+      lookupBarcode: (barcode: string) => Promise<IpcResult<FoodItem | null>>
     }
   }
 }

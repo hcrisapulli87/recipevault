@@ -20,7 +20,8 @@ export function SettingsPage(): JSX.Element {
     setSettings(next)
     const saved = await window.api.setSettings({
       botFolder: next.botFolder,
-      groceriesList: next.groceriesList
+      groceriesList: next.groceriesList,
+      activeProfileId: next.activeProfileId
     })
     setSettings(saved)
   }

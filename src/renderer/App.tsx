@@ -6,9 +6,10 @@ import { ImportPage } from './pages/ImportPage'
 import { RecipeDetailPage } from './pages/RecipeDetailPage'
 import { MealPlanPage } from './pages/MealPlanPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { MacroTrackerPage } from './pages/MacroTrackerPage'
 import { useRecipes } from './hooks/useRecipes'
 
-export type Page = 'library' | 'plan' | 'import' | 'settings'
+export type Page = 'library' | 'plan' | 'tracker' | 'import' | 'settings'
 
 export default function App(): JSX.Element {
   const [page, setPage] = useState<Page>('library')
@@ -56,6 +57,8 @@ export default function App(): JSX.Element {
             />
           ) : page === 'plan' ? (
             <MealPlanPage recipes={recipes.recipes} onOpenRecipe={openRecipe} />
+          ) : page === 'tracker' ? (
+            <MacroTrackerPage />
           ) : (
             <SettingsPage />
           )}

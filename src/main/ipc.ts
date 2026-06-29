@@ -2,7 +2,14 @@ import { ipcMain, shell } from 'electron'
 import { existsSync } from 'fs'
 import type { Database } from 'sql.js'
 import { IPC } from '../shared/types'
-import type { AppSettings, Day, DraftRecipe, MealPlanEntry } from '../shared/types'
+import type {
+  AppSettings,
+  Day,
+  DraftLogEntry,
+  DraftRecipe,
+  MealPlanEntry,
+  ProfileGoals
+} from '../shared/types'
 import { scaleIngredient } from '../shared/ingredient-parser'
 import {
   getRecipes,
@@ -11,8 +18,19 @@ import {
   deleteRecipe,
   getMealPlan,
   setMeal,
-  clearWeek
+  clearWeek,
+  getProfiles,
+  addProfile,
+  updateProfile,
+  deleteProfile,
+  getDailyLog,
+  addLogEntry,
+  updateLogEntry,
+  deleteLogEntry,
+  getCachedFood,
+  upsertCachedFood
 } from './db'
+import { searchFoods, lookupBarcode } from './nutrition'
 import { fetchAndExtract, ScrapeError } from './recipe-scraper'
 import { writeBotPlan, readBotPlan, mergeBotPlan } from './bot-mealplan-sync'
 import { mergeIngredients, groceryTitle } from './grocery-merge'
@@ -149,4 +167,74 @@ export function registerIpcHandlers(db: Database, persist: () => void): void {
   })
 
   ipcMain.handle(IPC.OPEN_EXTERNAL, (_e, url: string) => shell.openExternal(url))
+
+  // ── macro tracker: profiles ──────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.GET_PROFILES, () => getProfiles(db))
+
+  ipcMain.handle(IPC.ADD_PROFILE, (_e, name: string) => {
+    const id = addProfile(db, name)
+    persist()
+    return id
+  })
+
+  ipcMain.handle(
+    IPC.UPDATE_PROFILE,
+    (_e, args: { id: number; name?: string; goals?: ProfileGoals }) => {
+      updateProfile(db, args.id, { name: args.name, goals: args.goals })
+      persist()
+    }
+  )
+
+  ipcMain.handle(IPC.DELETE_PROFILE, (_e, id: number) => {
+    deleteProfile(db, id)
+    persist()
+  })
+
+  // ── macro tracker: daily log ─────────────────────────────────────────────────
+
+  ipcMain.handle(IPC.GET_DAILY_LOG, (_e, args: { profileId: number; date: string }) =>
+    getDailyLog(db, args.profileId, args.date)
+  )
+
+  ipcMain.handle(IPC.ADD_LOG_ENTRY, (_e, entry: DraftLogEntry) => {
+    const id = addLogEntry(db, entry)
+    persist()
+    return id
+  })
+
+  ipcMain.handle(IPC.UPDATE_LOG_ENTRY, (_e, args: { id: number; amount: number }) => {
+    updateLogEntry(db, args.id, { amount: args.amount })
+    persist()
+  })
+
+  ipcMain.handle(IPC.DELETE_LOG_ENTRY, (_e, id: number) => {
+    deleteLogEntry(db, id)
+    persist()
+  })
+
+  // ── macro tracker: food lookup ───────────────────────────────────────────────
+
+  ipcMain.handle(IPC.SEARCH_FOODS, async (_e, query: string) => {
+    try {
+      return { ok: true, data: await searchFoods(query) }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Food search failed.' }
+    }
+  })
+
+  ipcMain.handle(IPC.LOOKUP_BARCODE, async (_e, barcode: string) => {
+    try {
+      const cached = getCachedFood(db, barcode)
+      if (cached) return { ok: true, data: cached }
+      const item = await lookupBarcode(barcode)
+      if (item) {
+        upsertCachedFood(db, item)
+        persist()
+      }
+      return { ok: true, data: item }
+    } catch (e) {
+      return { ok: false, message: e instanceof Error ? e.message : 'Barcode lookup failed.' }
+    }
+  })
 }
