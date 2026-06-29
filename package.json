@@ -12,6 +12,7 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "start": "electron-vite preview",
+    "app": "electron-vite build && electron-vite preview",
     "dev": "electron-vite dev",
     "dev:web": "vite",
     "build:web": "npm run typecheck:web && vite build",
