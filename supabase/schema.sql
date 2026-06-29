@@ -121,8 +121,9 @@ create policy "grocery_items: own rows" on public.grocery_items
 -- Macro tracker
 -- profiles: one row per auth user (display name + daily goals). The app upserts the row
 -- on first sign-in. food_log: owner-scoped daily entries; macros are stored per ONE unit,
--- so a day's total is base_* × amount. food_cache: a SHARED barcode→macros cache (the
--- OpenFoodFacts data isn't private), so one person's scan benefits everyone.
+-- so a day's total is base_* × amount. food_cache: a per-user barcode→macros cache so
+-- re-scans are instant/offline (owner-scoped — no shared-mutable row another user could
+-- poison; numeric bounds guard against garbage values).
 -- ─────────────────────────────────────────────────────────────────────────────
 create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
@@ -153,16 +154,18 @@ create table if not exists public.food_log (
 create index if not exists food_log_owner_day_idx on public.food_log (owner_id, log_date);
 
 create table if not exists public.food_cache (
-  barcode          text primary key,
+  owner_id         uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  barcode          text not null,
   name             text not null,
   brand            text,
   serving_desc     text,
   unit             text not null,
-  cal_per_unit     real not null default 0,
-  protein_per_unit real not null default 0,
-  carbs_per_unit   real not null default 0,
-  fat_per_unit     real not null default 0,
-  last_fetched     timestamptz not null default now()
+  cal_per_unit     real not null default 0 check (cal_per_unit between 0 and 10000),
+  protein_per_unit real not null default 0 check (protein_per_unit between 0 and 1000),
+  carbs_per_unit   real not null default 0 check (carbs_per_unit between 0 and 1000),
+  fat_per_unit     real not null default 0 check (fat_per_unit between 0 and 1000),
+  last_fetched     timestamptz not null default now(),
+  primary key (owner_id, barcode)
 );
 
 alter table public.profiles   enable row level security;
@@ -179,16 +182,15 @@ create policy "food_log: own rows" on public.food_log
   for all to authenticated
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
--- food_cache is shared: any authenticated user may read, insert, and refresh entries.
+-- food_cache is per-user: each person reads/writes only their own cached barcodes, so no
+-- one can poison a row another user reads. (Drop any earlier shared policies if present.)
 drop policy if exists "food_cache: shared read" on public.food_cache;
-create policy "food_cache: shared read" on public.food_cache
-  for select to authenticated using (true);
 drop policy if exists "food_cache: shared insert" on public.food_cache;
-create policy "food_cache: shared insert" on public.food_cache
-  for insert to authenticated with check (true);
 drop policy if exists "food_cache: shared update" on public.food_cache;
-create policy "food_cache: shared update" on public.food_cache
-  for update to authenticated using (true) with check (true);
+drop policy if exists "food_cache: own rows" on public.food_cache;
+create policy "food_cache: own rows" on public.food_cache
+  for all to authenticated
+  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Realtime: broadcast changes so the PWA (phone) and the Electron app (desktop) update
