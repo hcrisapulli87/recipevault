@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import type { DraftRecipe } from '../../shared/types'
+import { scrapeUrl } from '../data/scrape'
 import { RecipeReviewForm } from '../components/RecipeReviewForm'
 
 const EMPTY_DRAFT: DraftRecipe = {
@@ -27,7 +28,7 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
     if (!url.trim()) return
     setLoading(true)
     setError(null)
-    const result = await window.api.scrapeUrl(url.trim())
+    const result = await scrapeUrl(url.trim())
     setLoading(false)
     if (result.ok) {
       setDraft(result.data)
