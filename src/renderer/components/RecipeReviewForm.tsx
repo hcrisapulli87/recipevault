@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { JSX } from 'react'
 import type { DraftRecipe, RecipeStep } from '../../shared/types'
 import { parseIngredient } from '../../shared/ingredient-parser'
+import { saveRecipe } from '../data/recipes'
 
 const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; cls: string } | null> = {
   structured: { text: '✓ Parsed from structured recipe data', cls: 'banner--ok' },
@@ -76,7 +77,7 @@ export function RecipeReviewForm(props: {
         .filter((s) => s.text.trim().length > 0)
         .map((s, position) => ({ ...s, position, text: s.text.trim() }))
     }
-    const id = await window.api.saveRecipe(draft)
+    const id = await saveRecipe(draft)
     props.onSaved(id)
   }
 

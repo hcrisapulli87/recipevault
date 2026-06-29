@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import type { Recipe } from '../../shared/types'
 import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
+import { getRecipe, deleteRecipe } from '../data/recipes'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 
@@ -24,7 +25,7 @@ export function RecipeDetailPage(props: {
   const [groceryOpen, setGroceryOpen] = useState(false)
 
   useEffect(() => {
-    window.api.getRecipe(props.recipeId).then((r) => {
+    getRecipe(props.recipeId).then((r) => {
       setRecipe(r)
       setServings(r?.servings ?? 1)
     })
@@ -37,7 +38,7 @@ export function RecipeDetailPage(props: {
 
   const remove = async (): Promise<void> => {
     if (!window.confirm(`Delete “${recipe.title}”? This can't be undone.`)) return
-    await window.api.deleteRecipe(recipe.id)
+    await deleteRecipe(recipe.id)
     props.onDeleted()
   }
 
@@ -59,7 +60,7 @@ export function RecipeDetailPage(props: {
             {recipe.sourceUrl && (
               <button
                 className="link-btn"
-                onClick={() => window.api.openExternal(recipe.sourceUrl!)}
+                onClick={() => window.open(recipe.sourceUrl!, '_blank', 'noopener')}
               >
                 Source ↗
               </button>
