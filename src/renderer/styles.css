@@ -1012,3 +1012,19 @@ body {
   font-size: 14px;
   margin-bottom: 8px;
 }
+
+/* Groceries page */
+.grocery-page__list {
+  margin-top: 14px;
+}
+.grocery-page__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0;
+}
+.grocery-page__done {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
