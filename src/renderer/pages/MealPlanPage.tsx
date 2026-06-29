@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import type { Day, MealPlanEntry, RecipeSummary } from '../../shared/types'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
+import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
 
 const DAY_LABEL: Record<Day, string> = {
   monday: 'Monday',
@@ -104,11 +105,10 @@ export function MealPlanPage(props: {
   onOpenRecipe: (id: number) => void
 }): JSX.Element {
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
-  const [warning, setWarning] = useState<string | null>(null)
   const [groceryOpen, setGroceryOpen] = useState(false)
 
   const reload = useCallback(() => {
-    window.api.getMealPlan().then(setPlan)
+    getMealPlan().then(setPlan)
   }, [])
 
   useEffect(() => {
@@ -120,15 +120,15 @@ export function MealPlanPage(props: {
     recipeId: number | null,
     freeText: string | null
   ): Promise<void> => {
-    const result = await window.api.setMeal({ day, recipeId, freeText })
-    setWarning(result.warning ?? null)
+    const mealText =
+      recipeId !== null ? (props.recipes.find((r) => r.id === recipeId)?.title ?? null) : freeText
+    await setMeal({ day, recipeId, freeText, mealText })
     reload()
   }
 
   const clearAll = async (): Promise<void> => {
     if (!window.confirm('Clear the whole week?')) return
-    const result = await window.api.clearWeek()
-    setWarning(result.warning ?? null)
+    await clearWeek()
     reload()
   }
 
@@ -152,15 +152,6 @@ export function MealPlanPage(props: {
         </button>
       </div>
 
-      {warning && (
-        <div className="banner banner--warn">
-          {warning}{' '}
-          <button className="link-btn" onClick={() => setWarning(null)}>
-            Dismiss
-          </button>
-        </div>
-      )}
-
       <div className="plan-grid">
         {plan.map((entry) => (
           <DayRow
@@ -174,8 +165,8 @@ export function MealPlanPage(props: {
       </div>
 
       <p className="plan-note">
-        The plan syncs to the Discord bot — <code>!mealplan</code> shows it, and the bot posts it
-        every Sunday evening. Days set with <code>!setmeal</code> show up here too.
+        Your meal plan syncs across all your devices. Discord bot sync (via the cloud) is coming
+        soon.
       </p>
 
       {groceryOpen && (
