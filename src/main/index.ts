@@ -1,12 +1,9 @@
 import { app, BrowserWindow, session, shell } from 'electron'
 import { join } from 'path'
-import * as fs from 'fs'
-import initSqlJs from 'sql.js'
-import { createSchema, ensureDefaultProfile } from './db'
-import { registerIpcHandlers } from './ipc'
-import { initGoogleTasks } from './google-tasks'
-import { initSettings } from './settings'
 
+// Desktop shell only: all data lives in Supabase and the renderer talks to it
+// directly (same code as the web PWA), so main just makes a window and grants
+// the camera for barcode scanning.
 async function createWindow(): Promise<void> {
   const win = new BrowserWindow({
     width: 1280,
@@ -34,38 +31,7 @@ async function createWindow(): Promise<void> {
   }
 }
 
-async function initDatabase(): Promise<{ db: import('sql.js').Database; dbPath: string }> {
-  const SQL = await initSqlJs({
-    locateFile: (file: string) =>
-      app.isPackaged
-        ? join(process.resourcesPath, file)
-        : join(process.cwd(), 'node_modules/sql.js/dist/', file)
-  })
-
-  const dbPath = join(app.getPath('userData'), 'recipe-vault.sqlite')
-  const buffer = fs.existsSync(dbPath) ? fs.readFileSync(dbPath) : undefined
-  const db = buffer ? new SQL.Database(buffer) : new SQL.Database()
-  createSchema(db)
-  return { db, dbPath }
-}
-
 app.whenReady().then(async () => {
-  const { db, dbPath } = await initDatabase()
-
-  // Persist the whole database to disk once per logical mutation. (Persisting after
-  // every individual db.run was both slow — 30+ serializations to save one recipe —
-  // and broke saveRecipe, because db.export() resets sqlite's last_insert_rowid().)
-  const persist = (): void => {
-    fs.writeFileSync(dbPath, Buffer.from(db.export()))
-  }
-
-  ensureDefaultProfile(db)
-  persist()
-
-  initSettings(app.getPath('userData'))
-  initGoogleTasks(app.getPath('userData'))
-  registerIpcHandlers(db, persist)
-
   // Allow the renderer to open the webcam for barcode scanning (local desktop app).
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
     callback(permission === 'media')
