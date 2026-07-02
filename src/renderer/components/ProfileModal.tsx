@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
-import type { Profile } from '../../shared/types'
+import type { ProfileGoals } from '../../shared/types'
+import { updateProfile } from '../data/tracker'
+import type { TrackerProfile } from '../data/tracker'
 
 const toGoal = (s: string): number | null => {
   const t = s.trim()
@@ -9,13 +11,11 @@ const toGoal = (s: string): number | null => {
   return Number.isFinite(n) && n >= 0 ? n : null
 }
 
-/** Edit a profile's name + daily macro goals, with an option to delete it. */
+/** Edit the signed-in user's display name + daily macro goals. */
 export function ProfileModal(props: {
-  profile: Profile
-  canDelete: boolean
+  profile: TrackerProfile
   onClose: () => void
   onSaved: () => void
-  onDeleted: () => void
 }): JSX.Element {
   const { profile } = props
   const [name, setName] = useState(profile.name)
@@ -25,37 +25,24 @@ export function ProfileModal(props: {
   const [fat, setFat] = useState(profile.fatGoal?.toString() ?? '')
 
   const save = async (): Promise<void> => {
-    await window.api.updateProfile({
-      id: profile.id,
-      name: name.trim() || profile.name,
-      goals: {
-        calGoal: toGoal(cal),
-        proteinGoal: toGoal(protein),
-        carbsGoal: toGoal(carbs),
-        fatGoal: toGoal(fat)
-      }
-    })
+    const goals: ProfileGoals = {
+      calGoal: toGoal(cal),
+      proteinGoal: toGoal(protein),
+      carbsGoal: toGoal(carbs),
+      fatGoal: toGoal(fat)
+    }
+    await updateProfile({ name: name.trim() || profile.name, goals })
     props.onSaved()
-    props.onClose()
-  }
-
-  const del = async (): Promise<void> => {
-    if (
-      !window.confirm(`Delete "${profile.name}" and all of its logged meals? This can't be undone.`)
-    )
-      return
-    await window.api.deleteProfile(profile.id)
-    props.onDeleted()
     props.onClose()
   }
 
   return (
     <div className="modal-overlay" onClick={props.onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal__title">⚙️ Profile & goals</h3>
+        <h3 className="modal__title">⚙️ Profile &amp; goals</h3>
 
         <label className="field">
-          <span className="field__label">Name</span>
+          <span className="field__label">Display name</span>
           <input className="text-input" value={name} onChange={(e) => setName(e.target.value)} />
         </label>
 
@@ -106,11 +93,6 @@ export function ProfileModal(props: {
         </div>
 
         <div className="modal__actions">
-          {props.canDelete && (
-            <button className="btn btn--danger" onClick={del}>
-              Delete profile
-            </button>
-          )}
           <button className="btn" onClick={props.onClose}>
             Cancel
           </button>

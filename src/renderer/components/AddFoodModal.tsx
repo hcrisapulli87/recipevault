@@ -1,7 +1,10 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
-import type { DraftLogEntry, FoodItem, MealType } from '../../shared/types'
+import type { FoodItem, MealType } from '../../shared/types'
 import { MEAL_LABEL } from '../../shared/types'
+import { lookupBarcode, searchFoods } from '../data/foods'
+import { addLogEntry } from '../data/tracker'
+import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
 
 type Tab = 'search' | 'barcode' | 'manual'
@@ -74,7 +77,6 @@ function PortionStep(props: {
 
 export function AddFoodModal(props: {
   mealType: MealType
-  profileId: number
   date: string
   onClose: () => void
   onLogged: () => void
@@ -108,11 +110,13 @@ export function AddFoodModal(props: {
     if (!query.trim()) return
     setSearching(true)
     setSearchError(null)
-    const res = await window.api.searchFoods(query.trim())
+    try {
+      setResults(await searchFoods(query.trim()))
+    } catch (err) {
+      setSearchError(err instanceof Error ? err.message : 'Search failed.')
+    }
     setSearching(false)
     setSearched(true)
-    if (res.ok) setResults(res.data)
-    else setSearchError(res.message)
   }
 
   const lookUp = async (code: string): Promise<void> => {
@@ -121,17 +125,14 @@ export function AddFoodModal(props: {
     setScanning(false)
     setLookingUp(true)
     setBarcodeError(null)
-    const res = await window.api.lookupBarcode(trimmed)
+    try {
+      const item = await lookupBarcode(trimmed)
+      if (!item) setBarcodeError(`No product found for barcode ${trimmed}.`)
+      else setSelected(item)
+    } catch (err) {
+      setBarcodeError(err instanceof Error ? err.message : 'Lookup failed.')
+    }
     setLookingUp(false)
-    if (!res.ok) {
-      setBarcodeError(res.message)
-      return
-    }
-    if (!res.data) {
-      setBarcodeError(`No product found for barcode ${trimmed}.`)
-      return
-    }
-    setSelected(res.data)
   }
 
   const startManual = (): void => {
@@ -152,8 +153,7 @@ export function AddFoodModal(props: {
 
   const log = async (amount: number): Promise<void> => {
     if (!selected) return
-    const entry: DraftLogEntry = {
-      profileId: props.profileId,
+    const entry: NewLogEntry = {
       date: props.date,
       mealType: props.mealType,
       name: selected.name,
@@ -167,7 +167,7 @@ export function AddFoodModal(props: {
       barcode: selected.barcode,
       source: selected.source
     }
-    await window.api.addLogEntry(entry)
+    await addLogEntry(entry)
     props.onLogged()
     props.onClose()
   }

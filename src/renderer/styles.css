@@ -714,8 +714,9 @@ body {
   align-items: center;
   margin-left: auto;
 }
-.tracker-profile {
-  min-width: 130px;
+.tracker-profile-name {
+  color: var(--text-secondary);
+  font-size: 13px;
 }
 .date-nav {
   display: flex;

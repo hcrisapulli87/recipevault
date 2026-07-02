@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { JSX } from 'react'
-import type { DailyLog, LogEntry, MealType, Profile } from '../../shared/types'
+import type { DailyLog, LogEntry, MealType } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
+import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
+import type { TrackerProfile } from '../data/tracker'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
 
@@ -127,67 +129,37 @@ function EntryRow(props: {
 }
 
 export function MacroTrackerPage(): JSX.Element {
-  const [profiles, setProfiles] = useState<Profile[]>([])
-  const [activeId, setActiveId] = useState<number | null>(null)
+  const [profile, setProfile] = useState<TrackerProfile | null>(null)
   const [date, setDate] = useState(todayStr())
   const [log, setLog] = useState<DailyLog | null>(null)
   const [adding, setAdding] = useState<MealType | null>(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
 
-  const loadProfiles = useCallback((): Promise<void> => {
-    return Promise.all([window.api.getProfiles(), window.api.getSettings()]).then(
-      ([profs, settings]) => {
-        setProfiles(profs)
-        setActiveId((cur) => {
-          if (cur != null && profs.some((p) => p.id === cur)) return cur
-          const fromSettings = profs.find((p) => p.id === settings.activeProfileId)
-          return (fromSettings ?? profs[0])?.id ?? null
-        })
-      }
-    )
+  const loadProfile = useCallback((): void => {
+    getProfile().then(setProfile)
   }, [])
 
   useEffect(() => {
-    loadProfiles()
-  }, [loadProfiles])
+    loadProfile()
+  }, [loadProfile])
 
   const reloadLog = useCallback((): void => {
-    if (activeId == null) return
-    window.api.getDailyLog({ profileId: activeId, date }).then(setLog)
-  }, [activeId, date])
+    getDailyLog(date).then(setLog)
+  }, [date])
 
   useEffect(() => {
     reloadLog()
   }, [reloadLog])
 
-  const switchProfile = async (id: number): Promise<void> => {
-    setActiveId(id)
-    const s = await window.api.getSettings()
-    await window.api.setSettings({
-      botFolder: s.botFolder,
-      groceriesList: s.groceriesList,
-      activeProfileId: id
-    })
-  }
-
-  const handleAddProfile = async (): Promise<void> => {
-    const name = window.prompt('New profile name?')?.trim()
-    if (!name) return
-    const id = await window.api.addProfile(name)
-    await loadProfiles()
-    switchProfile(id)
-  }
-
   const changeAmount = async (id: number, amount: number): Promise<void> => {
-    await window.api.updateLogEntry({ id, amount })
+    await updateLogEntry(id, amount)
     reloadLog()
   }
   const deleteEntry = async (id: number): Promise<void> => {
-    await window.api.deleteLogEntry(id)
+    await deleteLogEntry(id)
     reloadLog()
   }
 
-  const profile = profiles.find((p) => p.id === activeId) ?? null
   const totals = log?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
   const goals = log?.goals ?? { calories: null, protein: null, carbs: null, fat: null }
 
@@ -196,20 +168,7 @@ export function MacroTrackerPage(): JSX.Element {
       <div className="page-header">
         <h2 className="page-header__title">Tracker</h2>
         <div className="tracker-controls">
-          <select
-            className="text-input tracker-profile"
-            value={activeId ?? ''}
-            onChange={(e) => switchProfile(Number(e.target.value))}
-          >
-            {profiles.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <button className="btn" onClick={handleAddProfile} title="New profile">
-            ＋
-          </button>
+          {profile && <span className="tracker-profile-name">{profile.name}</span>}
           <button
             className="btn"
             onClick={() => setProfileModalOpen(true)}
@@ -310,10 +269,9 @@ export function MacroTrackerPage(): JSX.Element {
         amount on anything that looks off.
       </p>
 
-      {adding && activeId != null && (
+      {adding && (
         <AddFoodModal
           mealType={adding}
-          profileId={activeId}
           date={date}
           onClose={() => setAdding(null)}
           onLogged={reloadLog}
@@ -323,15 +281,10 @@ export function MacroTrackerPage(): JSX.Element {
       {profileModalOpen && profile && (
         <ProfileModal
           profile={profile}
-          canDelete={profiles.length > 1}
           onClose={() => setProfileModalOpen(false)}
           onSaved={() => {
-            loadProfiles()
+            loadProfile()
             reloadLog()
-          }}
-          onDeleted={() => {
-            setActiveId(null)
-            loadProfiles()
           }}
         />
       )}
