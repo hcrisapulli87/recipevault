@@ -27,7 +27,7 @@ and everything stays in sync.
 - **One renderer, two shells.** `src/renderer` is built by Vite (+ `vite-plugin-pwa`) into the
   web app in `dist-web/`, and by electron-vite into the desktop app. The Electron main process
   is just a window + camera permission — no IPC, no local database.
-- **Supabase** (Postgres + magic-link Auth + Realtime) holds all data. Row-Level Security keeps
+- **Supabase** (Postgres + email/password Auth + Realtime) holds all data. Row-Level Security keeps
   each user's rows private; the publishable key is safe in the browser. Schema:
   `supabase/schema.sql` (idempotent — safe to re-run).
 - **Scraping** runs in a Vercel serverless function (`api/scrape.ts`) because browsers can't
@@ -49,15 +49,16 @@ npm run build:win  # desktop to dist/win-unpacked/
 ## Deploy (one-time setup)
 
 1. **Supabase** — create a project, then run `supabase/schema.sql` in the SQL Editor.
-   Authentication → Sign In / Up: disable "Allow new users to sign up", keep Email (magic
-   link) enabled, and add each user (tick "Auto Confirm User").
+   Authentication → Sign In / Up: disable "Allow new users to sign up", keep Email enabled,
+   and add each user with their password (tick "Auto Confirm User"). Sign-in is email +
+   password; "Forgot password?" sends a reset email that opens the deployed web app.
 2. **Env** — copy `.env.example` to `.env` and fill in the project URL + publishable key
    (Project Settings → API). `.env` stays gitignored.
 3. **Vercel** — import the GitHub repo. Build command `npm run build:web`, output directory
    `dist-web`; the `/api` folder deploys as serverless functions automatically. Set
    `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` in Project → Settings →
    Environment Variables.
-4. **Phone** — open the Vercel URL, sign in via the emailed magic link, then "Add to Home
+4. **Phone** — open the Vercel URL, sign in with email + password, then "Add to Home
    Screen" to install the PWA.
 5. **Old data** — to bring recipes over from the pre-cloud desktop app, run
    `scripts/migrate-to-supabase.mjs` once (usage in the script header).
