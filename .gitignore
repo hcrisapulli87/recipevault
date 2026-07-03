@@ -7,3 +7,8 @@ dev-dist
 .eslintcache
 *.log*
 .env
+
+# scanner test harness artifacts
+test-scanner/harness.js
+test-scanner/barcode.y4m
+test-scanner/result.json
