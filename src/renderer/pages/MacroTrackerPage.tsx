@@ -7,6 +7,9 @@ import { ProfileModal } from '../components/ProfileModal'
 import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
 import type { TrackerProfile } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
+import { PersonSwitcher } from '../components/PersonSwitcher'
+import { useHousehold } from '../hooks/useHousehold'
+import type { HouseholdUser } from '../data/users'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
 
@@ -64,6 +67,7 @@ function MacroBar(props: {
 
 function EntryRow(props: {
   entry: LogEntry
+  readOnly: boolean
   onChangeAmount: (amount: number) => void
   onDelete: () => void
 }): JSX.Element {
@@ -117,14 +121,16 @@ function EntryRow(props: {
           · F {round1(entry.baseFat * entry.amount)}
         </span>
       </span>
-      <div className="food-entry__btns">
-        <button className="icon-btn" title="Edit amount" onClick={() => setEditing(true)}>
-          ✏️
-        </button>
-        <button className="icon-btn" title="Remove" onClick={props.onDelete}>
-          ✕
-        </button>
-      </div>
+      {!props.readOnly && (
+        <div className="food-entry__btns">
+          <button className="icon-btn" title="Edit amount" onClick={() => setEditing(true)}>
+            ✏️
+          </button>
+          <button className="icon-btn" title="Remove" onClick={props.onDelete}>
+            ✕
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -135,11 +141,15 @@ export function MacroTrackerPage(): JSX.Element {
   const [log, setLog] = useState<DailyLog | null>(null)
   const [adding, setAdding] = useState<MealType | null>(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const users = useHousehold()
+  const [viewer, setViewer] = useState<HouseholdUser | null>(null)
+  const current = viewer ?? users[0] ?? null
+  const readOnly = current !== null && !current.isMe
 
-  // Flipping days fires overlapping fetches; only the response for the day still on
-  // screen may land, otherwise the last *response* (not the last request) would win.
-  const dateRef = useRef(date)
-  dateRef.current = date
+  // Flipping days or Me/partner fires overlapping fetches; only the response for
+  // the view still on screen may land, otherwise the last *response* wins.
+  const viewRef = useRef('')
+  viewRef.current = `${date}|${current?.id ?? ''}`
 
   const loadProfile = useCallback((): void => {
     getProfile().then(setProfile)
@@ -151,10 +161,13 @@ export function MacroTrackerPage(): JSX.Element {
   }, [loadProfile])
 
   const reloadLog = useCallback((): void => {
-    getDailyLog(date).then((l) => {
-      if (l.date === dateRef.current) setLog(l)
+    if (!current) return
+    const view = `${date}|${current.id}`
+    getDailyLog(date, { id: current.id, isMe: current.isMe }).then((l) => {
+      if (view === viewRef.current) setLog(l)
     })
-  }, [date])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [date, current?.id])
 
   useEffect(() => {
     reloadLog()
@@ -178,17 +191,28 @@ export function MacroTrackerPage(): JSX.Element {
       <div className="page-header">
         <h2 className="page-header__title">Tracker</h2>
         <div className="tracker-controls">
-          {profile && <span className="tracker-profile-name">{profile.name}</span>}
-          <button
-            className="btn"
-            onClick={() => setProfileModalOpen(true)}
-            disabled={!profile}
-            title="Edit goals"
-          >
-            ⚙️ Goals
-          </button>
+          <PersonSwitcher
+            users={users}
+            selectedId={current?.id ?? ''}
+            onSelect={(u) => setViewer(u)}
+          />
+          {!readOnly && profile && <span className="tracker-profile-name">{profile.name}</span>}
+          {!readOnly && (
+            <button
+              className="btn"
+              onClick={() => setProfileModalOpen(true)}
+              disabled={!profile}
+              title="Edit goals"
+            >
+              ⚙️ Goals
+            </button>
+          )}
         </div>
       </div>
+
+      {readOnly && current && (
+        <p className="empty-note">Viewing {current.name}’s tracker — read only.</p>
+      )}
 
       <div className="date-nav">
         <button
@@ -252,9 +276,11 @@ export function MacroTrackerPage(): JSX.Element {
           <section key={meal} className="meal-section">
             <div className="meal-section__head">
               <h3 className="meal-section__title">{MEAL_LABEL[meal]}</h3>
-              <button className="link-btn" onClick={() => setAdding(meal)}>
-                ➕ Add food
-              </button>
+              {!readOnly && (
+                <button className="link-btn" onClick={() => setAdding(meal)}>
+                  ➕ Add food
+                </button>
+              )}
             </div>
             {entries.length === 0 ? (
               <p className="meal-section__empty">Nothing logged yet.</p>
@@ -264,6 +290,7 @@ export function MacroTrackerPage(): JSX.Element {
                   <EntryRow
                     key={e.id}
                     entry={e}
+                    readOnly={readOnly}
                     onChangeAmount={(amount) => changeAmount(e.id, amount)}
                     onDelete={() => deleteEntry(e.id)}
                   />

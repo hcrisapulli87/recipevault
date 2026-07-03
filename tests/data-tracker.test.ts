@@ -135,7 +135,7 @@ describe('getDailyLog', () => {
         base_fat: 4
       })
     ]
-    const log = await getDailyLog('2026-07-02')
+    const log = await getDailyLog('2026-07-02', { id: 'user-1', isMe: true })
     expect(log.meals.breakfast).toHaveLength(1)
     expect(log.meals.lunch).toHaveLength(1)
     expect(log.meals.dinner).toHaveLength(0)
@@ -155,8 +155,22 @@ describe('getDailyLog', () => {
       carbs_goal: null,
       fat_goal: null
     }
-    const log = await getDailyLog('2026-07-02')
+    const log = await getDailyLog('2026-07-02', { id: 'user-1', isMe: true })
     expect(log.goals).toEqual({ calories: 1800, protein: 120, carbs: null, fat: null })
+  })
+
+  it("reads the partner's goals without auto-creating a profile row", async () => {
+    state.profile = {
+      id: 'user-2',
+      display_name: 'Partner',
+      cal_goal: 2200,
+      protein_goal: 100,
+      carbs_goal: null,
+      fat_goal: null
+    }
+    const log = await getDailyLog('2026-07-02', { id: 'user-2', isMe: false })
+    expect(log.goals).toEqual({ calories: 2200, protein: 100, carbs: null, fat: null })
+    expect(state.upserted).toHaveLength(0) // partner path never writes
   })
 })
 

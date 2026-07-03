@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import type { RecipeSummary } from '../../shared/types'
+import { useHousehold } from '../hooks/useHousehold'
 
 function timeChip(totalMin: number | null): string | null {
   if (totalMin === null) return null
@@ -16,6 +17,13 @@ export function LibraryPage(props: {
   onImport: () => void
 }): JSX.Element {
   const [search, setSearch] = useState('')
+  const users = useHousehold()
+  const me = users.find((u) => u.isMe)
+  const nameOf = (ownerId: string): string | null => {
+    // Chip only for the partner's recipes — your own need no label.
+    if (!me || ownerId === me.id) return null
+    return users.find((u) => u.id === ownerId)?.name ?? 'Partner'
+  }
   const filtered = props.recipes.filter((r) => r.title.toLowerCase().includes(search.toLowerCase()))
 
   return (
@@ -54,6 +62,9 @@ export function LibraryPage(props: {
                 <span className="recipe-card__title">{r.title}</span>
                 {timeChip(r.totalMin) && (
                   <span className="recipe-card__time">⏱ {timeChip(r.totalMin)}</span>
+                )}
+                {nameOf(r.ownerId) && (
+                  <span className="recipe-card__time">👤 added by {nameOf(r.ownerId)}</span>
                 )}
               </div>
             </button>

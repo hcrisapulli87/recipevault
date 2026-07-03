@@ -1,9 +1,12 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { Day, MealPlanEntry, RecipeSummary } from '../../shared/types'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
+import { PersonSwitcher } from '../components/PersonSwitcher'
+import { useHousehold } from '../hooks/useHousehold'
+import type { HouseholdUser } from '../data/users'
 
 const DAY_LABEL: Record<Day, string> = {
   monday: 'Monday',
@@ -18,6 +21,7 @@ const DAY_LABEL: Record<Day, string> = {
 function DayRow(props: {
   entry: MealPlanEntry
   recipes: RecipeSummary[]
+  readOnly: boolean
   onSet: (recipeId: number | null, freeText: string | null) => void
   onOpenRecipe: (id: number) => void
 }): JSX.Element {
@@ -85,16 +89,18 @@ function DayRow(props: {
           ) : (
             <span className="plan-row__empty">—</span>
           )}
-          <div className="plan-row__btns">
-            <button className="icon-btn" title="Edit" onClick={() => setEditing(true)}>
-              ✏️
-            </button>
-            {(entry.recipeId !== null || entry.freeText) && (
-              <button className="icon-btn" title="Clear" onClick={() => choose(null, null)}>
-                ✕
+          {!props.readOnly && (
+            <div className="plan-row__btns">
+              <button className="icon-btn" title="Edit" onClick={() => setEditing(true)}>
+                ✏️
               </button>
-            )}
-          </div>
+              {(entry.recipeId !== null || entry.freeText) && (
+                <button className="icon-btn" title="Clear" onClick={() => choose(null, null)}>
+                  ✕
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -107,10 +113,23 @@ export function MealPlanPage(props: {
 }): JSX.Element {
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
+  const users = useHousehold()
+  const [viewer, setViewer] = useState<HouseholdUser | null>(null)
+  // Until profiles load, `current` is null and we show nothing but the header.
+  const current = viewer ?? users[0] ?? null
+  const readOnly = current !== null && !current.isMe
+  const currentIdRef = useRef<string | null>(null)
+  currentIdRef.current = current?.id ?? null
 
   const reload = useCallback(() => {
-    getMealPlan().then(setPlan)
-  }, [])
+    const forId = currentIdRef.current
+    if (!forId) return
+    getMealPlan(forId).then((p) => {
+      // Ignore stale responses after a quick Me/partner flip.
+      if (currentIdRef.current === forId) setPlan(p)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
 
   useEffect(() => {
     reload()
@@ -142,17 +161,30 @@ export function MealPlanPage(props: {
     <div>
       <div className="page-header">
         <h2 className="page-header__title">This week</h2>
-        <button
-          className="btn btn--primary"
-          onClick={() => setGroceryOpen(true)}
-          disabled={plannedRecipeIds.length === 0}
-        >
-          🛒 Send week to groceries
-        </button>
-        <button className="btn" onClick={clearAll}>
-          Clear week
-        </button>
+        <PersonSwitcher
+          users={users}
+          selectedId={current?.id ?? ''}
+          onSelect={(u) => setViewer(u)}
+        />
+        {!readOnly && (
+          <>
+            <button
+              className="btn btn--primary"
+              onClick={() => setGroceryOpen(true)}
+              disabled={plannedRecipeIds.length === 0}
+            >
+              🛒 Send week to groceries
+            </button>
+            <button className="btn" onClick={clearAll}>
+              Clear week
+            </button>
+          </>
+        )}
       </div>
+
+      {readOnly && current && (
+        <p className="empty-note">Viewing {current.name}’s week — read only.</p>
+      )}
 
       <div className="plan-grid">
         {plan.map((entry) => (
@@ -160,6 +192,7 @@ export function MealPlanPage(props: {
             key={entry.day}
             entry={entry}
             recipes={props.recipes}
+            readOnly={readOnly}
             onSet={(recipeId, freeText) => setDay(entry.day, recipeId, freeText)}
             onOpenRecipe={props.onOpenRecipe}
           />

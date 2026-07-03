@@ -5,6 +5,7 @@ import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
 import { getRecipe, deleteRecipe } from '../data/recipes'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
+import { useHousehold } from '../hooks/useHousehold'
 
 function formatIngredient(ing: Recipe['ingredients'][number], factor: number): string {
   const scaled = scaleIngredient(ing, factor)
@@ -23,6 +24,8 @@ export function RecipeDetailPage(props: {
   const [servings, setServings] = useState<number | null>(null)
   const [cooking, setCooking] = useState(false)
   const [groceryOpen, setGroceryOpen] = useState(false)
+  const users = useHousehold()
+  const me = users.find((u) => u.isMe)
 
   useEffect(() => {
     getRecipe(props.recipeId).then((r) => {
@@ -78,9 +81,12 @@ export function RecipeDetailPage(props: {
             <button className="btn" onClick={() => setGroceryOpen(true)}>
               🛒 Send ingredients to groceries
             </button>
-            <button className="btn btn--danger" onClick={remove}>
-              Delete
-            </button>
+            {/* Delete is owner-only; RLS refuses it server-side regardless. */}
+            {me && recipe.ownerId === me.id && (
+              <button className="btn btn--danger" onClick={remove}>
+                Delete
+              </button>
+            )}
           </div>
         </div>
       </div>
