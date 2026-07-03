@@ -18,6 +18,7 @@ export interface RecipeStep {
 
 export interface Recipe {
   id: number
+  ownerId: string
   title: string
   sourceUrl: string | null
   imageUrl: string | null
@@ -33,6 +34,7 @@ export interface Recipe {
 
 export interface RecipeSummary {
   id: number
+  ownerId: string
   title: string
   imageUrl: string | null
   totalMin: number | null
@@ -40,7 +42,9 @@ export interface RecipeSummary {
 
 export type ScrapeConfidence = 'structured' | 'heuristic' | 'manual'
 
-export type DraftRecipe = Omit<Recipe, 'id' | 'createdAt'> & { confidence: ScrapeConfidence }
+export type DraftRecipe = Omit<Recipe, 'id' | 'ownerId' | 'createdAt'> & {
+  confidence: ScrapeConfidence
+}
 
 export type Day = 'monday' | 'tuesday' | 'wednesday' | 'thursday' | 'friday' | 'saturday' | 'sunday'
 

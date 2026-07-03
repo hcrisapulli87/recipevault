@@ -102,13 +102,43 @@ export async function updateProfile(patch: { name?: string; goals?: ProfileGoals
   if (error) throw new Error(error.message)
 }
 
-export async function getDailyLog(date: string): Promise<DailyLog> {
-  const profile = await getProfile()
+/** Read-only goals for any household member (no auto-create — that's getProfile's job). */
+async function getGoalsOf(ownerId: string): Promise<ProfileGoals> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('cal_goal, protein_goal, carbs_goal, fat_goal')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (error) throw new Error(error.message)
+  return {
+    calGoal: data?.cal_goal ?? null,
+    proteinGoal: data?.protein_goal ?? null,
+    carbsGoal: data?.carbs_goal ?? null,
+    fatGoal: data?.fat_goal ?? null
+  }
+}
+
+/**
+ * One day's log for one household member. Policies allow reading both users'
+ * logs, so scoping is explicit — pass the id from the Me/partner switcher.
+ * `isMe` routes through getProfile so a first-time user still gets their
+ * profiles row auto-created; the partner's goals are read plainly.
+ */
+export async function getDailyLog(date: string, owner: { id: string; isMe: boolean }): Promise<DailyLog> {
+  const goals: ProfileGoals = owner.isMe
+    ? await getProfile().then((p) => ({
+        calGoal: p.calGoal,
+        proteinGoal: p.proteinGoal,
+        carbsGoal: p.carbsGoal,
+        fatGoal: p.fatGoal
+      }))
+    : await getGoalsOf(owner.id)
   const { data, error } = await supabase
     .from('food_log')
     .select(
       'id, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source'
     )
+    .eq('owner_id', owner.id)
     .eq('log_date', date)
     .order('id')
   if (error) throw new Error(error.message)
@@ -125,10 +155,10 @@ export async function getDailyLog(date: string): Promise<DailyLog> {
     meals,
     totals: computeTotals(entries),
     goals: {
-      calories: profile.calGoal,
-      protein: profile.proteinGoal,
-      carbs: profile.carbsGoal,
-      fat: profile.fatGoal
+      calories: goals.calGoal,
+      protein: goals.proteinGoal,
+      carbs: goals.carbsGoal,
+      fat: goals.fatGoal
     }
   }
 }

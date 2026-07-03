@@ -7,11 +7,12 @@ import type { DraftRecipe, Recipe, RecipeSummary } from '../../shared/types'
 export async function listRecipes(): Promise<RecipeSummary[]> {
   const { data, error } = await supabase
     .from('recipes')
-    .select('id, title, image_url, total_min')
+    .select('id, owner_id, title, image_url, total_min')
     .order('title')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r) => ({
     id: r.id,
+    ownerId: r.owner_id,
     title: r.title,
     imageUrl: r.image_url,
     totalMin: r.total_min
@@ -36,6 +37,7 @@ export async function getRecipe(id: number): Promise<Recipe | null> {
 
   return {
     id: r.id,
+    ownerId: r.owner_id,
     title: r.title,
     sourceUrl: r.source_url,
     imageUrl: r.image_url,

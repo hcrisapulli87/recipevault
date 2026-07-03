@@ -2,8 +2,13 @@ import { supabase } from './supabase'
 import { DAYS } from '../../shared/types'
 import type { Day, MealPlanEntry } from '../../shared/types'
 
-export async function getMealPlan(): Promise<MealPlanEntry[]> {
-  const { data, error } = await supabase.from('meal_plan').select('day, recipe_id, free_text')
+/** The week for one household member. Policies allow reading both users' plans,
+ *  so scoping is explicit now — pass the id from the Me/partner switcher. */
+export async function getMealPlan(ownerId: string): Promise<MealPlanEntry[]> {
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select('day, recipe_id, free_text')
+    .eq('owner_id', ownerId)
   if (error) throw new Error(error.message)
   const byDay = new Map((data ?? []).map((r) => [r.day as Day, r]))
   return DAYS.map((day) => {
