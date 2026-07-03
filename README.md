@@ -17,6 +17,10 @@ and everything stays in sync.
 - **Cooking mode** — full-screen step-by-step view with big text for the kitchen.
 - **Weekly meal plan** — Mon–Sun grid; assign saved recipes or free text. Each day also gets a
   denormalised `meal_text` column the Discord bot can read straight from Supabase.
+- **Household sharing** — one shared recipe library (recipes show who added them; only the
+  owner can delete), and a Me/partner switcher on the Meal Plan and Tracker pages for a
+  read-only view of each other's week and macros. Groceries stay private. Enforced by
+  Postgres RLS ("read all, write only your own"), not just hidden buttons.
 - **Groceries** — built-in checklist; "Send week to groceries" merges duplicate ingredients
   across recipes before adding them.
 - **Macro tracker** — per-day food log (search a bundled staples list + OpenFoodFacts, scan a
@@ -70,7 +74,10 @@ npm run build:win  # desktop to dist/win-unpacked/
 - [ ] Send a week to groceries; tick items off on the phone, watch desktop update.
 - [ ] Log a food by search and by barcode scan on the phone.
 - [ ] Install the PWA to the home screen; icon and standalone window look right.
-- [ ] Sign in as the second user — none of the first user's data is visible.
+- [ ] Sign in as the second user — their groceries are their own, but both users' recipes
+      appear in the library ("added by" chip on the other person's, no Delete button).
+- [ ] Me/partner switcher on Plan + Tracker shows the other person's week and macros,
+      read-only, updating live as they log.
 
 ## Docs
 
