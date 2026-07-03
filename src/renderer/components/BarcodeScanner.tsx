@@ -35,7 +35,13 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
       BarcodeFormat.UPC_E
     ])
     hints.set(DecodeHintType.TRY_HARDER, true)
-    const reader = new BrowserMultiFormatReader(hints)
+    // zxing defaults to one decode attempt per 500ms — only ~2 chances/sec for a
+    // checksum-valid read to land during the moments the camera has focus. A full
+    // attempt on a blank 1080p frame measures ~50ms, so 100ms pacing is cheap and
+    // gives real reads 10 chances/sec. (Checksum-less formats used to mask this
+    // scarcity by "succeeding" with garbage on blurry frames.)
+    const reader = new BrowserMultiFormatReader(hints, 100)
+    reader.timeBetweenDecodingAttempts = 100
     const video = videoRef.current
     if (!video) return
     let cancelled = false
@@ -75,7 +81,17 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
       // Resolves once the camera is attached; if we were torn down while it was
       // still opening, the cleanup below already ran, so stop the late stream here.
       .then(() => {
-        if (cancelled) stopStream()
+        if (cancelled) {
+          stopStream()
+          return
+        }
+        // Barcodes are scanned close up; ask for continuous autofocus where the
+        // browser supports it (Android Chrome does). Best-effort — focusMode isn't
+        // in the TS lib types and some devices reject it, hence the loose cast.
+        const track = (video.srcObject as MediaStream | null)?.getVideoTracks()[0]
+        track
+          ?.applyConstraints({ advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet] })
+          .catch(() => {})
       })
       .catch(() => {
         if (!cancelled) setError('Could not open the camera. Type the barcode below instead.')
