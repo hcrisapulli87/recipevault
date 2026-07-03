@@ -56,6 +56,30 @@ describe('mapOffProduct', () => {
     })
   })
 
+  it('derives missing per-serving macros from per-100 g data instead of zeroing them', () => {
+    // OFF often has serving calories but not serving protein/carbs/fat. With a
+    // numeric serving_quantity we can scale the per-100 g values rather than log 0.
+    const item = mapOffProduct({
+      product_name: 'Protein Pudding',
+      serving_size: '200 g',
+      serving_quantity: 200,
+      nutriments: {
+        'energy-kcal_100g': 80,
+        proteins_100g: 10,
+        carbohydrates_100g: 5.2,
+        fat_100g: 1.5,
+        'energy-kcal_serving': 160
+      }
+    })
+    expect(item).toMatchObject({
+      unit: 'serving',
+      calories: 160,
+      protein: 20, // 10 g/100g × 200 g
+      carbs: 10.4,
+      fat: 3
+    })
+  })
+
   it('returns null when the product has no name or no usable macros', () => {
     expect(mapOffProduct({ nutriments: { 'energy-kcal_100g': 100 } })).toBeNull()
     expect(mapOffProduct({ product_name: 'Mystery' })).toBeNull()

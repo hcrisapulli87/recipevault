@@ -96,6 +96,12 @@ export function mapOffProduct(
   const barcode = p.code !== undefined && p.code !== '' ? String(p.code) : null
 
   if (hasServing) {
+    // OFF data is often partial: serving calories present but serving macros missing.
+    // Derive those from the per-100 g values scaled by serving_quantity (grams) rather
+    // than silently logging them as 0.
+    const grams = num(p.serving_quantity)
+    const perServing = (serving: number | null, per100: number | null): number =>
+      serving ?? (per100 !== null && grams !== null ? (per100 * grams) / 100 : 0)
     return {
       name,
       brand,
@@ -103,9 +109,9 @@ export function mapOffProduct(
       servingDesc: p.serving_size ?? null,
       unit: 'serving',
       calories: round0(servingCal ?? 0),
-      protein: round1(num(n.proteins_serving) ?? 0),
-      carbs: round1(num(n.carbohydrates_serving) ?? 0),
-      fat: round1(num(n.fat_serving) ?? 0),
+      protein: round1(perServing(num(n.proteins_serving), pro100)),
+      carbs: round1(perServing(num(n.carbohydrates_serving), carb100)),
+      fat: round1(perServing(num(n.fat_serving), fat100)),
       source
     }
   }

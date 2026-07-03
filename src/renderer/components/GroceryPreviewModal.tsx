@@ -11,6 +11,7 @@ export function GroceryPreviewModal(props: {
 }): JSX.Element {
   const [phase, setPhase] = useState<Phase>('loading')
   const [items, setItems] = useState<{ title: string; checked: boolean }[]>([])
+  const [error, setError] = useState<string | null>(null)
 
   // Mounted fresh each open, so fetch the merged preview exactly once.
   useEffect(() => {
@@ -28,8 +29,14 @@ export function GroceryPreviewModal(props: {
 
   const add = async (): Promise<void> => {
     setPhase('saving')
-    await addGroceries(selected.map((it) => it.title))
-    setPhase('done')
+    setError(null)
+    try {
+      await addGroceries(selected.map((it) => it.title))
+      setPhase('done')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save — try again.')
+      setPhase('review')
+    }
   }
 
   return (
@@ -63,6 +70,7 @@ export function GroceryPreviewModal(props: {
                 </ul>
               </>
             )}
+            {error && <div className="banner banner--error">{error}</div>}
             <div className="modal__actions">
               <button className="btn" onClick={props.onClose} disabled={phase === 'saving'}>
                 Cancel

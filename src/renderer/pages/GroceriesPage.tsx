@@ -8,6 +8,7 @@ import {
   deleteGrocery,
   clearChecked
 } from '../data/groceries'
+import { onTableChange } from '../data/realtime'
 
 export function GroceriesPage(): JSX.Element {
   const [items, setItems] = useState<GroceryItem[]>([])
@@ -19,6 +20,7 @@ export function GroceriesPage(): JSX.Element {
 
   useEffect(() => {
     reload()
+    return onTableChange(['grocery_items'], reload)
   }, [reload])
 
   const add = async (): Promise<void> => {

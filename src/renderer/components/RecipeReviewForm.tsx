@@ -27,6 +27,7 @@ export function RecipeReviewForm(props: {
     props.draft.steps.length ? props.draft.steps : [{ position: 0, section: null, text: '' }]
   )
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
   const note = CONFIDENCE_NOTE[props.draft.confidence]
 
@@ -77,8 +78,14 @@ export function RecipeReviewForm(props: {
         .filter((s) => s.text.trim().length > 0)
         .map((s, position) => ({ ...s, position, text: s.text.trim() }))
     }
-    const id = await saveRecipe(draft)
-    props.onSaved(id)
+    setSaveError(null)
+    try {
+      const id = await saveRecipe(draft)
+      props.onSaved(id)
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Could not save — try again.')
+      setSaving(false)
+    }
   }
 
   return (
@@ -176,6 +183,7 @@ export function RecipeReviewForm(props: {
         </button>
       </div>
 
+      {saveError && <div className="banner banner--error">{saveError}</div>}
       <div className="review-form__actions">
         <button className="btn" onClick={props.onCancel} disabled={saving}>
           Back

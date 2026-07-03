@@ -79,6 +79,12 @@ export async function saveRecipe(draft: DraftRecipe): Promise<number> {
   if (error) throw new Error(error.message)
   const id = data.id as number
 
+  // Three separate inserts, not a transaction — if children fail, remove the recipe row
+  // (cascades) so a retry never leaves a title-only orphan in the library.
+  const childError = async (message: string): Promise<never> => {
+    await supabase.from('recipes').delete().eq('id', id)
+    throw new Error(message)
+  }
   if (draft.ingredients.length > 0) {
     const { error: ie } = await supabase.from('ingredients').insert(
       draft.ingredients.map((i) => ({
@@ -91,7 +97,7 @@ export async function saveRecipe(draft: DraftRecipe): Promise<number> {
         name: i.name
       }))
     )
-    if (ie) throw new Error(ie.message)
+    if (ie) await childError(ie.message)
   }
   if (draft.steps.length > 0) {
     const { error: se } = await supabase.from('steps').insert(
@@ -102,12 +108,21 @@ export async function saveRecipe(draft: DraftRecipe): Promise<number> {
         text: s.text
       }))
     )
-    if (se) throw new Error(se.message)
+    if (se) await childError(se.message)
   }
   return id
 }
 
 export async function deleteRecipe(id: number): Promise<void> {
+  // The FK nulls meal_plan.recipe_id, but meal_text (the denormalised label the Discord
+  // bot reads) would keep the deleted title — clear it first, while recipe_id still
+  // points at this recipe. free_text stays: it's a deliberate manual entry.
+  const { error: me } = await supabase
+    .from('meal_plan')
+    .update({ meal_text: null })
+    .eq('recipe_id', id)
+  if (me) throw new Error(me.message)
+
   // ingredients/steps cascade via the FK; meal_plan.recipe_id is ON DELETE SET NULL.
   const { error } = await supabase.from('recipes').delete().eq('id', id)
   if (error) throw new Error(error.message)

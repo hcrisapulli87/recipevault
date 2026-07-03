@@ -83,7 +83,8 @@ export async function getProfile(): Promise<TrackerProfile> {
   }
 
   const name = user.email ?? 'Me'
-  await supabase.from('profiles').upsert({ id: user.id, display_name: name })
+  const { error: ue } = await supabase.from('profiles').upsert({ id: user.id, display_name: name })
+  if (ue) throw new Error(ue.message)
   return { name, calGoal: null, proteinGoal: null, carbsGoal: null, fatGoal: null }
 }
 

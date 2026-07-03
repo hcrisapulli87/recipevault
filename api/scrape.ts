@@ -13,11 +13,15 @@ const MAX_REDIRECTS = 5
 const TIMEOUT_MS = 10_000
 
 // Comma-separated allowlist, e.g. "https://recipevault.vercel.app,https://www.recipevault.app".
-// Same-origin PWA requests need no CORS header; the Electron build's origin can be added here.
+// Same-origin PWA requests need no CORS header. 'null' is the Electron desktop build:
+// its window loads from file://, which browsers report as the literal Origin "null".
+// Safe to allow — this endpoint is unauthenticated anyway and only returns public,
+// SSRF-checked recipe pages; CORS here is about which pages may *read* the response.
 const ALLOWED_ORIGINS = (process.env.SCRAPE_ALLOWED_ORIGINS ?? '')
   .split(',')
   .map((s) => s.trim())
   .filter(Boolean)
+  .concat('null')
 
 function setCors(req: any, res: any): void {
   const origin = req.headers?.origin

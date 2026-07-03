@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import type { Day, MealPlanEntry, RecipeSummary } from '../../shared/types'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
+import { onTableChange } from '../data/realtime'
 
 const DAY_LABEL: Record<Day, string> = {
   monday: 'Monday',
@@ -113,6 +114,7 @@ export function MealPlanPage(props: {
 
   useEffect(() => {
     reload()
+    return onTableChange(['meal_plan'], reload)
   }, [reload])
 
   const setDay = async (

@@ -22,6 +22,8 @@ function macroLine(item: FoodItem, factor = 1): string {
 function PortionStep(props: {
   item: FoodItem
   mealLabel: string
+  busy: boolean
+  error: string | null
   onBack: () => void
   onAdd: (amount: number) => void
 }): JSX.Element {
@@ -58,17 +60,18 @@ function PortionStep(props: {
       </label>
 
       <div className="banner banner--ok food-preview">{macroLine(props.item, amount)}</div>
+      {props.error && <div className="banner banner--error">{props.error}</div>}
 
       <div className="modal__actions">
-        <button className="btn" onClick={props.onBack}>
+        <button className="btn" onClick={props.onBack} disabled={props.busy}>
           Back
         </button>
         <button
           className="btn btn--primary"
           onClick={() => props.onAdd(amount)}
-          disabled={amount <= 0}
+          disabled={amount <= 0 || props.busy}
         >
-          Add
+          {props.busy ? 'Adding…' : 'Add'}
         </button>
       </div>
     </>
@@ -84,6 +87,8 @@ export function AddFoodModal(props: {
   const mealLabel = MEAL_LABEL[props.mealType]
   const [tab, setTab] = useState<Tab>('search')
   const [selected, setSelected] = useState<FoodItem | null>(null)
+  const [logging, setLogging] = useState(false)
+  const [logError, setLogError] = useState<string | null>(null)
 
   // search tab
   const [query, setQuery] = useState('')
@@ -152,7 +157,7 @@ export function AddFoodModal(props: {
   }
 
   const log = async (amount: number): Promise<void> => {
-    if (!selected) return
+    if (!selected || logging) return
     const entry: NewLogEntry = {
       date: props.date,
       mealType: props.mealType,
@@ -167,9 +172,16 @@ export function AddFoodModal(props: {
       barcode: selected.barcode,
       source: selected.source
     }
-    await addLogEntry(entry)
-    props.onLogged()
-    props.onClose()
+    setLogging(true)
+    setLogError(null)
+    try {
+      await addLogEntry(entry)
+      props.onLogged()
+      props.onClose()
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : 'Could not save — try again.')
+      setLogging(false)
+    }
   }
 
   if (selected) {
@@ -179,7 +191,12 @@ export function AddFoodModal(props: {
           <PortionStep
             item={selected}
             mealLabel={mealLabel}
-            onBack={() => setSelected(null)}
+            busy={logging}
+            error={logError}
+            onBack={() => {
+              setSelected(null)
+              setLogError(null)
+            }}
             onAdd={log}
           />
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { DailyLog, LogEntry, MealType } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
@@ -6,6 +6,7 @@ import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
 import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
 import type { TrackerProfile } from '../data/tracker'
+import { onTableChange } from '../data/realtime'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
 
@@ -135,20 +136,29 @@ export function MacroTrackerPage(): JSX.Element {
   const [adding, setAdding] = useState<MealType | null>(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
 
+  // Flipping days fires overlapping fetches; only the response for the day still on
+  // screen may land, otherwise the last *response* (not the last request) would win.
+  const dateRef = useRef(date)
+  dateRef.current = date
+
   const loadProfile = useCallback((): void => {
     getProfile().then(setProfile)
   }, [])
 
   useEffect(() => {
     loadProfile()
+    return onTableChange(['profiles'], loadProfile)
   }, [loadProfile])
 
   const reloadLog = useCallback((): void => {
-    getDailyLog(date).then(setLog)
+    getDailyLog(date).then((l) => {
+      if (l.date === dateRef.current) setLog(l)
+    })
   }, [date])
 
   useEffect(() => {
     reloadLog()
+    return onTableChange(['food_log'], reloadLog)
   }, [reloadLog])
 
   const changeAmount = async (id: number, amount: number): Promise<void> => {
