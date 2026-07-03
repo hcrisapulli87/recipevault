@@ -26,6 +26,10 @@ export function RecipeDetailPage(props: {
   const [groceryOpen, setGroceryOpen] = useState(false)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
+  const ownerName =
+    recipe && me && recipe.ownerId !== me.id
+      ? (users.find((u) => u.id === recipe.ownerId)?.name ?? 'Partner')
+      : null
 
   useEffect(() => {
     getRecipe(props.recipeId).then((r) => {
@@ -57,6 +61,7 @@ export function RecipeDetailPage(props: {
           <h2 className="detail__title">{recipe.title}</h2>
           {recipe.description && <p className="detail__description">{recipe.description}</p>}
           <div className="detail__chips">
+            {ownerName && <span className="chip">👤 added by {ownerName}</span>}
             {recipe.prepMin !== null && <span className="chip">Prep {recipe.prepMin} min</span>}
             {recipe.cookMin !== null && <span className="chip">Cook {recipe.cookMin} min</span>}
             {recipe.totalMin !== null && <span className="chip">Total {recipe.totalMin} min</span>}

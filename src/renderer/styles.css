@@ -307,6 +307,10 @@ body {
 }
 .field-row .field {
   flex: 1;
+  /* Flex items default to min-width:auto, which floors each field at the input's
+     intrinsic ~180px — three across then overflow a phone screen instead of
+     shrinking. min-width:0 lets them share whatever width the row actually has. */
+  min-width: 0;
 }
 .review-form__ingredients {
   font-family: ui-monospace, monospace;
@@ -1034,6 +1038,21 @@ body {
 @media (max-width: 720px) {
   .app__main {
     padding: 16px 14px calc(76px + env(safe-area-inset-bottom));
+  }
+
+  /* Recipe hero: photo above text on phones — side-by-side leaves the title a
+     skinny column (only bites recipes WITH an image; imageless already stack). */
+  .detail__hero {
+    flex-direction: column;
+  }
+  .detail__image {
+    width: 100%;
+    height: 200px;
+  }
+
+  /* Redundant next to the Me/partner switcher and crowds the tracker header. */
+  .tracker-profile-name {
+    display: none;
   }
 
   .sidebar {

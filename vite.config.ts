@@ -7,6 +7,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 // dist-web, which Vercel serves. Both talk to the same Supabase backend.
 export default defineConfig({
   root: 'src/renderer',
+  // Vite reads .env from `root` by default, which for this config is src/renderer —
+  // so local dev/preview builds silently missed the project-root .env (VITE_SUPABASE_*)
+  // and crashed with "supabaseUrl is required". Vercel worked only because it injects
+  // env itself. Point envDir back at the repo root (path is relative to `root`).
+  envDir: '../..',
   publicDir: '../../public',
   base: '/',
   plugins: [
