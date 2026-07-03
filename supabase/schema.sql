@@ -1,13 +1,16 @@
 -- RecipeVault — database schema, Row-Level Security, and Realtime setup.
 -- Run this once in your Supabase project: Dashboard → SQL Editor → paste → Run.
 --
--- This app is MULTI-USER but invite-only: each person signs in with a magic link and sees
--- ONLY their own data. Set it up as:
---   Dashboard → Authentication → Providers → Email: keep enabled (magic link).
+-- This app is MULTI-USER but invite-only (a two-person household). Set it up as:
+--   Dashboard → Authentication → Providers → Email: keep enabled.
 --   Dashboard → Authentication → Sign In / Up → DISABLE "Allow new users to sign up".
 --   Dashboard → Authentication → Users → "Add user" for each person (e.g. you + partner),
---   tick "Auto Confirm User". Every owner-scoped policy below — `owner_id = auth.uid()` —
---   resolves to "that signed-in user's rows only". (food_cache is shared on purpose.)
+--   tick "Auto Confirm User".
+--
+-- Sharing model: recipes, meal plans, food logs and profiles are READABLE by both
+-- household users ("read all, write only your own" — writes always require
+-- `owner_id = auth.uid()`). Grocery lists and the barcode cache stay fully private.
+-- Since sign-ups are disabled, "any authenticated user" means exactly the household.
 --
 -- The script is idempotent / safe to re-run: create-if-not-exists tables, guarded column
 -- adds, drop-and-recreate policies (Postgres has no "create policy if not exists"), and a
@@ -82,8 +85,10 @@ create index if not exists steps_recipe_idx         on public.steps (recipe_id, 
 create index if not exists grocery_owner_state_idx  on public.grocery_items (owner_id, checked, sort_order);
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Row-Level Security: single-user, so every table is "your rows only" for all ops.
--- The owner_id default (auth.uid()) stamps inserts; the policy guards every operation.
+-- Row-Level Security.
+-- Shared tables (recipes/ingredients/steps/meal_plan): household-readable,
+-- owner-writable. Private tables (grocery_items): owner-only for everything.
+-- The owner_id default (auth.uid()) stamps inserts; policies guard every operation.
 -- Each policy is dropped-then-created so the whole script stays re-runnable.
 -- ─────────────────────────────────────────────────────────────────────────────
 alter table public.recipes       enable row level security;
@@ -92,25 +97,26 @@ alter table public.steps         enable row level security;
 alter table public.meal_plan     enable row level security;
 alter table public.grocery_items enable row level security;
 
-drop policy if exists "recipes: own rows" on public.recipes;
-create policy "recipes: own rows" on public.recipes
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
-
-drop policy if exists "ingredients: own rows" on public.ingredients;
-create policy "ingredients: own rows" on public.ingredients
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
-
-drop policy if exists "steps: own rows" on public.steps;
-create policy "steps: own rows" on public.steps
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
-
-drop policy if exists "meal_plan: own rows" on public.meal_plan;
-create policy "meal_plan: own rows" on public.meal_plan
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+-- Reusable pattern: read-all / write-own. (Old single "own rows" policies from the
+-- pre-sharing schema are dropped by name so re-runs upgrade cleanly.)
+do $$
+declare
+  t text;
+begin
+  -- (food_log gets the same treatment in the tracker section below, after its create table.)
+  foreach t in array array['recipes','ingredients','steps','meal_plan']
+  loop
+    execute format('drop policy if exists "%1$s: own rows" on public.%1$I', t);
+    execute format('drop policy if exists "%1$s: household read" on public.%1$I', t);
+    execute format('drop policy if exists "%1$s: owner insert" on public.%1$I', t);
+    execute format('drop policy if exists "%1$s: owner update" on public.%1$I', t);
+    execute format('drop policy if exists "%1$s: owner delete" on public.%1$I', t);
+    execute format('create policy "%1$s: household read" on public.%1$I for select to authenticated using (true)', t);
+    execute format('create policy "%1$s: owner insert" on public.%1$I for insert to authenticated with check (owner_id = auth.uid())', t);
+    execute format('create policy "%1$s: owner update" on public.%1$I for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid())', t);
+    execute format('create policy "%1$s: owner delete" on public.%1$I for delete to authenticated using (owner_id = auth.uid())', t);
+  end loop;
+end $$;
 
 drop policy if exists "grocery_items: own rows" on public.grocery_items;
 create policy "grocery_items: own rows" on public.grocery_items
@@ -172,15 +178,36 @@ alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;
 alter table public.food_cache enable row level security;
 
+-- profiles: both household users can read (names for the switcher/chips, partner's
+-- goals in the read-only tracker view); each user writes only their own row.
 drop policy if exists "profiles: own row" on public.profiles;
-create policy "profiles: own row" on public.profiles
-  for all to authenticated
-  using (id = auth.uid()) with check (id = auth.uid());
+drop policy if exists "profiles: household read" on public.profiles;
+drop policy if exists "profiles: owner insert" on public.profiles;
+drop policy if exists "profiles: owner update" on public.profiles;
+drop policy if exists "profiles: owner delete" on public.profiles;
+create policy "profiles: household read" on public.profiles
+  for select to authenticated using (true);
+create policy "profiles: owner insert" on public.profiles
+  for insert to authenticated with check (id = auth.uid());
+create policy "profiles: owner update" on public.profiles
+  for update to authenticated using (id = auth.uid()) with check (id = auth.uid());
+create policy "profiles: owner delete" on public.profiles
+  for delete to authenticated using (id = auth.uid());
 
+-- food_log: household-readable, owner-writable (same pattern as the recipe tables).
 drop policy if exists "food_log: own rows" on public.food_log;
-create policy "food_log: own rows" on public.food_log
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+drop policy if exists "food_log: household read" on public.food_log;
+drop policy if exists "food_log: owner insert" on public.food_log;
+drop policy if exists "food_log: owner update" on public.food_log;
+drop policy if exists "food_log: owner delete" on public.food_log;
+create policy "food_log: household read" on public.food_log
+  for select to authenticated using (true);
+create policy "food_log: owner insert" on public.food_log
+  for insert to authenticated with check (owner_id = auth.uid());
+create policy "food_log: owner update" on public.food_log
+  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "food_log: owner delete" on public.food_log
+  for delete to authenticated using (owner_id = auth.uid());
 
 -- food_cache is per-user: each person reads/writes only their own cached barcodes, so no
 -- one can poison a row another user reads. (Drop any earlier shared policies if present.)
@@ -201,7 +228,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log']
+  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log','profiles']
   loop
     if not exists (
       select 1 from pg_publication_tables
