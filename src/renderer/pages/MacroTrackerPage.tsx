@@ -238,68 +238,83 @@ export function MacroTrackerPage(): JSX.Element {
         )}
       </div>
 
-      <div className="totals-card">
-        <div className="totals-card__cals">
-          <span className="totals-card__cals-value">{Math.round(totals.calories)}</span>
-          <span className="totals-card__cals-label">
-            kcal{goals.calories != null ? ` of ${Math.round(goals.calories)}` : ''}
-          </span>
+      <div className="hero-card">
+        <div
+          className="cal-ring"
+          style={{
+            background: `conic-gradient(var(--accent) ${
+              goals.calories ? Math.min(100, (totals.calories / goals.calories) * 100) : 0
+            }%, var(--bg-elevated) 0)`
+          }}
+        >
+          <div className="cal-ring__inner">
+            <span
+              className={`cal-ring__value ${
+                goals.calories != null && totals.calories > goals.calories
+                  ? 'cal-ring__value--over'
+                  : ''
+              }`}
+            >
+              {Math.round(totals.calories).toLocaleString()}
+            </span>
+            <span className="cal-ring__label">
+              {goals.calories != null
+                ? `of ${Math.round(goals.calories).toLocaleString()} kcal`
+                : 'kcal'}
+            </span>
+          </div>
         </div>
-        <div className="totals-card__bars">
+        <div className="hero-card__bars">
           <MacroBar
             label="Protein"
             value={totals.protein}
             goal={goals.protein}
             unit="g"
-            color="var(--green)"
+            color="var(--blue)"
           />
           <MacroBar
             label="Carbs"
             value={totals.carbs}
             goal={goals.carbs}
             unit="g"
-            color="var(--amber)"
+            color="var(--green)"
           />
-          <MacroBar
-            label="Fat"
-            value={totals.fat}
-            goal={goals.fat}
-            unit="g"
-            color="var(--accent-bright)"
-          />
+          <MacroBar label="Fat" value={totals.fat} goal={goals.fat} unit="g" color="var(--amber)" />
         </div>
       </div>
 
-      {MEAL_TYPES.map((meal) => {
-        const entries = log?.meals[meal] ?? []
-        return (
-          <section key={meal} className="meal-section">
-            <div className="meal-section__head">
-              <h3 className="meal-section__title">{MEAL_LABEL[meal]}</h3>
-              {!readOnly && (
-                <button className="link-btn" onClick={() => setAdding(meal)}>
-                  ➕ Add food
-                </button>
-              )}
-            </div>
-            {entries.length === 0 ? (
-              <p className="meal-section__empty">Nothing logged yet.</p>
-            ) : (
-              <div className="meal-section__entries">
-                {entries.map((e) => (
-                  <EntryRow
-                    key={e.id}
-                    entry={e}
-                    readOnly={readOnly}
-                    onChangeAmount={(amount) => changeAmount(e.id, amount)}
-                    onDelete={() => deleteEntry(e.id)}
-                  />
-                ))}
+      <div className="meal-grid">
+        {MEAL_TYPES.map((meal) => {
+          const entries = log?.meals[meal] ?? []
+          return (
+            <section key={meal} className="meal-section">
+              <div className="meal-section__head">
+                <h3 className="meal-section__title">{MEAL_LABEL[meal]}</h3>
+                {!readOnly && (
+                  <button className="link-btn" onClick={() => setAdding(meal)}>
+                    ➕ Add food
+                  </button>
+                )}
               </div>
-            )}
-          </section>
-        )
-      })}
+              {entries.length === 0 ? (
+                <p className="meal-section__empty">Nothing logged yet.</p>
+              ) : (
+                <div className="meal-section__entries">
+                  {entries.map((e) => (
+                    <EntryRow
+                      key={e.id}
+                      entry={e}
+                      readOnly={readOnly}
+                      onChangeAmount={(amount) => changeAmount(e.id, amount)}
+                      onDelete={() => deleteEntry(e.id)}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          )
+        })}
+      </div>
 
       <p className="tracker-note">
         Macros are best-guess estimates from a built-in food list and OpenFoodFacts — tweak the
