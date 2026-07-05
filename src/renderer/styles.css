@@ -6,25 +6,62 @@
   padding: 0;
 }
 
+@font-face {
+  font-family: 'Inter';
+  src: url('./assets/fonts/InterVariable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── Studio Light (default) ─────────────────────────────────────────────── */
 :root {
-  --bg-base: #16181d;
-  --bg-surface: #1e2128;
-  --bg-elevated: #262a33;
-  --border: #333845;
-  --accent: #e8943a;
-  --accent-bright: #f5a94e;
-  --text-primary: #e6e2da;
-  --text-secondary: #a8a499;
-  --text-muted: #6b6860;
-  --green: #4ade80;
-  --red: #ef4444;
+  --bg-base: #f2f4f7;
+  --bg-surface: #ffffff;
+  --bg-elevated: #eef0f4;
+  --border: #e8eaee;
+  --accent: #e87f22;
+  --accent-bright: #f6902f; /* hover on accent surfaces */
+  --accent-deep: #c2620e; /* accent-colored TEXT (contrast-safe per theme) */
+  --accent-tint: #fdeedd; /* accent-tinted backgrounds (nav pill, badges) */
+  --on-accent: #ffffff; /* text on solid accent */
+  --text-primary: #101828;
+  --text-secondary: #667085;
+  --text-muted: #98a2b3;
+  --green: #10b981;
+  --red: #e5483f;
   --amber: #f59e0b;
+  --blue: #3b82f6;
+  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.1);
+  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.14);
+  --scrim: rgba(16, 18, 22, 0.6);
+  --radius: 8px;
+  --radius-btn: 7px;
+}
+
+/* ── Studio Dark ────────────────────────────────────────────────────────── */
+/* Panels rely on hairline borders, not shadows (shadows don't read on dark). */
+[data-theme='dark'] {
+  --bg-base: #101216;
+  --bg-surface: #191c21;
+  --bg-elevated: #20242b;
+  --border: rgba(255, 255, 255, 0.07);
+  --accent-deep: #f6a35a;
+  --accent-tint: rgba(232, 127, 34, 0.16);
+  --text-primary: #ecedef;
+  --text-secondary: #9ba0aa;
+  --text-muted: #6b707a;
+  --shadow-sm: none;
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
+  --scrim: rgba(0, 0, 0, 0.65);
 }
 
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
 }
 
 .app {
@@ -58,7 +95,7 @@ body {
 .sidebar__title {
   font-size: 16px;
   font-weight: 700;
-  color: var(--accent-bright);
+  color: var(--text-primary);
   padding: 0 6px;
 }
 .sidebar__section {
@@ -134,7 +171,7 @@ body {
 .btn--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #1a1408;
+  color: var(--on-accent);
   font-weight: 600;
 }
 .btn--primary:hover:not(:disabled) {
@@ -163,7 +200,7 @@ body {
 .link-btn {
   background: none;
   border: none;
-  color: var(--accent-bright);
+  color: var(--accent-deep);
   font-size: 13px;
   cursor: pointer;
   padding: 0;
@@ -322,7 +359,7 @@ body {
 .review-form__section {
   display: block;
   font-size: 11px;
-  color: var(--accent-bright);
+  color: var(--accent-deep);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 4px;
@@ -448,7 +485,7 @@ body {
 .step-list__section {
   display: block;
   font-size: 11px;
-  color: var(--accent-bright);
+  color: var(--accent-deep);
   text-transform: uppercase;
   letter-spacing: 1px;
   margin-bottom: 2px;
@@ -483,7 +520,7 @@ body {
   margin-bottom: 6px;
 }
 .cooking__progress {
-  color: var(--accent-bright);
+  color: var(--accent-deep);
   font-size: 14px;
 }
 .cooking__step {
@@ -753,7 +790,7 @@ body {
 .totals-card__cals-value {
   font-size: 34px;
   font-weight: 700;
-  color: var(--accent-bright);
+  color: var(--accent-deep);
   line-height: 1;
 }
 .totals-card__cals-label {
@@ -867,7 +904,7 @@ body {
 .food-entry__cals {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent-bright);
+  color: var(--accent-deep);
 }
 .food-entry__pcf {
   font-size: 11px;
@@ -950,7 +987,7 @@ body {
 }
 .food-result__tag {
   background: var(--accent);
-  color: #1a1408;
+  color: var(--on-accent);
   font-size: 10px;
   font-weight: 700;
   border-radius: 4px;
