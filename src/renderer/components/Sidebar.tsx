@@ -17,7 +17,10 @@ export function Sidebar(props: {
 }): JSX.Element {
   return (
     <nav className="sidebar">
-      <h1 className="sidebar__title">🍳 RecipeVault</h1>
+      <h1 className="sidebar__title">
+        <span className="sidebar__logo-dot" aria-hidden="true" />
+        RecipeVault
+      </h1>
       <div className="sidebar__section">
         {NAV.map((item) => (
           <button

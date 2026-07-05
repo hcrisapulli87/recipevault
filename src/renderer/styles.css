@@ -78,25 +78,39 @@ body {
 .app__main {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
+  padding: 24px 28px;
 }
 
-/* Sidebar */
+/* Sidebar — floating Studio panel */
 .sidebar {
-  width: 190px;
+  width: 200px;
   flex-shrink: 0;
   background: var(--bg-surface);
-  border-right: 1px solid var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  margin: 12px 0 12px 12px;
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 .sidebar__title {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
   color: var(--text-primary);
-  padding: 0 6px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sidebar__logo-dot {
+  width: 16px;
+  height: 16px;
+  background: var(--accent);
+  border-radius: 5px;
+  flex-shrink: 0;
 }
 .sidebar__section {
   display: flex;
@@ -107,10 +121,12 @@ body {
   background: none;
   border: none;
   text-align: left;
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 99px;
   color: var(--text-secondary);
   font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
 }
 .sidebar__nav-btn:hover {
@@ -118,12 +134,12 @@ body {
   background: var(--bg-elevated);
 }
 .sidebar__nav-btn--active {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+  color: var(--accent-deep);
+  background: var(--accent-tint);
   font-weight: 600;
 }
 .sidebar__nav-icon {
-  margin-right: 6px;
+  margin-right: 8px;
 }
 
 /* Shared bits */
