@@ -12,3 +12,4 @@ dev-dist
 test-scanner/harness.js
 test-scanner/barcode.y4m
 test-scanner/result.json
+.superpowers/
