@@ -435,9 +435,9 @@ body {
   padding-top: 8px;
 }
 
-/* Recipe detail */
+/* Recipe detail — Card Hero */
 .detail {
-  max-width: 900px;
+  max-width: 960px;
 }
 .detail__hero {
   display: flex;
@@ -446,10 +446,12 @@ body {
 }
 .detail__image {
   width: 220px;
-  height: 165px;
+  height: 160px;
   object-fit: cover;
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
   background: var(--bg-elevated);
+  flex-shrink: 0;
 }
 .detail__head {
   display: flex;
@@ -458,7 +460,8 @@ body {
 }
 .detail__title {
   font-size: 24px;
-  font-weight: 700;
+  font-weight: 800;
+  letter-spacing: -0.5px;
 }
 .detail__description {
   color: var(--text-secondary);
@@ -478,8 +481,17 @@ body {
 }
 .detail__columns {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 32px;
+  grid-template-columns: 300px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+.detail__ingredients,
+.detail__steps {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
 }
 .detail__section-head {
   display: flex;
@@ -490,7 +502,11 @@ body {
 }
 .detail__section-head h3,
 .detail__steps h3 {
-  font-size: 15px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.7px;
+  color: var(--text-muted);
 }
 .detail__steps h3 {
   margin-bottom: 12px;
@@ -513,17 +529,26 @@ body {
   font-size: 14px;
 }
 .ingredient-list li {
-  padding: 8px 10px;
-  background: var(--bg-surface);
-  border-radius: 6px;
+  padding: 8px 0;
+  background: none;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  font-size: 13px;
+}
+.ingredient-list li:last-child {
+  border-bottom: none;
 }
 .step-list {
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding-left: 20px;
-  font-size: 14px;
-  line-height: 1.6;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.step-list li::marker {
+  color: var(--accent-deep);
+  font-weight: 700;
 }
 .step-list__section {
   display: block;
