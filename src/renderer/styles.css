@@ -135,34 +135,47 @@ body {
   flex-wrap: wrap;
 }
 .page-header__title {
-  font-size: 20px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   margin-right: auto;
 }
 .text-input {
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text-primary);
-  padding: 8px 10px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-btn);
   font-size: 13px;
   font-family: inherit;
+  box-shadow: var(--shadow-sm);
+}
+.text-input::placeholder {
+  color: var(--text-muted);
 }
 .text-input:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-tint);
 }
 .btn {
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
   color: var(--text-primary);
   padding: 8px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
 }
 .btn:hover:not(:disabled) {
-  border-color: var(--accent);
+  border-color: var(--text-muted);
+  box-shadow: var(--shadow-md);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -176,6 +189,7 @@ body {
 }
 .btn--primary:hover:not(:disabled) {
   background: var(--accent-bright);
+  border-color: var(--accent-bright);
 }
 .btn--danger {
   color: var(--red);
@@ -184,9 +198,10 @@ body {
   background: none;
   border: 1px solid var(--border);
   color: var(--text-secondary);
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   padding: 4px 9px;
   font-size: 13px;
+  font-family: inherit;
   cursor: pointer;
 }
 .icon-btn:hover:not(:disabled) {
@@ -202,8 +217,13 @@ body {
   border: none;
   color: var(--accent-deep);
   font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
   padding: 0;
+  text-decoration: none;
+}
+.link-btn:hover {
   text-decoration: underline;
 }
 .empty-note {
@@ -212,16 +232,18 @@ body {
   text-align: center;
 }
 .chip {
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 3px 10px;
+  border-radius: 99px;
+  padding: 4px 11px;
   font-size: 11px;
+  font-weight: 500;
   color: var(--text-secondary);
+  box-shadow: var(--shadow-sm);
 }
 .banner {
   padding: 10px 14px;
-  border-radius: 6px;
+  border-radius: var(--radius-btn);
   font-size: 13px;
   margin: 10px 0;
   display: flex;
@@ -663,7 +685,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--scrim);
   z-index: 150;
   display: flex;
   align-items: center;
@@ -672,7 +694,8 @@ body {
 .modal {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
   padding: 24px;
   width: 440px;
   max-height: 80vh;
@@ -680,7 +703,8 @@ body {
   flex-direction: column;
 }
 .modal__title {
-  font-size: 16px;
+  font-size: 18px;
+  font-weight: 700;
   margin-bottom: 8px;
 }
 .modal__hint {
@@ -923,23 +947,33 @@ body {
 
 /* Add-food modal */
 .tabs {
-  display: flex;
-  gap: 4px;
-  border-bottom: 1px solid var(--border);
-  margin-bottom: 14px;
+  display: inline-flex;
+  gap: 2px;
+  background: var(--bg-surface);
+  border-radius: 99px;
+  padding: 3px;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border);
 }
 .tabs__tab {
   background: none;
   border: none;
   color: var(--text-secondary);
-  padding: 8px 12px;
-  font-size: 13px;
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border-radius: 99px;
 }
 .tabs__tab--active {
-  color: var(--text-primary);
-  border-bottom-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+.modal .tabs {
+  margin-bottom: 14px;
+  align-self: flex-start;
 }
 .search-row {
   display: flex;
