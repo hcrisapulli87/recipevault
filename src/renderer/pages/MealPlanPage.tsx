@@ -9,16 +9,45 @@ import { useHousehold } from '../hooks/useHousehold'
 import type { HouseholdUser } from '../data/users'
 
 const DAY_LABEL: Record<Day, string> = {
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-  sunday: 'Sunday'
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun'
 }
 
-function DayRow(props: {
+const DAY_ORDER: Day[] = [
+  'monday',
+  'tuesday',
+  'wednesday',
+  'thursday',
+  'friday',
+  'saturday',
+  'sunday'
+]
+
+const todayDay = (): Day => {
+  // getDay(): 0=Sunday … 6=Saturday; our week starts Monday.
+  const jsDay = new Date().getDay()
+  return DAY_ORDER[(jsDay + 6) % 7]
+}
+
+function CellActions(props: { onEdit: () => void; onClear: () => void }): JSX.Element {
+  return (
+    <div className="board-card__btns">
+      <button className="icon-btn" title="Edit" onClick={props.onEdit}>
+        ✏️
+      </button>
+      <button className="icon-btn" title="Clear" onClick={props.onClear}>
+        ✕
+      </button>
+    </div>
+  )
+}
+
+function DayCell(props: {
   entry: MealPlanEntry
   recipes: RecipeSummary[]
   readOnly: boolean
@@ -28,6 +57,7 @@ function DayRow(props: {
   const [editing, setEditing] = useState(false)
   const [query, setQuery] = useState('')
   const { entry, recipes } = props
+  const isToday = entry.day === todayDay()
 
   const recipe = entry.recipeId !== null ? recipes.find((r) => r.id === entry.recipeId) : undefined
   const matches =
@@ -42,11 +72,48 @@ function DayRow(props: {
   }
 
   return (
-    <div className="plan-row">
-      <span className="plan-row__day">{DAY_LABEL[entry.day]}</span>
+    <div className={`board-cell ${isToday ? 'board-cell--today' : ''}`}>
+      <span className="board-cell__day">
+        {DAY_LABEL[entry.day]}
+        {isToday && <span className="board-cell__today-tag"> · today</span>}
+      </span>
 
-      {editing ? (
-        <div className="plan-row__editor">
+      {recipe ? (
+        <div className="board-card board-card--recipe">
+          <button
+            className="board-card__open"
+            onClick={() => props.onOpenRecipe(recipe.id)}
+            title="Open recipe"
+          >
+            {recipe.imageUrl ? (
+              <img className="board-card__image" src={recipe.imageUrl} alt="" />
+            ) : (
+              <div className="board-card__image board-card__image--empty">🍽️</div>
+            )}
+            <span className="board-card__title">{recipe.title}</span>
+          </button>
+          {!props.readOnly && (
+            <CellActions onEdit={() => setEditing(true)} onClear={() => choose(null, null)} />
+          )}
+        </div>
+      ) : entry.freeText ? (
+        <div className="board-card board-card--text">
+          <span className="board-card__title">{entry.freeText}</span>
+          <span className="board-card__meta">free text</span>
+          {!props.readOnly && (
+            <CellActions onEdit={() => setEditing(true)} onClear={() => choose(null, null)} />
+          )}
+        </div>
+      ) : props.readOnly ? (
+        <div className="board-card board-card--blank">—</div>
+      ) : (
+        <button className="board-card board-card--empty" onClick={() => setEditing(true)}>
+          +
+        </button>
+      )}
+
+      {editing && (
+        <div className="board-cell__editor">
           <input
             autoFocus
             className="text-input"
@@ -59,10 +126,10 @@ function DayRow(props: {
             }}
           />
           {matches.length > 0 && (
-            <ul className="plan-row__suggestions">
+            <ul className="board-cell__suggestions">
               {matches.slice(0, 6).map((r) => (
                 <li key={r.id}>
-                  <button className="plan-row__suggestion" onClick={() => choose(r.id, null)}>
+                  <button className="board-cell__suggestion" onClick={() => choose(r.id, null)}>
                     📖 {r.title}
                   </button>
                 </li>
@@ -73,33 +140,6 @@ function DayRow(props: {
             <button className="link-btn" onClick={() => choose(null, query.trim())}>
               Use “{query.trim()}” as free text ↵
             </button>
-          )}
-        </div>
-      ) : (
-        <div className="plan-row__content">
-          {recipe ? (
-            <button
-              className="link-btn plan-row__meal"
-              onClick={() => props.onOpenRecipe(recipe.id)}
-            >
-              📖 {recipe.title}
-            </button>
-          ) : entry.freeText ? (
-            <span className="plan-row__meal">{entry.freeText}</span>
-          ) : (
-            <span className="plan-row__empty">—</span>
-          )}
-          {!props.readOnly && (
-            <div className="plan-row__btns">
-              <button className="icon-btn" title="Edit" onClick={() => setEditing(true)}>
-                ✏️
-              </button>
-              {(entry.recipeId !== null || entry.freeText) && (
-                <button className="icon-btn" title="Clear" onClick={() => choose(null, null)}>
-                  ✕
-                </button>
-              )}
-            </div>
           )}
         </div>
       )}
@@ -186,9 +226,9 @@ export function MealPlanPage(props: {
         <p className="empty-note">Viewing {current.name}’s week — read only.</p>
       )}
 
-      <div className="plan-grid">
+      <div className="board">
         {plan.map((entry) => (
-          <DayRow
+          <DayCell
             key={entry.day}
             entry={entry}
             recipes={props.recipes}
