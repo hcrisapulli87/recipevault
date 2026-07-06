@@ -1308,14 +1308,158 @@ body {
   color: var(--text-muted);
 }
 
-/* ── Mobile (phones): sidebar becomes a fixed bottom nav ─────────────────── */
+/* Mobile dock — hidden on desktop */
+.dock,
+.dock-sheet,
+.dock-sheet__backdrop {
+  display: none;
+}
+
+/* ── Mobile (phones): floating pill dock, stacked layouts ───────────────── */
 @media (max-width: 720px) {
   .app__main {
-    padding: 16px 14px calc(76px + env(safe-area-inset-bottom));
+    padding: 16px 14px calc(84px + env(safe-area-inset-bottom));
   }
 
-  /* Recipe hero: photo above text on phones — side-by-side leaves the title a
-     skinny column (only bites recipes WITH an image; imageless already stack). */
+  .sidebar {
+    display: none;
+  }
+
+  /* Floating pill dock (deliberately dark in BOTH themes) */
+  .dock {
+    display: flex;
+    position: fixed;
+    left: 14px;
+    right: 14px;
+    bottom: calc(12px + env(safe-area-inset-bottom));
+    z-index: 100;
+    background: rgba(20, 22, 27, 0.94);
+    border-radius: 99px;
+    padding: 7px 9px;
+    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.35);
+  }
+  .dock__tab {
+    flex: 1;
+    min-height: 44px;
+    background: none;
+    border: none;
+    border-radius: 99px;
+    font-size: 20px;
+    color: #8b8f98;
+    cursor: pointer;
+  }
+  .dock__tab--active {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
+  .dock-sheet__backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 99;
+  }
+  .dock-sheet {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    position: fixed;
+    right: 14px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    z-index: 101;
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 6px;
+    min-width: 160px;
+  }
+  .dock-sheet__item {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 44px;
+  }
+  .dock-sheet__item:hover {
+    background: var(--bg-elevated);
+  }
+
+  /* Tap targets ≥ 44px, no iOS zoom-on-focus */
+  .btn,
+  .icon-btn,
+  .text-input {
+    min-height: 44px;
+  }
+  .text-input {
+    font-size: 16px;
+  }
+  .link-btn {
+    padding: 10px 4px;
+  }
+
+  /* Week Board → stacked day list */
+  .board {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .board-card {
+    flex-direction: row;
+    align-items: center;
+    min-height: 56px;
+  }
+  .board-card__open {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+  }
+  .board-card__image {
+    width: 56px;
+    height: 46px;
+    border-radius: 6px;
+    margin: 5px 0 5px 6px;
+    flex-shrink: 0;
+  }
+  .board-card__btns {
+    display: flex;
+    position: static;
+    margin-right: 6px;
+  }
+  .board-cell__editor {
+    position: static;
+    width: 100%;
+    margin-top: 6px;
+  }
+
+  /* Tracker: hero compresses, meal grid single column */
+  .hero-card {
+    gap: 16px;
+    padding: 14px 16px;
+  }
+  .cal-ring {
+    width: 84px;
+    height: 84px;
+  }
+  .cal-ring__inner {
+    width: 64px;
+    height: 64px;
+  }
+  .cal-ring__value {
+    font-size: 15px;
+  }
+  .meal-grid {
+    grid-template-columns: 1fr;
+  }
+  .tracker-profile-name {
+    display: none;
+  }
+
+  /* Recipe detail: photo card full-width above title */
   .detail__hero {
     flex-direction: column;
   }
@@ -1323,74 +1467,14 @@ body {
     width: 100%;
     height: 200px;
   }
-
-  /* Redundant next to the Me/partner switcher and crowds the tracker header. */
-  .tracker-profile-name {
-    display: none;
-  }
-
-  .sidebar {
-    position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 100;
-    width: auto;
-    flex-direction: row;
-    padding: 0;
-    padding-bottom: env(safe-area-inset-bottom);
-    border-right: none;
-    border-top: 1px solid var(--border);
-    gap: 0;
-  }
-  .sidebar__title {
-    display: none;
-  }
-  .sidebar__section {
-    flex: 1;
-    flex-direction: row;
-    gap: 0;
-  }
-  .sidebar__nav-btn {
-    flex: 1;
-    min-height: 56px; /* comfortable thumb target */
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    padding: 6px 2px;
-    border-radius: 0;
-    font-size: 10px;
-    text-align: center;
-  }
-  .sidebar__nav-icon {
-    margin-right: 0;
-    font-size: 20px;
-  }
-
-  /* Tap targets ≥ 44px */
-  .btn,
-  .icon-btn,
-  .text-input {
-    min-height: 44px;
-  }
-  .text-input {
-    font-size: 16px; /* prevents iOS zoom-on-focus */
-  }
-  .link-btn {
-    padding: 10px 4px;
-  }
-
-  /* Single-column pages */
-  .recipe-grid {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
   .detail__columns {
     grid-template-columns: 1fr;
-    gap: 20px;
+    gap: 16px;
   }
 
+  .recipe-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  }
   .modal {
     width: calc(100vw - 24px);
     max-height: 85vh;

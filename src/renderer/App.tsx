@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { JSX } from 'react'
 import { Sidebar } from './components/Sidebar'
+import { MobileDock } from './components/MobileDock'
 import { LibraryPage } from './pages/LibraryPage'
 import { ImportPage } from './pages/ImportPage'
 import { RecipeDetailPage } from './pages/RecipeDetailPage'
@@ -33,6 +34,7 @@ export default function App(): JSX.Element {
     <div className="app">
       <div className="app__body">
         <Sidebar page={page} selectedRecipe={selectedRecipeId !== null} onNavigate={navigate} />
+        <MobileDock page={page} onNavigate={navigate} />
         <main className="app__main">
           {page === 'library' && selectedRecipeId !== null ? (
             <RecipeDetailPage
