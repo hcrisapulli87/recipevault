@@ -31,6 +31,9 @@ export function RecipeDetailPage(props: {
   const [est, setEst] = useState<RecipeEstimate | null>(null)
   const [estDetail, setEstDetail] = useState<EstimateDetail[] | null>(null)
   const [estimating, setEstimating] = useState(false)
+  // All hooks stay ABOVE the loading early-return — a hook below it crashes the
+  // page the moment the recipe arrives (hook count changes between renders).
+  const [converting, setConverting] = useState(false)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
   const ownerName =
@@ -52,7 +55,6 @@ export function RecipeDetailPage(props: {
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
 
-  const [converting, setConverting] = useState(false)
   const convertMetric = async (): Promise<void> => {
     if (!recipe) return
     setConverting(true)
