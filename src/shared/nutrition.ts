@@ -1,4 +1,4 @@
-import type { FoodItem } from './types'
+import type { FoodItem, Per100g } from './types'
 import staplesData from './data/common-foods.json'
 
 // OpenFoodFacts asks every client to send an identifying User-Agent.
@@ -44,6 +44,24 @@ export function searchStaples(query: string): FoodItem[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
   return STAPLES.filter((s) => s.name.toLowerCase().includes(q)).map(stapleToFoodItem)
+}
+
+// Crude depluraliser applied to BOTH sides of the match, so consistency matters
+// more than English correctness ("thighs"→"thigh"; "couscous"→"couscou" on both sides).
+function normFood(s: string): string {
+  return s.toLowerCase().replace(/(\w{3,}?)s\b/g, '$1')
+}
+
+/** Per-100g staple lookup for the macro estimator: shortest staple whose pre-comma
+ *  name contains — or is contained by — the query ("chicken thighs" → "Chicken thigh, cooked"). */
+export function staplePer100g(name: string): { per100g: Per100g; servingGrams: number } | null {
+  const q = normFood(name.trim())
+  if (!q) return null
+  const hits = STAPLES.filter((s) => {
+    const n = normFood(s.name.split(',')[0])
+    return n.includes(q) || q.includes(n)
+  }).sort((a, b) => a.name.length - b.name.length)
+  return hits[0] ? { per100g: hits[0].per100g, servingGrams: hits[0].serving.grams } : null
 }
 
 interface OffNutriments {

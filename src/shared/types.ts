@@ -63,7 +63,8 @@ export interface RecipeEstimate {
 
 export type ScrapeConfidence = 'structured' | 'heuristic' | 'manual'
 
-export type DraftRecipe = Omit<Recipe, 'id' | 'ownerId' | 'createdAt'> & {
+// Drafts have no estimate yet — it's computed right after save.
+export type DraftRecipe = Omit<Recipe, 'id' | 'ownerId' | 'createdAt' | 'est'> & {
   confidence: ScrapeConfidence
 }
 

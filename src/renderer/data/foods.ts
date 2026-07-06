@@ -6,7 +6,7 @@ import type { FoodItem } from '../../shared/types'
 // Search-a-licious API sends no CORS headers, so the browser can't call it directly.
 // DEV → same-origin (the vite dev proxy forwards /api to the deployed origin);
 // desktop production → derived from VITE_SCRAPE_URL (same origin, sibling function).
-const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
+export const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
   ? '/api/food-search'
   : import.meta.env.VITE_SCRAPE_URL
     ? (import.meta.env.VITE_SCRAPE_URL as string).replace(/scrape$/, 'food-search')

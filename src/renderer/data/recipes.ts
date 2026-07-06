@@ -1,13 +1,38 @@
 import { supabase } from './supabase'
-import type { DraftRecipe, Recipe, RecipeSummary } from '../../shared/types'
+import type { DraftRecipe, Recipe, RecipeEstimate, RecipeSummary } from '../../shared/types'
 
 // owner_id is stamped by the column default (auth.uid()) and guarded by RLS, so inserts
 // below never set it explicitly. Postgres snake_case ↔ app camelCase is mapped here.
 
+const EST_COLS =
+  'servings, est_cal_serve, est_protein_serve, est_carbs_serve, est_fat_serve, est_matched, est_total, est_computed_at'
+
+function mapEst(r: {
+  est_cal_serve: number | null
+  est_protein_serve: number | null
+  est_carbs_serve: number | null
+  est_fat_serve: number | null
+  est_matched: number | null
+  est_total: number | null
+  est_computed_at: string | null
+  servings?: number | null
+}): RecipeEstimate | null {
+  if (r.est_computed_at === null || r.est_cal_serve === null) return null
+  return {
+    calories: r.est_cal_serve,
+    protein: r.est_protein_serve ?? 0,
+    carbs: r.est_carbs_serve ?? 0,
+    fat: r.est_fat_serve ?? 0,
+    matched: r.est_matched ?? 0,
+    total: r.est_total ?? 0,
+    assumedServings: (r.servings ?? null) === null
+  }
+}
+
 export async function listRecipes(): Promise<RecipeSummary[]> {
   const { data, error } = await supabase
     .from('recipes')
-    .select('id, owner_id, title, image_url, total_min')
+    .select(`id, owner_id, title, image_url, total_min, ${EST_COLS}`)
     .order('title')
   if (error) throw new Error(error.message)
   return (data ?? []).map((r) => ({
@@ -15,7 +40,8 @@ export async function listRecipes(): Promise<RecipeSummary[]> {
     ownerId: r.owner_id,
     title: r.title,
     imageUrl: r.image_url,
-    totalMin: r.total_min
+    totalMin: r.total_min,
+    est: mapEst(r)
   }))
 }
 
@@ -47,6 +73,7 @@ export async function getRecipe(id: number): Promise<Recipe | null> {
     cookMin: r.cook_min,
     totalMin: r.total_min,
     createdAt: r.created_at,
+    est: mapEst(r),
     ingredients: (ingRes.data ?? []).map((i) => ({
       position: i.position,
       raw: i.raw_text,
