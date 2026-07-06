@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import { computeTotals } from '../../shared/tracker-logic'
 import { MEAL_TYPES } from '../../shared/types'
-import type { DailyLog, LogEntry, MealType, ProfileGoals } from '../../shared/types'
+import type { DailyLog, DailyTotals, LogEntry, MealType, ProfileGoals } from '../../shared/types'
 
 // Each signed-in user IS a profile (one profiles row keyed by auth.users.id). No switcher.
 export interface TrackerProfile extends ProfileGoals {
@@ -161,6 +161,32 @@ export async function getDailyLog(date: string, owner: { id: string; isMe: boole
       fat: goals.fatGoal
     }
   }
+}
+
+/** Per-day totals over a date range (inclusive), for the Trends view.
+ *  One query; aggregation client-side. RLS household-read covers partner ids. */
+export async function getDailyTotalsRange(
+  ownerId: string,
+  from: string,
+  to: string
+): Promise<Map<string, DailyTotals>> {
+  const { data, error } = await supabase
+    .from('food_log')
+    .select('log_date, amount, base_calories, base_protein, base_carbs, base_fat')
+    .eq('owner_id', ownerId)
+    .gte('log_date', from)
+    .lte('log_date', to)
+  if (error) throw new Error(error.message)
+  const map = new Map<string, DailyTotals>()
+  for (const r of data ?? []) {
+    const t = map.get(r.log_date) ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    t.calories += r.base_calories * r.amount
+    t.protein += r.base_protein * r.amount
+    t.carbs += r.base_carbs * r.amount
+    t.fat += r.base_fat * r.amount
+    map.set(r.log_date, t)
+  }
+  return map
 }
 
 export async function addLogEntry(entry: NewLogEntry): Promise<void> {
