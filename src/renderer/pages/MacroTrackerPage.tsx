@@ -12,8 +12,16 @@ import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
 import { macroCalorieShares } from '../../shared/tracker-logic'
-import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
+import {
+  deleteLogEntry,
+  getDailyLog,
+  getDailyTotalsRange,
+  getProfile,
+  updateLogEntry
+} from '../data/tracker'
 import { getMealPlan } from '../data/mealPlan'
+import { summarizeWindow, loggingStreak, dayBars, shiftDate as shiftIso } from '../../shared/trends'
+import type { DailyTotals } from '../../shared/types'
 import type { TrackerProfile } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
 import { PersonSwitcher } from '../components/PersonSwitcher'
@@ -151,9 +159,80 @@ function EntryRow(props: {
   )
 }
 
+function TrendsView(props: {
+  totals: Map<string, DailyTotals>
+  goals: DailyLog['goals']
+}): JSX.Element {
+  const today = todayStr()
+  const streak = loggingStreak(props.totals, today)
+  const bars = dayBars(props.totals, today, 14)
+  const calGoal = props.goals.calories
+  const maxBar = Math.max(calGoal ? calGoal * 1.5 : 0, ...bars.map((b) => b.calories), 1)
+  return (
+    <div className="trends">
+      {streak > 1 && <p className="trends__streak">🔥 {streak}-day logging streak</p>}
+      <div className="trends__cards">
+        {[7, 30].map((days) => {
+          const s = summarizeWindow(props.totals, today, days)
+          return (
+            <div key={days} className="trends__card">
+              <span className="trends__card-title">Last {days} days</span>
+              {s.avg ? (
+                <>
+                  <span className="trends__card-line">
+                    {Math.round(s.avg.calories).toLocaleString()} kcal/day
+                    {calGoal ? ` · goal ${Math.round(calGoal).toLocaleString()}` : ''}
+                  </span>
+                  <span className="trends__card-line">
+                    P {Math.round(s.avg.protein)} g/day
+                    {props.goals.protein ? ` · goal ${Math.round(props.goals.protein)}` : ''}
+                  </span>
+                </>
+              ) : (
+                <span className="trends__card-line">nothing logged</span>
+              )}
+              <span className="trends__card-meta">
+                logged {s.loggedDays} of {s.windowDays} days
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="trends__bars">
+        {bars.map((b) => (
+          <div
+            key={b.date}
+            className="trends__bar-col"
+            title={`${b.date}: ${Math.round(b.calories)} kcal`}
+          >
+            <div className="trends__bar-track">
+              <div
+                className={`trends__bar-fill ${
+                  calGoal && b.calories > calGoal ? 'trends__bar-fill--over' : ''
+                }`}
+                style={{ height: `${Math.min(100, (b.calories / maxBar) * 100)}%` }}
+              />
+            </div>
+            <span
+              className={`trends__bar-day ${b.date === today ? 'trends__bar-day--today' : ''}`}
+            >
+              {'MTWTFSS'[(new Date(b.date + 'T00:00:00').getDay() + 6) % 7]}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="plan-note">
+        Averages count logged days only — a day you didn’t log isn’t a 0-calorie day.
+      </p>
+    </div>
+  )
+}
+
 export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Element {
   const [profile, setProfile] = useState<TrackerProfile | null>(null)
   const [date, setDate] = useState(todayStr())
+  const [view, setView] = useState<'today' | 'trends'>('today')
+  const [rangeTotals, setRangeTotals] = useState<Map<string, DailyTotals> | null>(null)
   const [log, setLog] = useState<DailyLog | null>(null)
   const [adding, setAdding] = useState<MealType | null>(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
@@ -208,6 +287,21 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
     return onTableChange(['meal_plan'], reloadPlan)
   }, [reloadPlan])
 
+  // 30-day totals for the Trends view; refreshed live as entries change.
+  const reloadRange = useCallback((): void => {
+    if (!current || view !== 'trends') return
+    const forId = current.id
+    getDailyTotalsRange(forId, shiftIso(todayStr(), -29), todayStr()).then((m) => {
+      if (viewRef.current.endsWith(`|${forId}`)) setRangeTotals(m)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id, view])
+
+  useEffect(() => {
+    reloadRange()
+    return onTableChange(['food_log'], reloadRange)
+  }, [reloadRange])
+
   /** The recipe planned for this meal on the viewed date, as a ready-to-log item. */
   const plannedFor = (meal: MealType): FoodItem | null => {
     if (meal === 'snack' || !plan) return null
@@ -257,6 +351,13 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
             onSelect={(u) => setViewer(u)}
           />
           {!readOnly && profile && <span className="tracker-profile-name">{profile.name}</span>}
+          <button
+            className="btn"
+            onClick={() => setView(view === 'today' ? 'trends' : 'today')}
+            title="Toggle trends view"
+          >
+            {view === 'today' ? '📈 Trends' : '📅 Today'}
+          </button>
           {!readOnly && (
             <button
               className="btn"
@@ -274,6 +375,14 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
         <p className="empty-note">Viewing {current.name}’s tracker — read only.</p>
       )}
 
+      {view === 'trends' ? (
+        rangeTotals ? (
+          <TrendsView totals={rangeTotals} goals={goals} />
+        ) : (
+          <p className="empty-note">Loading…</p>
+        )
+      ) : (
+        <>
       <div className="date-nav">
         <button
           className="icon-btn"
@@ -395,6 +504,8 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
         Macros are best-guess estimates from a built-in food list and OpenFoodFacts — tweak the
         amount on anything that looks off.
       </p>
+        </>
+      )}
 
       {adding && (
         <AddFoodModal

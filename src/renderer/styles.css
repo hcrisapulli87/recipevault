@@ -362,6 +362,90 @@ body {
   color: var(--text-muted);
   font-size: 13px;
 }
+/* Trends view */
+.trends {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+.trends__streak {
+  font-weight: 600;
+}
+.trends__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.trends__card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.trends__card-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+.trends__card-line {
+  font-size: 14px;
+  font-weight: 600;
+}
+.trends__card-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.trends__bars {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+}
+.trends__bar-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.trends__bar-track {
+  height: 110px;
+  width: 100%;
+  max-width: 26px;
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  display: flex;
+  align-items: flex-end;
+  overflow: hidden;
+}
+.trends__bar-fill {
+  width: 100%;
+  background: var(--accent);
+  border-radius: 6px 6px 0 0;
+}
+.trends__bar-fill--over {
+  background: var(--red);
+}
+.trends__bar-day {
+  font-size: 9px;
+  color: var(--text-muted);
+}
+.trends__bar-day--today {
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+@media (max-width: 720px) {
+  .trends__cards {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* One-tap "log the planned meal" card at the top of Add Food */
 .food-result--planned {
   border: 1.5px solid var(--accent);
