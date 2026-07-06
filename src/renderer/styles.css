@@ -362,6 +362,15 @@ body {
   color: var(--text-muted);
   font-size: 13px;
 }
+/* One-tap "log the planned meal" card at the top of Add Food */
+.food-result--planned {
+  border: 1.5px solid var(--accent);
+  background: var(--accent-tint);
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+  width: 100%;
+}
+
 /* Macro estimate (best guess) on the recipe detail page */
 .est-block {
   margin-top: 8px;

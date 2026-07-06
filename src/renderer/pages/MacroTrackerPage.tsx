@@ -1,11 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import type { DailyLog, LogEntry, MealType } from '../../shared/types'
-import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
+import type {
+  DailyLog,
+  FoodItem,
+  LogEntry,
+  MealPlanEntry,
+  MealType,
+  RecipeSummary
+} from '../../shared/types'
+import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
 import { macroCalorieShares } from '../../shared/tracker-logic'
 import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
+import { getMealPlan } from '../data/mealPlan'
 import type { TrackerProfile } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
 import { PersonSwitcher } from '../components/PersonSwitcher'
@@ -143,7 +151,7 @@ function EntryRow(props: {
   )
 }
 
-export function MacroTrackerPage(): JSX.Element {
+export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Element {
   const [profile, setProfile] = useState<TrackerProfile | null>(null)
   const [date, setDate] = useState(todayStr())
   const [log, setLog] = useState<DailyLog | null>(null)
@@ -183,6 +191,45 @@ export function MacroTrackerPage(): JSX.Element {
     reloadLog()
     return onTableChange(['food_log'], reloadLog)
   }, [reloadLog])
+
+  // The viewed user's meal plan, for the one-tap "log the planned meal" card.
+  const [plan, setPlan] = useState<MealPlanEntry[] | null>(null)
+  const reloadPlan = useCallback((): void => {
+    if (!current) return
+    const forId = current.id
+    getMealPlan(forId).then((p) => {
+      if (viewRef.current.endsWith(`|${forId}`)) setPlan(p)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
+
+  useEffect(() => {
+    reloadPlan()
+    return onTableChange(['meal_plan'], reloadPlan)
+  }, [reloadPlan])
+
+  /** The recipe planned for this meal on the viewed date, as a ready-to-log item. */
+  const plannedFor = (meal: MealType): FoodItem | null => {
+    if (meal === 'snack' || !plan) return null
+    const jsDay = new Date(date + 'T00:00:00').getDay()
+    const day = DAYS[(jsDay + 6) % 7] // getDay(): 0=Sunday; our week starts Monday
+    const slot = plan.find((e) => e.day === day && e.meal === meal)
+    if (!slot || slot.recipeId === null) return null
+    const r = props.recipes.find((x) => x.id === slot.recipeId)
+    if (!r || !r.est) return null
+    return {
+      name: r.title,
+      brand: null,
+      barcode: null,
+      servingDesc: `planned ${MEAL_LABEL[meal].toLowerCase()} · best-guess macros`,
+      unit: 'serving',
+      calories: r.est.calories,
+      protein: r.est.protein,
+      carbs: r.est.carbs,
+      fat: r.est.fat,
+      source: 'plan'
+    }
+  }
 
   const changeAmount = async (id: number, amount: number): Promise<void> => {
     await updateLogEntry(id, amount)
@@ -353,6 +400,7 @@ export function MacroTrackerPage(): JSX.Element {
         <AddFoodModal
           mealType={adding}
           date={date}
+          planned={plannedFor(adding)}
           onClose={() => setAdding(null)}
           onLogged={reloadLog}
         />

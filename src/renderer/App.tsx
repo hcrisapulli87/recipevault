@@ -63,7 +63,7 @@ export default function App(): JSX.Element {
           ) : page === 'plan' ? (
             <MealPlanPage recipes={recipes.recipes} onOpenRecipe={openRecipe} />
           ) : page === 'tracker' ? (
-            <MacroTrackerPage />
+            <MacroTrackerPage recipes={recipes.recipes} />
           ) : page === 'groceries' ? (
             <GroceriesPage />
           ) : (

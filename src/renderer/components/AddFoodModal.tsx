@@ -81,6 +81,7 @@ function PortionStep(props: {
 export function AddFoodModal(props: {
   mealType: MealType
   date: string
+  planned?: FoodItem | null
   onClose: () => void
   onLogged: () => void
 }): JSX.Element {
@@ -238,6 +239,17 @@ export function AddFoodModal(props: {
 
         {tab === 'search' && (
           <>
+            {props.planned && (
+              <button
+                className="food-result food-result--planned"
+                onClick={() => setSelected(props.planned!)}
+              >
+                <span className="food-result__name">📋 Planned: {props.planned.name}</span>
+                <span className="food-result__macros">
+                  {macroLine(props.planned)} — tap to log
+                </span>
+              </button>
+            )}
             <div className="search-row">
               <input
                 className="text-input"
