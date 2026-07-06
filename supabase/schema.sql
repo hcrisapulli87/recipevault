@@ -37,6 +37,16 @@ create table if not exists public.recipes (
   created_at  timestamptz not null default now()
 );
 
+-- Macro-estimate summary (computed client-side from parsed ingredients; per serving).
+-- Guarded adds so re-runs are no-ops.
+alter table public.recipes add column if not exists est_cal_serve     real;
+alter table public.recipes add column if not exists est_protein_serve real;
+alter table public.recipes add column if not exists est_carbs_serve   real;
+alter table public.recipes add column if not exists est_fat_serve     real;
+alter table public.recipes add column if not exists est_matched       integer;
+alter table public.recipes add column if not exists est_total         integer;
+alter table public.recipes add column if not exists est_computed_at   timestamptz;
+
 -- Parsed ingredient lines. on delete cascade → deleting a recipe clears these in one go.
 create table if not exists public.ingredients (
   id           bigint generated always as identity primary key,

@@ -28,6 +28,7 @@ export interface Recipe {
   cookMin: number | null
   totalMin: number | null
   createdAt: string
+  est: RecipeEstimate | null
   ingredients: RecipeIngredient[]
   steps: RecipeStep[]
 }
@@ -38,6 +39,26 @@ export interface RecipeSummary {
   title: string
   imageUrl: string | null
   totalMin: number | null
+  est: RecipeEstimate | null
+}
+
+/** Per-100g macro values used by the estimator. */
+export interface Per100g {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+/** Stored per-serving macro estimate summary (best guess from parsed ingredients). */
+export interface RecipeEstimate {
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  matched: number
+  total: number
+  assumedServings: boolean
 }
 
 export type ScrapeConfidence = 'structured' | 'heuristic' | 'manual'
@@ -140,7 +161,7 @@ export interface FoodItem {
   protein: number
   carbs: number
   fat: number
-  source: 'staple' | 'search' | 'barcode' | 'manual'
+  source: 'staple' | 'search' | 'barcode' | 'manual' | 'plan'
 }
 
 /** A logged item. Macros are stored per-unit; the day's total is base_* × amount. */
