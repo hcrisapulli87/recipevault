@@ -149,7 +149,9 @@ export function MacroTrackerPage(): JSX.Element {
   // Flipping days or Me/partner fires overlapping fetches; only the response for
   // the view still on screen may land, otherwise the last *response* wins.
   const viewRef = useRef('')
-  viewRef.current = `${date}|${current?.id ?? ''}`
+  useEffect(() => {
+    viewRef.current = `${date}|${current?.id ?? ''}`
+  })
 
   const loadProfile = useCallback((): void => {
     getProfile().then(setProfile)

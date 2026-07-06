@@ -159,7 +159,11 @@ export function MealPlanPage(props: {
   const current = viewer ?? users[0] ?? null
   const readOnly = current !== null && !current.isMe
   const currentIdRef = useRef<string | null>(null)
-  currentIdRef.current = current?.id ?? null
+  // Updated in an effect (not during render); declared before the reload effect
+  // so it always holds the committed viewer id when reload's response lands.
+  useEffect(() => {
+    currentIdRef.current = current?.id ?? null
+  })
 
   const reload = useCallback(() => {
     const forId = currentIdRef.current

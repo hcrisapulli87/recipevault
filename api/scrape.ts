@@ -23,9 +23,22 @@ const ALLOWED_ORIGINS = (process.env.SCRAPE_ALLOWED_ORIGINS ?? '')
   .filter(Boolean)
   .concat('null')
 
-function setCors(req: any, res: any): void {
+// Minimal structural types for Vercel's req/res (no @vercel/node dependency).
+interface ApiRequest {
+  method?: string
+  headers?: Record<string, string | string[] | undefined>
+  query?: Record<string, string | string[]>
+}
+interface ApiResponse {
+  setHeader(name: string, value: string): void
+  status(code: number): ApiResponse
+  json(body: unknown): void
+  end(): void
+}
+
+function setCors(req: ApiRequest, res: ApiResponse): void {
   const origin = req.headers?.origin
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+  if (typeof origin === 'string' && ALLOWED_ORIGINS.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin)
     res.setHeader('Vary', 'Origin')
   }
@@ -63,7 +76,7 @@ async function safeFetchHtml(initialUrl: string): Promise<string | null> {
   return null // too many redirects
 }
 
-export default async function handler(req: any, res: any): Promise<void> {
+export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   setCors(req, res)
   if (req.method === 'OPTIONS') {
     res.status(204).end()
