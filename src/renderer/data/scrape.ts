@@ -1,8 +1,12 @@
 import type { DraftRecipe, IpcResult } from '../../shared/types'
 
 // On the PWA this defaults to the same-origin function; the Electron build can point
-// VITE_SCRAPE_URL at the deployed endpoint.
-const SCRAPE_ENDPOINT = import.meta.env.VITE_SCRAPE_URL ?? '/api/scrape'
+// VITE_SCRAPE_URL at the deployed endpoint. In dev, always go same-origin — the dev
+// servers proxy /api to the deployed function (see vite configs), because calling it
+// cross-origin from localhost gets CORS-blocked (it only allows the Electron null Origin).
+const SCRAPE_ENDPOINT = import.meta.env.DEV
+  ? '/api/scrape'
+  : (import.meta.env.VITE_SCRAPE_URL ?? '/api/scrape')
 
 export async function scrapeUrl(url: string): Promise<IpcResult<DraftRecipe>> {
   try {
