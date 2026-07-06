@@ -63,6 +63,11 @@ export function LibraryPage(props: {
                 {timeChip(r.totalMin) && (
                   <span className="recipe-card__time">⏱ {timeChip(r.totalMin)}</span>
                 )}
+                {r.est && (
+                  <span className="recipe-card__time">
+                    ≈ {Math.round(r.est.calories)} kcal/serve
+                  </span>
+                )}
                 {nameOf(r.ownerId) && (
                   <span className="recipe-card__time">👤 added by {nameOf(r.ownerId)}</span>
                 )}

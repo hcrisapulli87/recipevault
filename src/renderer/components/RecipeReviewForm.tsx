@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import type { DraftRecipe, RecipeStep } from '../../shared/types'
 import { parseIngredient } from '../../shared/ingredient-parser'
 import { saveRecipe } from '../data/recipes'
+import { estimateAndSave } from '../data/macroEstimate'
 
 const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; cls: string } | null> = {
   structured: { text: '✓ Parsed from structured recipe data', cls: 'banner--ok' },
@@ -81,6 +82,7 @@ export function RecipeReviewForm(props: {
     setSaveError(null)
     try {
       const id = await saveRecipe(draft)
+      void estimateAndSave(id) // background best-guess macros; the detail page can redo it
       props.onSaved(id)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save — try again.')

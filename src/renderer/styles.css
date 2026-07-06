@@ -362,6 +362,36 @@ body {
   color: var(--text-muted);
   font-size: 13px;
 }
+/* Macro estimate (best guess) on the recipe detail page */
+.est-block {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+}
+.est-block__line {
+  font-size: 13px;
+  font-weight: 600;
+}
+.est-block__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.est-breakdown {
+  list-style: none;
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.est-breakdown__miss {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Instagram import queue (phone submits, desktop fetches) */
 .import-queue {
   list-style: none;

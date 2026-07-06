@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
-import type { Recipe } from '../../shared/types'
+import type { Recipe, RecipeEstimate } from '../../shared/types'
 import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
+import type { EstimateDetail } from '../../shared/macro-estimator'
 import { getRecipe, deleteRecipe } from '../data/recipes'
+import { computeRecipeEstimate, saveRecipeEstimate } from '../data/macroEstimate'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { useHousehold } from '../hooks/useHousehold'
@@ -24,6 +26,9 @@ export function RecipeDetailPage(props: {
   const [servings, setServings] = useState<number | null>(null)
   const [cooking, setCooking] = useState(false)
   const [groceryOpen, setGroceryOpen] = useState(false)
+  const [est, setEst] = useState<RecipeEstimate | null>(null)
+  const [estDetail, setEstDetail] = useState<EstimateDetail[] | null>(null)
+  const [estimating, setEstimating] = useState(false)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
   const ownerName =
@@ -35,6 +40,8 @@ export function RecipeDetailPage(props: {
     getRecipe(props.recipeId).then((r) => {
       setRecipe(r)
       setServings(r?.servings ?? 1)
+      setEst(r?.est ?? null)
+      setEstDetail(null)
     })
   }, [props.recipeId])
 
@@ -42,6 +49,19 @@ export function RecipeDetailPage(props: {
 
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
+
+  const recalc = async (): Promise<void> => {
+    if (!recipe) return
+    setEstimating(true)
+    try {
+      const out = await computeRecipeEstimate(recipe)
+      await saveRecipeEstimate(recipe.id, out.estimate)
+      setEst(out.estimate)
+      setEstDetail(out.detail)
+    } finally {
+      setEstimating(false)
+    }
+  }
 
   const remove = async (): Promise<void> => {
     if (!window.confirm(`Delete “${recipe.title}”? This can't be undone.`)) return
@@ -72,6 +92,37 @@ export function RecipeDetailPage(props: {
               >
                 Source ↗
               </button>
+            )}
+          </div>
+          <div className="est-block">
+            {est ? (
+              <>
+                <span className="est-block__line">
+                  ≈ {Math.round(est.calories)} kcal · P {est.protein} / C {est.carbs} / F{' '}
+                  {est.fat} g per serve{est.assumedServings ? ' (assumes 4 serves)' : ''}
+                </span>
+                <span className="est-block__meta">
+                  best guess — matched {est.matched} of {est.total} ingredients
+                </span>
+              </>
+            ) : (
+              <span className="est-block__meta">No macro estimate yet.</span>
+            )}
+            {me && recipe.ownerId === me.id && (
+              <button className="link-btn" onClick={recalc} disabled={estimating}>
+                {estimating ? 'Estimating…' : est ? '♻️ Recalculate' : 'Estimate macros'}
+              </button>
+            )}
+            {estDetail && (
+              <ul className="est-breakdown">
+                {estDetail.map((d, i) => (
+                  <li key={i} className={d.matched ? '' : 'est-breakdown__miss'}>
+                    {d.matched
+                      ? `${d.name} — ${Math.round(d.grams ?? 0)} g · ${d.calories} kcal`
+                      : `${d.name} — not matched`}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
           <div className="detail__actions">
