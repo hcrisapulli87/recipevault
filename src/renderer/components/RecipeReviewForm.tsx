@@ -4,6 +4,7 @@ import type { DraftRecipe, RecipeStep } from '../../shared/types'
 import { parseIngredient } from '../../shared/ingredient-parser'
 import { saveRecipe } from '../data/recipes'
 import { estimateAndSave } from '../data/macroEstimate'
+import { convertDraftToMetric } from '../../shared/unit-convert'
 
 const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; cls: string } | null> = {
   structured: { text: '✓ Parsed from structured recipe data', cls: 'banner--ok' },
@@ -16,16 +17,21 @@ export function RecipeReviewForm(props: {
   onCancel: () => void
   onSaved: (id: number) => void
 }): JSX.Element {
+  // American imports read in Australian units: oz/lb → g, °F → °C (exact conversions
+  // only — cups/spoons stay). Runs once; the banner below says what changed.
+  const [converted] = useState(() => convertDraftToMetric(props.draft))
   const [title, setTitle] = useState(props.draft.title)
   const [description, setDescription] = useState(props.draft.description)
   const [servings, setServings] = useState(props.draft.servings?.toString() ?? '')
   const [prepMin, setPrepMin] = useState(props.draft.prepMin?.toString() ?? '')
   const [cookMin, setCookMin] = useState(props.draft.cookMin?.toString() ?? '')
   const [ingredientText, setIngredientText] = useState(
-    props.draft.ingredients.map((i) => i.raw).join('\n')
+    converted.draft.ingredients.map((i) => i.raw).join('\n')
   )
   const [steps, setSteps] = useState<RecipeStep[]>(
-    props.draft.steps.length ? props.draft.steps : [{ position: 0, section: null, text: '' }]
+    converted.draft.steps.length
+      ? converted.draft.steps
+      : [{ position: 0, section: null, text: '' }]
   )
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -94,6 +100,13 @@ export function RecipeReviewForm(props: {
     <div className="review-form">
       <h2 className="page-header__title">Review recipe</h2>
       {note && <div className={`banner ${note.cls}`}>{note.text}</div>}
+      {converted.measurements + converted.temps > 0 && (
+        <div className="banner banner--ok">
+          📏 Converted to metric: {converted.measurements} measurement
+          {converted.measurements === 1 ? '' : 's'}, {converted.temps} temperature
+          {converted.temps === 1 ? '' : 's'}.
+        </div>
+      )}
 
       <label className="field">
         <span className="field__label">Title</span>

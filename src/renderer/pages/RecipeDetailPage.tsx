@@ -5,6 +5,8 @@ import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
 import type { EstimateDetail } from '../../shared/macro-estimator'
 import { getRecipe, deleteRecipe } from '../data/recipes'
 import { computeRecipeEstimate, saveRecipeEstimate } from '../data/macroEstimate'
+import { convertRecipeToMetric } from '../data/metricConvert'
+import { hasImperialUnits } from '../../shared/unit-convert'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { useHousehold } from '../hooks/useHousehold'
@@ -49,6 +51,21 @@ export function RecipeDetailPage(props: {
 
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
+
+  const [converting, setConverting] = useState(false)
+  const convertMetric = async (): Promise<void> => {
+    if (!recipe) return
+    setConverting(true)
+    try {
+      await convertRecipeToMetric(recipe)
+      const fresh = await getRecipe(recipe.id)
+      setRecipe(fresh)
+      setEst(fresh?.est ?? null)
+      setEstDetail(null)
+    } finally {
+      setConverting(false)
+    }
+  }
 
   const recalc = async (): Promise<void> => {
     if (!recipe) return
@@ -137,6 +154,11 @@ export function RecipeDetailPage(props: {
             <button className="btn" onClick={() => setGroceryOpen(true)}>
               🛒 Send ingredients to groceries
             </button>
+            {me && recipe.ownerId === me.id && hasImperialUnits(recipe) && (
+              <button className="btn" onClick={convertMetric} disabled={converting}>
+                {converting ? 'Converting…' : '📏 Convert to metric'}
+              </button>
+            )}
             {/* Delete is owner-only; RLS refuses it server-side regardless. */}
             {me && recipe.ownerId === me.id && (
               <button className="btn btn--danger" onClick={remove}>
