@@ -12,6 +12,9 @@ and everything stays in sync.
 
 - **Import from URL** — parses schema.org JSON-LD (most recipe sites), falls back to heuristic
   HTML scanning, and always shows a review screen before saving.
+- **Import from Instagram** — paste a reel link; the caption's recipe is parsed (or its blog
+  link followed through the normal importer). On the phone the link queues through Supabase
+  and the desktop app fetches it. See "Instagram import" below.
 - **Library** — searchable recipe cards with images and cook times.
 - **Serving scaler** — bump 4 servings to 6 and every quantity rescales (with tidy fractions).
 - **Cooking mode** — full-screen step-by-step view with big text for the kitchen.
@@ -30,7 +33,8 @@ and everything stays in sync.
 
 - **One renderer, two shells.** `src/renderer` is built by Vite (+ `vite-plugin-pwa`) into the
   web app in `dist-web/`, and by electron-vite into the desktop app. The Electron main process
-  is just a window + camera permission — no IPC, no local database.
+  is a window + camera permission + one IPC channel (the local Instagram fetcher) — no local
+  database.
 - **Supabase** (Postgres + email/password Auth + Realtime) holds all data. Row-Level Security keeps
   each user's rows private; the publishable key is safe in the browser. Schema:
   `supabase/schema.sql` (idempotent — safe to re-run).
@@ -49,6 +53,19 @@ npm run typecheck
 npm run build:web  # PWA to dist-web/
 npm run build:win  # desktop to dist/win-unpacked/
 ```
+
+## Instagram import (desktop)
+
+Importing from Instagram reels uses a locally installed [yt-dlp](https://github.com/yt-dlp/yt-dlp):
+
+```
+pip install --user yt-dlp
+```
+
+Instagram blocks datacenter IPs, so reel fetching only runs in the desktop app (home
+connection). Phone imports queue through Supabase (`import_queue` table) and are fetched
+next time the desktop app is open. If Instagram imports suddenly fail, update it:
+`pip install -U yt-dlp`.
 
 ## Deploy (one-time setup)
 
