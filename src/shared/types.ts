@@ -83,6 +83,28 @@ export interface GroceryItem {
   sortOrder: number
 }
 
+// ── instagram import ──────────────────────────────────────────────────────────
+
+/** What the desktop yt-dlp fetch returns for a reel. */
+export interface InstagramPost {
+  caption: string
+  uploader: string | null
+}
+
+export type ImportQueueStatus = 'pending' | 'fetched' | 'failed'
+
+/** One phone-submitted reel waiting for (or processed by) the desktop fetcher. */
+export interface ImportQueueItem {
+  id: number
+  ownerId: string
+  url: string
+  status: ImportQueueStatus
+  caption: string | null
+  uploader: string | null
+  error: string | null
+  createdAt: string
+}
+
 // ── macro / meal tracker ──────────────────────────────────────────────────────
 
 export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack'
@@ -172,6 +194,7 @@ export const IPC = {
   SAVE_RECIPE: 'save-recipe',
   DELETE_RECIPE: 'delete-recipe',
   SCRAPE_URL: 'scrape-url',
+  INSTAGRAM_FETCH: 'instagram-fetch',
   GET_MEAL_PLAN: 'get-meal-plan',
   SET_MEAL: 'set-meal',
   CLEAR_WEEK: 'clear-week',
