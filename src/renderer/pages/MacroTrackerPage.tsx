@@ -4,6 +4,7 @@ import type { DailyLog, LogEntry, MealType } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
+import { macroCalorieShares } from '../../shared/tracker-logic'
 import { deleteLogEntry, getDailyLog, getProfile, updateLogEntry } from '../data/tracker'
 import type { TrackerProfile } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
@@ -44,10 +45,13 @@ function MacroBar(props: {
   label: string
   value: number
   goal: number | null
+  sharePct: number
   unit: string
   color: string
 }): JSX.Element {
-  const pct = props.goal ? Math.min(100, (props.value / props.goal) * 100) : 0
+  // With a goal the bar tracks progress toward it; without one it falls back to
+  // this macro's share of the day's calories, so it still fills as food is logged.
+  const pct = props.goal ? Math.min(100, (props.value / props.goal) * 100) : props.sharePct
   return (
     <div className="macro-bar">
       <div className="macro-bar__head">
@@ -55,7 +59,11 @@ function MacroBar(props: {
         <span className="macro-bar__value">
           {Math.round(props.value)}
           {props.unit}
-          {props.goal != null ? ` / ${Math.round(props.goal)}${props.unit}` : ''}
+          {props.goal != null
+            ? ` / ${Math.round(props.goal)}${props.unit}`
+            : props.sharePct > 0
+              ? ` · ${Math.round(props.sharePct)}% of kcal`
+              : ''}
         </span>
       </div>
       <div className="macro-bar__track">
@@ -187,6 +195,9 @@ export function MacroTrackerPage(): JSX.Element {
 
   const totals = log?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
   const goals = log?.goals ?? { calories: null, protein: null, carbs: null, fat: null }
+  const shares = macroCalorieShares(totals)
+  const noGoals =
+    goals.calories == null && goals.protein == null && goals.carbs == null && goals.fat == null
 
   return (
     <div>
@@ -271,6 +282,7 @@ export function MacroTrackerPage(): JSX.Element {
             label="Protein"
             value={totals.protein}
             goal={goals.protein}
+            sharePct={shares.protein}
             unit="g"
             color="var(--blue)"
           />
@@ -278,10 +290,24 @@ export function MacroTrackerPage(): JSX.Element {
             label="Carbs"
             value={totals.carbs}
             goal={goals.carbs}
+            sharePct={shares.carbs}
             unit="g"
             color="var(--green)"
           />
-          <MacroBar label="Fat" value={totals.fat} goal={goals.fat} unit="g" color="var(--amber)" />
+          <MacroBar
+            label="Fat"
+            value={totals.fat}
+            goal={goals.fat}
+            sharePct={shares.fat}
+            unit="g"
+            color="var(--amber)"
+          />
+          {noGoals && (
+            <p className="hero-card__hint">
+              No goals set — bars show today’s macro split.
+              {!readOnly && ' Set or calculate goals via ⚙️ Goals.'}
+            </p>
+          )}
         </div>
       </div>
 

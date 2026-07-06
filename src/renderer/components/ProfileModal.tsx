@@ -1,8 +1,17 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import type { ProfileGoals } from '../../shared/types'
+import { ACTIVITY_LABEL, calculateGoals } from '../../shared/goal-calculator'
+import type { ActivityLevel, GoalDirection, Sex } from '../../shared/goal-calculator'
 import { updateProfile } from '../data/tracker'
 import type { TrackerProfile } from '../data/tracker'
+
+const ACTIVITY_LEVELS = Object.keys(ACTIVITY_LABEL) as ActivityLevel[]
+const DIRECTION_LABEL: Record<GoalDirection, string> = {
+  lose: 'Lose weight',
+  maintain: 'Maintain',
+  gain: 'Gain weight'
+}
 
 const toGoal = (s: string): number | null => {
   const t = s.trim()
@@ -23,6 +32,32 @@ export function ProfileModal(props: {
   const [protein, setProtein] = useState(profile.proteinGoal?.toString() ?? '')
   const [carbs, setCarbs] = useState(profile.carbsGoal?.toString() ?? '')
   const [fat, setFat] = useState(profile.fatGoal?.toString() ?? '')
+
+  // Goal calculator — inputs are transient (only the resulting goals are saved).
+  const [calcOpen, setCalcOpen] = useState(false)
+  const [sex, setSex] = useState<Sex>('male')
+  const [age, setAge] = useState('')
+  const [heightCm, setHeightCm] = useState('')
+  const [weightKg, setWeightKg] = useState('')
+  const [activity, setActivity] = useState<ActivityLevel>('moderate')
+  const [direction, setDirection] = useState<GoalDirection>('maintain')
+
+  const calculated = calculateGoals({
+    sex,
+    age: Number(age),
+    heightCm: Number(heightCm),
+    weightKg: Number(weightKg),
+    activity,
+    direction
+  })
+
+  const applyCalculated = (): void => {
+    if (!calculated) return
+    setCal(String(calculated.calories))
+    setProtein(String(calculated.protein))
+    setCarbs(String(calculated.carbs))
+    setFat(String(calculated.fat))
+  }
 
   const save = async (): Promise<void> => {
     const goals: ProfileGoals = {
@@ -91,6 +126,94 @@ export function ProfileModal(props: {
             />
           </label>
         </div>
+
+        <button className="link-btn" onClick={() => setCalcOpen((o) => !o)}>
+          ✨ {calcOpen ? 'Hide the goal calculator' : 'Calculate goals from my stats'}
+        </button>
+
+        {calcOpen && (
+          <div className="goal-calc">
+            <div className="tabs">
+              {(['male', 'female'] as const).map((s) => (
+                <button
+                  key={s}
+                  className={`tabs__tab ${sex === s ? 'tabs__tab--active' : ''}`}
+                  onClick={() => setSex(s)}
+                >
+                  {s === 'male' ? 'Male' : 'Female'}
+                </button>
+              ))}
+            </div>
+            <div className="field-row">
+              <label className="field">
+                <span className="field__label">Age</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min="10"
+                  value={age}
+                  onChange={(e) => setAge(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field__label">Height (cm)</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min="100"
+                  value={heightCm}
+                  onChange={(e) => setHeightCm(e.target.value)}
+                />
+              </label>
+              <label className="field">
+                <span className="field__label">Weight (kg)</span>
+                <input
+                  className="text-input"
+                  type="number"
+                  min="30"
+                  value={weightKg}
+                  onChange={(e) => setWeightKg(e.target.value)}
+                />
+              </label>
+            </div>
+            <label className="field">
+              <span className="field__label">Activity</span>
+              <select
+                className="text-input"
+                value={activity}
+                onChange={(e) => setActivity(e.target.value as ActivityLevel)}
+              >
+                {ACTIVITY_LEVELS.map((a) => (
+                  <option key={a} value={a}>
+                    {ACTIVITY_LABEL[a]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <div className="tabs">
+              {(Object.keys(DIRECTION_LABEL) as GoalDirection[]).map((d) => (
+                <button
+                  key={d}
+                  className={`tabs__tab ${direction === d ? 'tabs__tab--active' : ''}`}
+                  onClick={() => setDirection(d)}
+                >
+                  {DIRECTION_LABEL[d]}
+                </button>
+              ))}
+            </div>
+            {calculated ? (
+              <p className="goal-calc__preview">
+                ≈ {calculated.calories.toLocaleString()} kcal · P {calculated.protein}g · C{' '}
+                {calculated.carbs}g · F {calculated.fat}g — best-guess estimate (Mifflin-St Jeor)
+              </p>
+            ) : (
+              <p className="modal__hint">Fill in age, height and weight for an estimate.</p>
+            )}
+            <button className="btn" disabled={!calculated} onClick={applyCalculated}>
+              Use these goals
+            </button>
+          </div>
+        )}
 
         <div className="modal__actions">
           <button className="btn" onClick={props.onClose}>

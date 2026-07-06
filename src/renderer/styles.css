@@ -1135,6 +1135,31 @@ body {
   color: var(--text-muted);
   font-style: italic;
 }
+.hero-card__hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* Goal calculator (inside the profile modal) */
+.goal-calc {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.goal-calc__preview {
+  font-size: 12px;
+  color: var(--accent-deep);
+  font-weight: 600;
+}
+select.text-input {
+  font-family: inherit;
+  color: var(--text-primary);
+}
 
 /* Add-food modal */
 .tabs {
