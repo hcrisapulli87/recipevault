@@ -597,8 +597,9 @@ body {
   align-items: center;
   justify-content: center;
   background: var(--bg-surface);
-  border: 2px solid var(--border);
-  border-radius: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
   font-size: 1.6rem;
   line-height: 1.7;
   padding: 40px;
@@ -896,7 +897,8 @@ body {
 .settings__section {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
   padding: 18px;
   display: flex;
   flex-direction: column;
@@ -1183,7 +1185,8 @@ body {
 .food-result {
   width: 100%;
   text-align: left;
-  background: var(--bg-elevated);
+  background: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 10px;
@@ -1260,15 +1263,21 @@ body {
 
 /* Sign-in */
 .signin {
-  max-width: 360px;
-  margin: 12vh auto 0;
+  max-width: 380px;
+  margin: 10vh auto 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
-  padding: 0 20px;
+  padding: 28px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
 }
 .signin__title {
-  font-size: 28px;
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   text-align: center;
 }
 .signin__tagline {
@@ -1287,7 +1296,12 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 4px 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-btn);
+  box-shadow: var(--shadow-sm);
+  padding: 10px 12px;
+  margin-bottom: 6px;
 }
 .grocery-page__done {
   text-decoration: line-through;

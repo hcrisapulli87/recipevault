@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { getSession, signOut } from '../data/auth'
+import { getThemePref, setThemePref } from '../lib/theme'
+import type { ThemePref } from '../lib/theme'
 
 export function SettingsPage(): JSX.Element {
   const [email, setEmail] = useState<string | null>(null)
+  const [theme, setTheme] = useState<ThemePref>(getThemePref())
 
   useEffect(() => {
     getSession().then((s) => setEmail(s?.user.email ?? null))
@@ -23,6 +26,24 @@ export function SettingsPage(): JSX.Element {
         <button className="btn" onClick={() => signOut()}>
           Sign out
         </button>
+      </section>
+
+      <section className="settings__section">
+        <h3>Appearance</h3>
+        <div className="tabs">
+          {(['light', 'dark', 'system'] as const).map((p) => (
+            <button
+              key={p}
+              className={`tabs__tab ${theme === p ? 'tabs__tab--active' : ''}`}
+              onClick={() => {
+                setThemePref(p)
+                setTheme(p)
+              }}
+            >
+              {p === 'light' ? '☀️ Light' : p === 'dark' ? '🌙 Dark' : '🖥️ System'}
+            </button>
+          ))}
+        </div>
       </section>
 
       <section className="settings__section">
