@@ -73,6 +73,48 @@ describe('parseIngredient', () => {
       unit: null,
       name: 'red onions'
     }))
+
+  it('parses ASCII fraction ("1/4 tsp")', () =>
+    expect(parseIngredient('1/4 tsp black pepper')).toMatchObject({
+      quantity: 0.25,
+      unit: 'tsp',
+      name: 'black pepper'
+    }))
+
+  it('parses ASCII mixed number ("1 1/2 tbsp")', () =>
+    expect(parseIngredient('1 1/2 tbsp olive oil')).toMatchObject({
+      quantity: 1.5,
+      unit: 'tbsp',
+      name: 'olive oil'
+    }))
+
+  it('parses ASCII fraction with no unit', () =>
+    expect(parseIngredient('1/2 cup pasta cooking water')).toMatchObject({
+      quantity: 0.5,
+      unit: 'cup',
+      name: 'pasta cooking water'
+    }))
+
+  it('drops the imperial twin in dual-unit quantities ("175g/6 oz")', () =>
+    expect(parseIngredient('175g/6 oz guanciale, skin removed')).toMatchObject({
+      quantity: 175,
+      unit: 'g',
+      name: 'guanciale, skin removed'
+    }))
+
+  it('drops a decimal imperial twin ("100g/3.5 oz")', () =>
+    expect(parseIngredient('100g/3.5 oz parmigiano reggiano, finely shredded')).toMatchObject({
+      quantity: 100,
+      unit: 'g',
+      name: 'parmigiano reggiano, finely shredded'
+    }))
+
+  it('still parses ranges after the fraction support ("1-2")', () =>
+    expect(parseIngredient('1-2 cloves garlic')).toMatchObject({
+      quantity: 1,
+      quantityMax: 2,
+      unit: 'clove'
+    }))
 })
 
 describe('scaleIngredient', () => {

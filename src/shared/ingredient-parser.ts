@@ -51,6 +51,12 @@ function readNumber(s: string): { value: number; rest: string } | null {
   // bare fraction: "½"
   m = s.match(/^([½⅓⅔¼¾⅕⅛⅜⅝⅞])\s*/)
   if (m) return { value: FRACTIONS[m[1]], rest: s.slice(m[0].length) }
+  // ASCII mixed number: "1 1/2" (space required, or it would eat plain integers)
+  m = s.match(/^(\d+)\s+(\d+)\s*\/\s*([1-9]\d*)\s*/)
+  if (m) return { value: Number(m[1]) + Number(m[2]) / Number(m[3]), rest: s.slice(m[0].length) }
+  // ASCII fraction: "1/4"
+  m = s.match(/^(\d+)\s*\/\s*([1-9]\d*)\s*/)
+  if (m) return { value: Number(m[1]) / Number(m[2]), rest: s.slice(m[0].length) }
   // decimal/integer, allowing "400g" (no space before unit)
   m = s.match(/^(\d+(?:\.\d+)?)(?:\s*)/)
   if (m) return { value: Number(m[1]), rest: s.slice(m[0].length) }
@@ -97,6 +103,14 @@ export function parseIngredient(raw: string): ParsedIngredient {
 
   // unit, then any trailing container words ("400g tins of …" → unit g, container tins)
   let unit: string | null = null
+
+  // dual-unit metric/imperial twin: "175g/6 oz …" — keep the first unit, drop the twin
+  const dual = s.match(/^([a-zA-Z]+)\s*\/\s*(\d+(?:\.\d+)?)\s*([a-zA-Z]+)\.?\s*/)
+  if (dual && UNIT_LOOKUP.has(dual[1].toLowerCase()) && UNIT_LOOKUP.has(dual[3].toLowerCase())) {
+    unit = UNIT_LOOKUP.get(dual[1].toLowerCase())!
+    s = s.slice(dual[0].length)
+  }
+
   for (;;) {
     const word = s.match(/^([a-zA-Z]+)\.?(?:\s+|$)/)
     if (!word || !UNIT_LOOKUP.has(word[1].toLowerCase())) break
