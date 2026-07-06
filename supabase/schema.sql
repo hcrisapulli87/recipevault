@@ -110,6 +110,21 @@ create table if not exists public.grocery_items (
   created_at timestamptz not null default now()
 );
 
+-- Instagram import relay: the phone inserts a reel URL; the desktop app (the only
+-- device on a residential IP that can talk to Instagram) fetches the caption and
+-- writes it back; the submitter's device parses it and opens the review form.
+-- Transient work queue — rows are deleted after review.
+create table if not exists public.import_queue (
+  id         bigint generated always as identity primary key,
+  owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  url        text not null,
+  status     text not null default 'pending' check (status in ('pending','fetched','failed')),
+  caption    text,
+  uploader   text,
+  error      text,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists ingredients_recipe_idx   on public.ingredients (recipe_id, position);
 create index if not exists steps_recipe_idx         on public.steps (recipe_id, position);
 create index if not exists grocery_owner_state_idx  on public.grocery_items (owner_id, checked, sort_order);
@@ -152,6 +167,18 @@ drop policy if exists "grocery_items: own rows" on public.grocery_items;
 create policy "grocery_items: own rows" on public.grocery_items
   for all to authenticated
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+
+-- import_queue: household read + household UPDATE (the desktop app is signed in as
+-- one user but must serve the other's queued fetches too); insert/delete stay owner-only.
+alter table public.import_queue enable row level security;
+drop policy if exists "import_queue: household read"   on public.import_queue;
+drop policy if exists "import_queue: owner insert"     on public.import_queue;
+drop policy if exists "import_queue: household update" on public.import_queue;
+drop policy if exists "import_queue: owner delete"     on public.import_queue;
+create policy "import_queue: household read"   on public.import_queue for select to authenticated using (true);
+create policy "import_queue: owner insert"     on public.import_queue for insert to authenticated with check (owner_id = auth.uid());
+create policy "import_queue: household update" on public.import_queue for update to authenticated using (true) with check (true);
+create policy "import_queue: owner delete"     on public.import_queue for delete to authenticated using (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Macro tracker
@@ -258,7 +285,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log','profiles']
+  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log','profiles','import_queue']
   loop
     if not exists (
       select 1 from pg_publication_tables
