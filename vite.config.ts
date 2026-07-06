@@ -23,8 +23,8 @@ export default defineConfig({
         name: 'RecipeVault',
         short_name: 'RecipeVault',
         description: 'Your recipe library and weekly meal planner, in your pocket.',
-        theme_color: '#16181d',
-        background_color: '#16181d',
+        theme_color: '#f2f4f7',
+        background_color: '#f2f4f7',
         display: 'standalone',
         start_url: '/',
         icons: [
