@@ -1,7 +1,11 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import type { DraftRecipe } from '../../shared/types'
+import type { DraftRecipe, ImportQueueItem, IpcResult } from '../../shared/types'
 import { scrapeUrl } from '../data/scrape'
+import { isInstagramUrl, importInstagramDesktop, captionToDraft } from '../data/instagram'
+import { queueImport, listMyImports, retryImport, deleteImport } from '../data/importQueue'
+import { onTableChange } from '../data/realtime'
+import { useHousehold } from '../hooks/useHousehold'
 import { RecipeReviewForm } from '../components/RecipeReviewForm'
 
 const EMPTY_DRAFT: DraftRecipe = {
@@ -18,28 +22,122 @@ const EMPTY_DRAFT: DraftRecipe = {
   confidence: 'manual'
 }
 
+const STATUS_LABEL: Record<ImportQueueItem['status'], string> = {
+  pending: 'Waiting for your desktop app…',
+  fetched: 'Ready to review',
+  failed: 'Failed'
+}
+
 export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Element {
   const [url, setUrl] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [draft, setDraft] = useState<DraftRecipe | null>(null)
+  const [captionOpen, setCaptionOpen] = useState(false)
+  const [captionText, setCaptionText] = useState('')
+  const [queue, setQueue] = useState<ImportQueueItem[]>([])
+  // Queue row currently open in the review form — deleted once saved.
+  const [reviewingId, setReviewingId] = useState<number | null>(null)
+  // URL submitted this session; when its row comes back fetched, auto-open review.
+  const autoOpenUrl = useRef<string | null>(null)
+
+  const users = useHousehold()
+  const meId = users.find((u) => u.isMe)?.id ?? null
+
+  const openFetchedItem = useCallback(async (item: ImportQueueItem): Promise<void> => {
+    setLoading(true)
+    const res = await captionToDraft(item.caption ?? '', item.uploader, item.url)
+    setLoading(false)
+    if (res.ok) {
+      setReviewingId(item.id)
+      setDraft(res.data)
+    } else {
+      setError(res.message)
+    }
+  }, [])
+
+  const reloadQueue = useCallback(() => {
+    if (!meId) return
+    listMyImports(meId).then((items) => {
+      setQueue(items)
+      const wanted = autoOpenUrl.current
+      if (wanted) {
+        const hit = items.find((i) => i.url === wanted && i.status === 'fetched')
+        if (hit) {
+          autoOpenUrl.current = null
+          void openFetchedItem(hit)
+        }
+      }
+    })
+  }, [meId, openFetchedItem])
+
+  useEffect(() => {
+    reloadQueue()
+    return onTableChange(['import_queue'], reloadQueue)
+  }, [reloadQueue])
 
   const fetchRecipe = async (): Promise<void> => {
-    if (!url.trim()) return
+    const u = url.trim()
+    if (!u) return
     setLoading(true)
     setError(null)
-    const result = await scrapeUrl(url.trim())
-    setLoading(false)
-    if (result.ok) {
-      setDraft(result.data)
+    let result: IpcResult<DraftRecipe>
+    if (isInstagramUrl(u)) {
+      if (window.api) {
+        result = await importInstagramDesktop(u)
+      } else {
+        // Phone/web: hand the fetch to the desktop app via the queue.
+        try {
+          await queueImport(u)
+          autoOpenUrl.current = u
+          setUrl('')
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Could not queue the import.')
+        }
+        setLoading(false)
+        return
+      }
     } else {
-      setError(result.message)
+      result = await scrapeUrl(u)
+    }
+    setLoading(false)
+    if (result.ok) setDraft(result.data)
+    else setError(result.message)
+  }
+
+  const parseCaption = async (): Promise<void> => {
+    const text = captionText.trim()
+    if (!text) return
+    setLoading(true)
+    setError(null)
+    const source = isInstagramUrl(url.trim()) ? url.trim() : null
+    const res = await captionToDraft(text, null, source)
+    setLoading(false)
+    if (res.ok) {
+      setDraft(res.data)
+      setCaptionText('')
+      setCaptionOpen(false)
+    } else {
+      setError(res.message)
     }
   }
 
   if (draft) {
     return (
-      <RecipeReviewForm draft={draft} onCancel={() => setDraft(null)} onSaved={props.onSaved} />
+      <RecipeReviewForm
+        draft={draft}
+        onCancel={() => {
+          setDraft(null)
+          setReviewingId(null)
+        }}
+        onSaved={(id) => {
+          if (reviewingId !== null) {
+            void deleteImport(reviewingId)
+            setReviewingId(null)
+          }
+          props.onSaved(id)
+        }}
+      />
     )
   }
 
@@ -47,13 +145,14 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
     <div className="import-page">
       <h2 className="page-header__title">Import a recipe</h2>
       <p className="import-page__hint">
-        Paste a link to any recipe page. RecipeVault strips it down to just the ingredients and
-        steps — no ads, no life stories.
+        Paste a link to any recipe page — or an Instagram reel. RecipeVault strips it down to just
+        the ingredients and steps — no ads, no life stories.
+        {!window.api && ' Instagram links are fetched by your desktop app and appear below.'}
       </p>
       <div className="import-page__row">
         <input
           className="text-input import-page__url"
-          placeholder="https://www.bbcgoodfood.com/recipes/…"
+          placeholder="https://www.instagram.com/reel/… or any recipe page"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && fetchRecipe()}
@@ -75,12 +174,69 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
           </button>
         </div>
       )}
+
+      {queue.length > 0 && (
+        <ul className="import-queue">
+          {queue.map((item) => (
+            <li key={item.id} className={`import-queue__item import-queue__item--${item.status}`}>
+              <div className="import-queue__info">
+                <span className="import-queue__url">{item.url}</span>
+                <span className="import-queue__status">
+                  {STATUS_LABEL[item.status]}
+                  {item.status === 'failed' && item.error ? ` — ${item.error}` : ''}
+                </span>
+              </div>
+              {item.status === 'fetched' && (
+                <button className="btn btn--primary" onClick={() => void openFetchedItem(item)}>
+                  Review
+                </button>
+              )}
+              {item.status === 'failed' && (
+                <button className="btn" onClick={() => void retryImport(item.id)}>
+                  Retry
+                </button>
+              )}
+              <button
+                className="icon-btn"
+                title="Remove"
+                onClick={() => void deleteImport(item.id)}
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+
       <p className="import-page__manual">
         …or{' '}
+        <button className="link-btn" onClick={() => setCaptionOpen(!captionOpen)}>
+          paste an Instagram caption
+        </button>{' '}
+        ·{' '}
         <button className="link-btn" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
           enter a recipe manually
         </button>
       </p>
+      {captionOpen && (
+        <div className="import-page__caption">
+          <textarea
+            className="text-input import-page__caption-box"
+            rows={8}
+            placeholder="Paste the reel's caption here…"
+            value={captionText}
+            onChange={(e) => setCaptionText(e.target.value)}
+            disabled={loading}
+          />
+          <button
+            className="btn btn--primary"
+            onClick={parseCaption}
+            disabled={loading || !captionText.trim()}
+          >
+            Read recipe from caption
+          </button>
+        </div>
+      )}
     </div>
   )
 }

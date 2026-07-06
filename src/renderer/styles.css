@@ -362,6 +362,60 @@ body {
   color: var(--text-muted);
   font-size: 13px;
 }
+/* Instagram import queue (phone submits, desktop fetches) */
+.import-queue {
+  list-style: none;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 720px;
+}
+.import-queue__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+.import-queue__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.import-queue__url {
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-queue__status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.import-queue__item--fetched .import-queue__status {
+  color: var(--green);
+}
+.import-queue__item--failed .import-queue__status {
+  color: var(--red);
+}
+.import-page__caption {
+  margin-top: 10px;
+  max-width: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.import-page__caption-box {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+}
 
 /* Review form */
 .review-form {
