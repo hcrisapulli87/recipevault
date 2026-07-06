@@ -26,8 +26,11 @@ and everything stays in sync.
   Postgres RLS ("read all, write only your own"), not just hidden buttons.
 - **Groceries** — built-in checklist; "Send week to groceries" merges duplicate ingredients
   across recipes before adding them.
-- **Macro tracker** — per-day food log (search a bundled staples list + OpenFoodFacts, scan a
-  barcode with the camera, or enter manually) with daily calorie/protein/carb/fat goals.
+- **Macro tracker** — per-day food log (search a bundled staples list + OpenFoodFacts
+  ranked Australia-first via `api/food-search.ts` — brands work as plain text, e.g.
+  "tip top bread" — scan a barcode with the camera, or enter manually; a product the
+  database doesn't know can be added once and is cached per-user for future scans)
+  with daily calorie/protein/carb/fat goals.
 
 ## Architecture
 
