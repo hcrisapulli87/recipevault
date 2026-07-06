@@ -10,10 +10,12 @@ import { SettingsPage } from './pages/SettingsPage'
 import { MacroTrackerPage } from './pages/MacroTrackerPage'
 import { GroceriesPage } from './pages/GroceriesPage'
 import { useRecipes } from './hooks/useRecipes'
+import { useImportQueueWorker } from './hooks/useImportQueueWorker'
 
 export type Page = 'library' | 'plan' | 'groceries' | 'tracker' | 'import' | 'settings'
 
 export default function App(): JSX.Element {
+  useImportQueueWorker() // desktop: serve phone-queued Instagram fetches (no-op on web)
   const [page, setPage] = useState<Page>('library')
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null)
   const recipes = useRecipes()
