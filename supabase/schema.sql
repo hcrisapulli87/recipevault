@@ -204,7 +204,10 @@ create table if not exists public.profiles (
   cal_goal     real,
   protein_goal real,
   carbs_goal   real,
-  fat_goal     real
+  fat_goal     real,
+  -- Service accounts (the Discord bot) are authenticated users too, but must never
+  -- appear in the Me/partner switchers. The bot marks its own row on startup.
+  is_bot       boolean not null default false
 );
 
 create table if not exists public.food_log (
@@ -240,6 +243,8 @@ create table if not exists public.food_cache (
   last_fetched     timestamptz not null default now(),
   primary key (owner_id, barcode)
 );
+
+alter table public.profiles add column if not exists is_bot boolean not null default false;
 
 alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;

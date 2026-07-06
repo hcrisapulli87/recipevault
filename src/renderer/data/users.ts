@@ -17,7 +17,12 @@ export async function listProfiles(): Promise<HouseholdUser[]> {
   } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
-  const { data, error } = await supabase.from('profiles').select('id, display_name')
+  // is_bot excludes service accounts (the Discord bot) — only real household
+  // members belong in the Me/partner switchers and "added by" chips.
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, display_name')
+    .eq('is_bot', false)
   if (error) throw new Error(error.message)
 
   return (data ?? [])
