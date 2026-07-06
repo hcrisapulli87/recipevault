@@ -2,25 +2,35 @@ import { supabase } from './supabase'
 import { searchStaples, mapOffProduct } from '../../shared/nutrition'
 import type { FoodItem } from '../../shared/types'
 
-// OpenFoodFacts is called directly from the browser (it sends Access-Control-Allow-Origin: *).
+// Text search goes through our Vercel proxy (api/food-search.ts): OFF's ranked
+// Search-a-licious API sends no CORS headers, so the browser can't call it directly.
+// DEV → same-origin (the vite dev proxy forwards /api to the deployed origin);
+// desktop production → derived from VITE_SCRAPE_URL (same origin, sibling function).
+const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
+  ? '/api/food-search'
+  : import.meta.env.VITE_SCRAPE_URL
+    ? (import.meta.env.VITE_SCRAPE_URL as string).replace(/scrape$/, 'food-search')
+    : '/api/food-search'
+
+// Barcode lookups still hit OFF directly — the v2 product endpoint sends ACAO: *
+// and isn't the rate-limited search endpoint.
 const OFF_BASE = 'https://world.openfoodfacts.org'
 const OFF_FIELDS = 'product_name,brands,code,serving_size,serving_quantity,nutriments'
 
-/** Bundled offline staples first, then OpenFoodFacts text search. Degrades to staples offline. */
+/** Bundled offline staples first, then the AU-first proxy search. Degrades to staples offline. */
 export async function searchFoods(query: string): Promise<FoodItem[]> {
   const staples = searchStaples(query)
 
   let off: FoodItem[] = []
   try {
-    const url =
-      `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
-      `&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`
-    const res = await fetch(url)
+    const res = await fetch(`${FOOD_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`)
     if (res.ok) {
-      const data = (await res.json()) as { products?: unknown[] }
-      off = (data.products ?? [])
-        .map((p) => mapOffProduct(p as never, 'search'))
-        .filter((x): x is FoodItem => x !== null)
+      const data = (await res.json()) as { ok?: boolean; products?: unknown[] }
+      if (data.ok) {
+        off = (data.products ?? [])
+          .map((p) => mapOffProduct(p as never, 'search'))
+          .filter((x): x is FoodItem => x !== null)
+      }
     }
   } catch {
     // offline — staples still returned
@@ -76,22 +86,29 @@ export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
     // offline
   }
 
-  if (item) {
-    // Best-effort cache (owner_id defaults to auth.uid()); ignore check-constraint/RLS errors.
-    await supabase.from('food_cache').upsert(
-      {
-        barcode: item.barcode,
-        name: item.name,
-        brand: item.brand,
-        serving_desc: item.servingDesc,
-        unit: item.unit,
-        cal_per_unit: item.calories,
-        protein_per_unit: item.protein,
-        carbs_per_unit: item.carbs,
-        fat_per_unit: item.fat
-      },
-      { onConflict: 'owner_id,barcode' }
-    )
-  }
+  if (item) await cacheFood(item)
   return item
+}
+
+/**
+ * Best-effort per-user barcode cache write (owner_id defaults to auth.uid()).
+ * Used by lookupBarcode on OFF hits AND by the Add Food modal when a scanned
+ * product OFF doesn't know is entered manually — the next scan is then instant.
+ */
+export async function cacheFood(item: FoodItem): Promise<void> {
+  if (!item.barcode) return
+  await supabase.from('food_cache').upsert(
+    {
+      barcode: item.barcode,
+      name: item.name,
+      brand: item.brand,
+      serving_desc: item.servingDesc,
+      unit: item.unit,
+      cal_per_unit: item.calories,
+      protein_per_unit: item.protein,
+      carbs_per_unit: item.carbs,
+      fat_per_unit: item.fat
+    },
+    { onConflict: 'owner_id,barcode' }
+  )
 }
