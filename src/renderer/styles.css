@@ -661,6 +661,22 @@ body {
   flex-direction: column;
   gap: 6px;
 }
+/* One breakfast/lunch/dinner slot inside a day column. Relative so the
+   editor popover anchors under the slot being edited, not the whole day. */
+.board-slot {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.board-slot__label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
 .board-cell__day {
   font-size: 10px;
   font-weight: 700;
@@ -683,10 +699,13 @@ body {
   display: flex;
   flex-direction: column;
 }
-.board-cell--today .board-card {
-  box-shadow:
-    0 0 0 2px var(--accent),
-    var(--shadow-sm);
+/* Today = tinted column (a ring on all three slot cards was too noisy).
+   Negative margin cancels the padding so the column stays aligned with the rest. */
+.board-cell--today {
+  background: var(--accent-tint);
+  border-radius: var(--radius);
+  padding: 6px;
+  margin: -6px;
 }
 .board-card__open {
   background: none;
@@ -1427,10 +1446,10 @@ select.text-input {
     padding: 10px 4px;
   }
 
-  /* Week Board → stacked day list */
+  /* Week Board → stacked day list (each day now holds 3 slot rows) */
   .board {
     grid-template-columns: 1fr;
-    gap: 8px;
+    gap: 16px;
   }
   .board-card {
     flex-direction: row;

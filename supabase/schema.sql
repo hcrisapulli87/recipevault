@@ -14,7 +14,9 @@
 --
 -- The script is idempotent / safe to re-run: create-if-not-exists tables, guarded column
 -- adds, drop-and-recreate policies (Postgres has no "create policy if not exists"), and a
--- guarded realtime publication block. It never drops a table or deletes a row.
+-- guarded realtime publication block. It never drops a table. One exception on row
+-- deletes: the 2026-07 three-meal migration clears legacy one-meal-per-day planner rows
+-- (a one-time cutover; a no-op on every run after that).
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Tables  (Postgres mirror of the old local SQLite schema, now owner-scoped)
@@ -58,16 +60,44 @@ create table if not exists public.steps (
   text      text not null
 );
 
--- One row per weekday. recipe_id `on delete set null` so deleting a planned recipe just
--- empties that day. meal_text is a denormalised label the Discord bot reads (no join).
+-- One row per weekday MEAL SLOT (breakfast/lunch/dinner). recipe_id `on delete set null`
+-- so deleting a planned recipe just empties that slot. meal_text is a denormalised label
+-- the Discord bot reads (no join).
 create table if not exists public.meal_plan (
   owner_id  uuid not null default auth.uid() references auth.users (id) on delete cascade,
   day       text not null check (day in ('monday','tuesday','wednesday','thursday','friday','saturday','sunday')),
+  meal      text not null check (meal in ('breakfast','lunch','dinner')),
   recipe_id bigint references public.recipes (id) on delete set null,
   free_text text,
   meal_text text,
-  primary key (owner_id, day)
+  primary key (owner_id, day, meal)
 );
+
+-- Migration (2026-07): planner upgraded from one meal/day to three slots/day.
+-- Legacy rows predate the meal column and can't be mapped to a slot, so they're
+-- cleared once ("start fresh" cutover — the only row-delete in this script).
+-- Every step is guarded, so re-runs and fresh installs are no-ops.
+alter table public.meal_plan add column if not exists meal text;
+delete from public.meal_plan where meal is null;
+alter table public.meal_plan alter column meal set not null;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.meal_plan'::regclass and conname = 'meal_plan_meal_check'
+  ) then
+    alter table public.meal_plan
+      add constraint meal_plan_meal_check check (meal in ('breakfast','lunch','dinner'));
+  end if;
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.meal_plan'::regclass
+      and conname = 'meal_plan_pkey' and array_length(conkey, 1) = 3
+  ) then
+    alter table public.meal_plan drop constraint if exists meal_plan_pkey;
+    alter table public.meal_plan add constraint meal_plan_pkey primary key (owner_id, day, meal);
+  end if;
+end $$;
 
 -- The built-in grocery list (replaces the old Google Tasks push).
 create table if not exists public.grocery_items (

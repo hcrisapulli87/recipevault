@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import type { Day, MealPlanEntry, RecipeSummary } from '../../shared/types'
+import { MEAL_LABEL } from '../../shared/types'
+import type { Day, MealPlanEntry, PlanMeal, RecipeSummary } from '../../shared/types'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
@@ -47,7 +48,7 @@ function CellActions(props: { onEdit: () => void; onClear: () => void }): JSX.El
   )
 }
 
-function DayCell(props: {
+function MealSlot(props: {
   entry: MealPlanEntry
   recipes: RecipeSummary[]
   readOnly: boolean
@@ -57,7 +58,6 @@ function DayCell(props: {
   const [editing, setEditing] = useState(false)
   const [query, setQuery] = useState('')
   const { entry, recipes } = props
-  const isToday = entry.day === todayDay()
 
   const recipe = entry.recipeId !== null ? recipes.find((r) => r.id === entry.recipeId) : undefined
   const matches =
@@ -72,11 +72,8 @@ function DayCell(props: {
   }
 
   return (
-    <div className={`board-cell ${isToday ? 'board-cell--today' : ''}`}>
-      <span className="board-cell__day">
-        {DAY_LABEL[entry.day]}
-        {isToday && <span className="board-cell__today-tag"> · today</span>}
-      </span>
+    <div className="board-slot">
+      <span className="board-slot__label">{MEAL_LABEL[entry.meal]}</span>
 
       {recipe ? (
         <div className="board-card board-card--recipe">
@@ -147,6 +144,35 @@ function DayCell(props: {
   )
 }
 
+function DayColumn(props: {
+  day: Day
+  entries: MealPlanEntry[]
+  recipes: RecipeSummary[]
+  readOnly: boolean
+  onSet: (meal: PlanMeal, recipeId: number | null, freeText: string | null) => void
+  onOpenRecipe: (id: number) => void
+}): JSX.Element {
+  const isToday = props.day === todayDay()
+  return (
+    <div className={`board-cell ${isToday ? 'board-cell--today' : ''}`}>
+      <span className="board-cell__day">
+        {DAY_LABEL[props.day]}
+        {isToday && <span className="board-cell__today-tag"> · today</span>}
+      </span>
+      {props.entries.map((entry) => (
+        <MealSlot
+          key={entry.meal}
+          entry={entry}
+          recipes={props.recipes}
+          readOnly={props.readOnly}
+          onSet={(recipeId, freeText) => props.onSet(entry.meal, recipeId, freeText)}
+          onOpenRecipe={props.onOpenRecipe}
+        />
+      ))}
+    </div>
+  )
+}
+
 export function MealPlanPage(props: {
   recipes: RecipeSummary[]
   onOpenRecipe: (id: number) => void
@@ -180,14 +206,15 @@ export function MealPlanPage(props: {
     return onTableChange(['meal_plan'], reload)
   }, [reload])
 
-  const setDay = async (
+  const setSlot = async (
     day: Day,
+    meal: PlanMeal,
     recipeId: number | null,
     freeText: string | null
   ): Promise<void> => {
     const mealText =
       recipeId !== null ? (props.recipes.find((r) => r.id === recipeId)?.title ?? null) : freeText
-    await setMeal({ day, recipeId, freeText, mealText })
+    await setMeal({ day, meal, recipeId, freeText, mealText })
     reload()
   }
 
@@ -231,13 +258,14 @@ export function MealPlanPage(props: {
       )}
 
       <div className="board">
-        {plan.map((entry) => (
-          <DayCell
-            key={entry.day}
-            entry={entry}
+        {DAY_ORDER.map((day) => (
+          <DayColumn
+            key={day}
+            day={day}
+            entries={plan.filter((e) => e.day === day)}
             recipes={props.recipes}
             readOnly={readOnly}
-            onSet={(recipeId, freeText) => setDay(entry.day, recipeId, freeText)}
+            onSet={(meal, recipeId, freeText) => setSlot(day, meal, recipeId, freeText)}
             onOpenRecipe={props.onOpenRecipe}
           />
         ))}

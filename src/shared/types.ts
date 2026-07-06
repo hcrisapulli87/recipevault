@@ -58,8 +58,14 @@ export const DAYS: Day[] = [
   'sunday'
 ]
 
+/** Planner slots: the tracker's meal types minus snack. Labels come from MEAL_LABEL. */
+export type PlanMeal = 'breakfast' | 'lunch' | 'dinner'
+
+export const PLAN_MEALS: PlanMeal[] = ['breakfast', 'lunch', 'dinner']
+
 export interface MealPlanEntry {
   day: Day
+  meal: PlanMeal
   recipeId: number | null
   freeText: string | null
 }
