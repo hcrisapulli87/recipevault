@@ -2,7 +2,7 @@ import { useState } from 'react'
 import type { JSX } from 'react'
 import type { FoodItem, MealType } from '../../shared/types'
 import { MEAL_LABEL } from '../../shared/types'
-import { lookupBarcode, searchFoods } from '../data/foods'
+import { lookupBarcode, searchFoods, cacheFood } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
@@ -102,6 +102,9 @@ export function AddFoodModal(props: {
   const [barcodeInput, setBarcodeInput] = useState('')
   const [lookingUp, setLookingUp] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
+  // Set when a scan/lookup found no product — carried into the Manual tab so the
+  // entry is saved into food_cache and the next scan of it resolves instantly.
+  const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
 
   // manual tab
   const [mName, setMName] = useState('')
@@ -132,8 +135,13 @@ export function AddFoodModal(props: {
     setBarcodeError(null)
     try {
       const item = await lookupBarcode(trimmed)
-      if (!item) setBarcodeError(`No product found for barcode ${trimmed}.`)
-      else setSelected(item)
+      if (!item) {
+        setBarcodeError(`No product found for barcode ${trimmed}.`)
+        setPendingBarcode(trimmed)
+      } else {
+        setPendingBarcode(null)
+        setSelected(item)
+      }
     } catch (err) {
       setBarcodeError(err instanceof Error ? err.message : 'Lookup failed.')
     }
@@ -145,7 +153,7 @@ export function AddFoodModal(props: {
     setSelected({
       name: mName.trim(),
       brand: mBrand.trim() || null,
-      barcode: null,
+      barcode: pendingBarcode,
       servingDesc: null,
       unit: 'serving',
       calories: Number(mCal) || 0,
@@ -176,6 +184,13 @@ export function AddFoodModal(props: {
     setLogError(null)
     try {
       await addLogEntry(entry)
+      if (selected.source === 'manual' && selected.barcode) {
+        try {
+          await cacheFood(selected)
+        } catch {
+          // cache is best-effort; the entry itself is already logged
+        }
+      }
       props.onLogged()
       props.onClose()
     } catch (err) {
@@ -294,12 +309,32 @@ export function AddFoodModal(props: {
                 {lookingUp ? '…' : 'Look up'}
               </button>
             </div>
-            {barcodeError && <div className="banner banner--warn">{barcodeError}</div>}
+            {barcodeError && (
+              <div className="banner banner--warn">
+                <span>{barcodeError}</span>
+                {pendingBarcode && (
+                  <button className="btn" onClick={() => setTab('manual')}>
+                    ✏️ Add it manually — saves for next scan
+                  </button>
+                )}
+              </div>
+            )}
           </>
         )}
 
         {tab === 'manual' && (
           <>
+            {pendingBarcode && (
+              <div className="banner banner--ok">
+                <span>
+                  Will be saved for barcode <strong>{pendingBarcode}</strong> — next scan is
+                  instant.
+                </span>
+                <button className="btn" onClick={() => setPendingBarcode(null)}>
+                  Detach
+                </button>
+              </div>
+            )}
             <label className="field">
               <span className="field__label">Food name</span>
               <input
