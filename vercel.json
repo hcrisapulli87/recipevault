@@ -1,5 +1,15 @@
 {
   "buildCommand": "npm run build:web",
   "outputDirectory": "dist-web",
-  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 30
+    }
+  }
 }

@@ -54,21 +54,33 @@ describe('searchFoods', () => {
         })
       }
     })
-    const results = await searchFoods('banana')
+    const { items, online } = await searchFoods('banana')
     expect(requested).toContain('/api/food-search?q=banana')
-    const bananas = results.filter((r) => r.name.toLowerCase() === 'banana')
+    expect(online).toBe(true)
+    const bananas = items.filter((r) => r.name.toLowerCase() === 'banana')
     expect(bananas).toHaveLength(1)
     expect(bananas[0].source).toBe('staple') // staple wins the name collision
-    expect(results.some((r) => r.name === 'Tuna in Oil' && r.brand === 'Sirena')).toBe(true)
+    expect(items.some((r) => r.name === 'Tuna in Oil' && r.brand === 'Sirena')).toBe(true)
   })
 
-  it('degrades to staples when the proxy is unreachable', async () => {
+  it('degrades to staples and reports online:false when the proxy is unreachable', async () => {
     vi.stubGlobal('fetch', async () => {
       throw new Error('offline')
     })
-    const results = await searchFoods('banana')
-    expect(results.length).toBeGreaterThan(0)
-    expect(results.every((r) => r.source === 'staple')).toBe(true)
+    const { items, online } = await searchFoods('banana')
+    expect(online).toBe(false)
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.every((r) => r.source === 'staple')).toBe(true)
+  })
+
+  it('reports online:false when the proxy answers ok:false (upstream search down)', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({ ok: false, message: 'Food search is unavailable right now.' })
+    }))
+    const { items, online } = await searchFoods('banana')
+    expect(online).toBe(false)
+    expect(items.every((r) => r.source === 'staple')).toBe(true)
   })
 })
 

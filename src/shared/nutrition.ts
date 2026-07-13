@@ -1,11 +1,6 @@
 import type { FoodItem, Per100g } from './types'
 import staplesData from './data/common-foods.json'
 
-// OpenFoodFacts asks every client to send an identifying User-Agent.
-const USER_AGENT = 'RecipeVault/1.0 (personal meal tracker)'
-const OFF_BASE = 'https://world.openfoodfacts.org'
-const OFF_FIELDS = 'product_name,brands,code,serving_size,serving_quantity,nutriments'
-
 interface Staple {
   name: string
   serving: { desc: string; grams: number }
@@ -146,48 +141,4 @@ export function mapOffProduct(
     fat: round1(fat100 ?? 0),
     source
   }
-}
-
-/** Bundled staples first (clean whole-food data), then OpenFoodFacts text search. */
-export async function searchFoods(query: string): Promise<FoodItem[]> {
-  const staples = searchStaples(query)
-
-  let off: FoodItem[] = []
-  try {
-    const url =
-      `${OFF_BASE}/cgi/search.pl?search_terms=${encodeURIComponent(query)}` +
-      `&search_simple=1&action=process&json=1&page_size=20&fields=${OFF_FIELDS}`
-    const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
-    if (res.ok) {
-      const data = (await res.json()) as { products?: OffProduct[] }
-      off = (data.products ?? [])
-        .map((p) => mapOffProduct(p, 'search'))
-        .filter((x): x is FoodItem => x !== null)
-    }
-  } catch {
-    // Network failure: staples are still returned so the feature degrades gracefully.
-  }
-
-  const seen = new Set(staples.map((s) => s.name.toLowerCase()))
-  const merged = [...staples]
-  for (const item of off) {
-    const key = item.name.toLowerCase()
-    if (!seen.has(key)) {
-      merged.push(item)
-      seen.add(key)
-    }
-  }
-  return merged.slice(0, 30)
-}
-
-/** Look up a single product by barcode via OpenFoodFacts. */
-export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
-  const url = `${OFF_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${OFF_FIELDS}`
-  const res = await fetch(url, { headers: { 'User-Agent': USER_AGENT } })
-  if (!res.ok) return null
-  const data = (await res.json()) as { status?: number; product?: OffProduct }
-  if (data.status !== 1 || !data.product) return null
-  const item = mapOffProduct(data.product, 'barcode')
-  if (item && !item.barcode) item.barcode = barcode
-  return item
 }

@@ -35,6 +35,28 @@ export function normalizeSalHit(h: SalHit): NormalizedProduct {
   }
 }
 
+/**
+ * URL for the legacy OpenFoodFacts search (cgi/search.pl). Kept as the fallback
+ * source: Search-a-licious has better ranking but has proven to go hard-down
+ * (502s for days), while the legacy endpoint stays up, if flaky. Its products
+ * already use the legacy shape (brands as a comma string), so results feed
+ * straight into mergeSearchHits.
+ */
+export function legacySearchUrl(
+  q: string,
+  opts: { fields: string; pageSize: number; australia?: boolean }
+): string {
+  let url =
+    'https://world.openfoodfacts.org/cgi/search.pl' +
+    `?search_terms=${encodeURIComponent(q)}` +
+    '&search_simple=1&action=process&json=1' +
+    `&page_size=${opts.pageSize}&fields=${opts.fields}`
+  if (opts.australia) {
+    url += '&tagtype_0=countries&tag_contains_0=contains&tag_0=australia'
+  }
+  return url
+}
+
 /** AU hits first, world hits appended, deduped by barcode — or by name when code-less. */
 export function mergeSearchHits(au: SalHit[], world: SalHit[]): NormalizedProduct[] {
   const out: NormalizedProduct[] = []

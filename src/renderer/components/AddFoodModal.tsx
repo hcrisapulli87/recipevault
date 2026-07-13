@@ -97,6 +97,7 @@ export function AddFoodModal(props: {
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
+  const [searchOnline, setSearchOnline] = useState(true)
 
   // barcode tab
   const [scanning, setScanning] = useState(false)
@@ -120,7 +121,9 @@ export function AddFoodModal(props: {
     setSearching(true)
     setSearchError(null)
     try {
-      setResults(await searchFoods(query.trim()))
+      const { items, online } = await searchFoods(query.trim())
+      setResults(items)
+      setSearchOnline(online)
     } catch (err) {
       setSearchError(err instanceof Error ? err.message : 'Search failed.')
     }
@@ -264,6 +267,12 @@ export function AddFoodModal(props: {
               </button>
             </div>
             {searchError && <div className="banner banner--error">{searchError}</div>}
+            {searched && !searching && !searchOnline && (
+              <div className="banner banner--warn">
+                Online food search is unavailable right now — only the offline staples list was
+                searched.
+              </div>
+            )}
             <ul className="food-results">
               {results.map((item, i) => (
                 <li key={i}>
@@ -283,7 +292,7 @@ export function AddFoodModal(props: {
                 </li>
               ))}
             </ul>
-            {searched && !searching && results.length === 0 && !searchError && (
+            {searched && !searching && results.length === 0 && !searchError && searchOnline && (
               <p className="empty-note">No matches. Try the Manual tab.</p>
             )}
           </>

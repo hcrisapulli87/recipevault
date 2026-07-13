@@ -1,5 +1,21 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeSalHit, mergeSearchHits } from '../src/shared/food-search'
+import { normalizeSalHit, mergeSearchHits, legacySearchUrl } from '../src/shared/food-search'
+
+describe('legacySearchUrl', () => {
+  it('builds a world search URL with the query encoded', () => {
+    const url = legacySearchUrl('greek yogurt', { fields: 'product_name,code', pageSize: 20 })
+    expect(url).toContain('world.openfoodfacts.org/cgi/search.pl')
+    expect(url).toContain('search_terms=greek%20yogurt')
+    expect(url).toContain('json=1')
+    expect(url).not.toContain('tagtype_0')
+  })
+  it('adds the Australia country filter when asked', () => {
+    const url = legacySearchUrl('oats', { fields: 'product_name', pageSize: 20, australia: true })
+    expect(url).toContain('tagtype_0=countries')
+    expect(url).toContain('tag_contains_0=contains')
+    expect(url).toContain('tag_0=australia')
+  })
+})
 
 describe('normalizeSalHit', () => {
   it('joins the brands array to a comma string and stringifies the code', () => {

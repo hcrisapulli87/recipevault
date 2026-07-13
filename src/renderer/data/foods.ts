@@ -17,16 +17,26 @@ export const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
 const OFF_BASE = 'https://world.openfoodfacts.org'
 const OFF_FIELDS = 'product_name,brands,code,serving_size,serving_quantity,nutriments'
 
+export interface FoodSearchResult {
+  items: FoodItem[]
+  /** False when the online product search failed (offline, or OpenFoodFacts down)
+   *  and only the bundled staples could be searched — the UI says so instead of
+   *  presenting a misleading "no matches". */
+  online: boolean
+}
+
 /** Bundled offline staples first, then the AU-first proxy search. Degrades to staples offline. */
-export async function searchFoods(query: string): Promise<FoodItem[]> {
+export async function searchFoods(query: string): Promise<FoodSearchResult> {
   const staples = searchStaples(query)
 
   let off: FoodItem[] = []
+  let online = false
   try {
     const res = await fetch(`${FOOD_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`)
     if (res.ok) {
       const data = (await res.json()) as { ok?: boolean; products?: unknown[] }
       if (data.ok) {
+        online = true
         off = (data.products ?? [])
           .map((p) => mapOffProduct(p as never, 'search'))
           .filter((x): x is FoodItem => x !== null)
@@ -45,7 +55,7 @@ export async function searchFoods(query: string): Promise<FoodItem[]> {
       seen.add(k)
     }
   }
-  return merged.slice(0, 30)
+  return { items: merged.slice(0, 30), online }
 }
 
 /** Look up a barcode: per-user cache first, then OpenFoodFacts (and cache the result). */
