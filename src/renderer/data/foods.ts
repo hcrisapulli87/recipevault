@@ -123,6 +123,49 @@ export async function lookupBarcode(
 }
 
 /**
+ * The user's most recently logged foods, deduped by name+brand — shown in the
+ * Add Food modal before a search is typed, so everyday items are one tap
+ * instead of a network search. Own entries only (recents are personal).
+ */
+export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+  if (!user) return []
+
+  // Over-fetch (recent days repeat the same foods heavily), dedupe client-side.
+  const { data, error } = await supabase
+    .from('food_log')
+    .select('name, brand, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source')
+    .eq('owner_id', user.id)
+    .order('id', { ascending: false })
+    .limit(100)
+  if (error || !data) return []
+
+  const seen = new Set<string>()
+  const out: FoodItem[] = []
+  for (const r of data) {
+    const key = `${r.name.toLowerCase()}|${(r.brand ?? '').toLowerCase()}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push({
+      name: r.name,
+      brand: r.brand,
+      barcode: r.barcode,
+      servingDesc: r.unit === '100g' ? 'per 100 g' : null,
+      unit: r.unit,
+      calories: r.base_calories,
+      protein: r.base_protein,
+      carbs: r.base_carbs,
+      fat: r.base_fat,
+      source: 'recent'
+    })
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+/**
  * Best-effort per-user barcode cache write (owner_id defaults to auth.uid()).
  * Used by lookupBarcode on OFF hits AND by the Add Food modal when a scanned
  * product OFF doesn't know is entered manually — the next scan is then instant.

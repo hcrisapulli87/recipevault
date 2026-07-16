@@ -162,7 +162,7 @@ export interface FoodItem {
   protein: number
   carbs: number
   fat: number
-  source: 'staple' | 'search' | 'barcode' | 'manual' | 'plan'
+  source: 'staple' | 'search' | 'barcode' | 'manual' | 'plan' | 'recent'
 }
 
 /** A logged item. Macros are stored per-unit; the day's total is base_* × amount. */

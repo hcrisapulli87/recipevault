@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { FoodItem, MealType } from '../../shared/types'
 import { MEAL_LABEL } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
-import { lookupBarcode, searchFoods, cacheFood } from '../data/foods'
+import { lookupBarcode, searchFoods, cacheFood, getRecentFoods } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
@@ -114,6 +114,12 @@ export function AddFoodModal(props: {
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [searchOnline, setSearchOnline] = useState(true)
+  // Recently logged foods (own entries), shown before a query is typed —
+  // everyday items are one tap instead of a network search. Best-effort.
+  const [recents, setRecents] = useState<FoodItem[]>([])
+  useEffect(() => {
+    getRecentFoods().then(setRecents, () => {})
+  }, [])
 
   // barcode tab
   const [scanning, setScanning] = useState(false)
@@ -346,6 +352,36 @@ export function AddFoodModal(props: {
                 {searching ? '…' : 'Search'}
               </button>
             </div>
+            {query.trim() === '' && recents.length > 0 && (
+              <>
+                <p className="modal__hint">Recently logged:</p>
+                <ul className="food-results">
+                  {recents.map((item, i) => (
+                    <li key={i}>
+                      <button
+                        className="food-result"
+                        onClick={() => {
+                          setSelectedFromCache(false)
+                          setSelected(item)
+                        }}
+                      >
+                        <span className="food-result__name">
+                          <span className="food-result__tag">recent</span>
+                          {item.name}
+                          {item.brand ? (
+                            <span className="food-result__brand"> · {item.brand}</span>
+                          ) : null}
+                        </span>
+                        <span className="food-result__macros">
+                          {macroLine(item)}
+                          {item.servingDesc ? ` — ${item.servingDesc}` : ''}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
             {searchError && <div className="banner banner--error">{searchError}</div>}
             {searched && !searching && !searchOnline && (
               <div className="banner banner--warn">

@@ -1,21 +1,28 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchFoods, cacheFood, lookupBarcode } from '../src/renderer/data/foods'
+import { searchFoods, cacheFood, lookupBarcode, getRecentFoods } from '../src/renderer/data/foods'
 import type { FoodItem } from '../src/shared/types'
 
 const state = vi.hoisted(() => ({
   upserted: [] as { row: Record<string, unknown>; options: Record<string, unknown> }[],
-  cachedRow: null as Record<string, unknown> | null
+  cachedRow: null as Record<string, unknown> | null,
+  logRows: [] as Record<string, unknown>[]
 }))
 
 vi.mock('../src/renderer/data/supabase', () => ({
   supabase: {
+    auth: { getUser: async () => ({ data: { user: { id: 'user-1' } } }) },
     from: () => ({
       upsert: (row: Record<string, unknown>, options: Record<string, unknown>) => {
         state.upserted.push({ row, options })
         return Promise.resolve({ error: null })
       },
       select: () => ({
-        eq: () => ({ maybeSingle: () => Promise.resolve({ data: state.cachedRow }) })
+        eq: () => ({
+          maybeSingle: () => Promise.resolve({ data: state.cachedRow }),
+          order: () => ({
+            limit: () => Promise.resolve({ data: state.logRows, error: null })
+          })
+        })
       })
     })
   }
@@ -39,6 +46,7 @@ function offProduct(over: Record<string, unknown> = {}): Record<string, unknown>
 beforeEach(() => {
   state.upserted = []
   state.cachedRow = null
+  state.logRows = []
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -140,6 +148,45 @@ describe('lookupBarcode', () => {
     const offline = await lookupBarcode('4000000000000')
     expect(offline.item).toBeNull()
     expect(offline.online).toBe(false)
+  })
+})
+
+describe('getRecentFoods', () => {
+  const logRow = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    name: 'Greek Yogurt',
+    brand: 'Chobani',
+    unit: 'serving',
+    base_calories: 140,
+    base_protein: 15,
+    base_carbs: 8,
+    base_fat: 4,
+    barcode: null,
+    source: 'search',
+    ...over
+  })
+
+  it('dedupes repeat logs by name+brand and maps rows to FoodItems', async () => {
+    state.logRows = [
+      logRow(),
+      logRow(), // yesterday's identical log — must collapse
+      logRow({ name: 'Greek Yogurt', brand: null }), // same name, no brand → distinct
+      logRow({ name: 'Oats', brand: null, unit: '100g', base_calories: 389 })
+    ]
+    const recents = await getRecentFoods()
+    expect(recents).toHaveLength(3)
+    expect(recents[0]).toMatchObject({
+      name: 'Greek Yogurt',
+      brand: 'Chobani',
+      calories: 140,
+      source: 'recent'
+    })
+    expect(recents[2]).toMatchObject({ name: 'Oats', unit: '100g', servingDesc: 'per 100 g' })
+  })
+
+  it('caps the list at the requested limit', async () => {
+    state.logRows = Array.from({ length: 20 }, (_, i) => logRow({ name: `Food ${i}` }))
+    const recents = await getRecentFoods(8)
+    expect(recents).toHaveLength(8)
   })
 })
 
