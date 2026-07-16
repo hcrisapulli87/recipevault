@@ -46,10 +46,14 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
     // offline — staples still returned
   }
 
-  const seen = new Set(staples.map((s) => s.name.toLowerCase()))
+  // Dedupe on name+brand, not name alone: a branded OFF product that happens to
+  // share a staple's name (e.g. "Banana · Some Brand") is a different food with
+  // its own barcode/serving, and must not be swallowed by the staple.
+  const foodKey = (f: FoodItem): string => `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`
+  const seen = new Set(staples.map(foodKey))
   const merged = [...staples]
   for (const item of off) {
-    const k = item.name.toLowerCase()
+    const k = foodKey(item)
     if (!seen.has(k)) {
       merged.push(item)
       seen.add(k)

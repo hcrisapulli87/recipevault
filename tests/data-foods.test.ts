@@ -53,7 +53,7 @@ afterEach(() => {
 })
 
 describe('searchFoods', () => {
-  it('queries the proxy and merges staples first, deduped by name', async () => {
+  it('queries the proxy and merges staples first, deduped by name+brand', async () => {
     let requested = ''
     vi.stubGlobal('fetch', async (url: string) => {
       requested = String(url)
@@ -61,8 +61,13 @@ describe('searchFoods', () => {
         ok: true,
         json: async () => ({
           ok: true,
-          // First product collides with the bundled "Banana" staple by name.
-          products: [offProduct({ product_name: 'Banana' }), offProduct()]
+          products: [
+            // Unbranded product colliding with the bundled "Banana" staple — deduped.
+            offProduct({ product_name: 'Banana', brands: undefined }),
+            // Branded same-name product: a different food (own barcode/serving) — kept.
+            offProduct({ product_name: 'Banana' }),
+            offProduct()
+          ]
         })
       }
     })
@@ -70,8 +75,9 @@ describe('searchFoods', () => {
     expect(requested).toContain('/api/food-search?q=banana')
     expect(online).toBe(true)
     const bananas = items.filter((r) => r.name.toLowerCase() === 'banana')
-    expect(bananas).toHaveLength(1)
-    expect(bananas[0].source).toBe('staple') // staple wins the name collision
+    expect(bananas).toHaveLength(2)
+    expect(bananas[0].source).toBe('staple') // staple wins the unbranded collision
+    expect(bananas[1].brand).toBe('Sirena') // branded variant survives the merge
     expect(items.some((r) => r.name === 'Tuna in Oil' && r.brand === 'Sirena')).toBe(true)
   })
 
