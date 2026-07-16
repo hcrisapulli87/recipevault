@@ -26,6 +26,10 @@ function PortionStep(props: {
   error: string | null
   onBack: () => void
   onAdd: (amount: number) => void
+  /** Set when the item came from the barcode cache — offers a fresh OFF fetch. */
+  onRecheck?: (() => void) | null
+  recheckBusy?: boolean
+  recheckNote?: string | null
 }): JSX.Element {
   const isGram = props.item.unit === '100g'
   const [value, setValue] = useState(isGram ? 100 : 1)
@@ -60,6 +64,15 @@ function PortionStep(props: {
       </label>
 
       <div className="banner banner--ok food-preview">{macroLine(props.item, amount)}</div>
+      {props.onRecheck && (
+        <div className="banner banner--warn">
+          <span>Saved from an earlier scan — macros may be out of date.</span>
+          <button className="btn" onClick={props.onRecheck} disabled={props.recheckBusy}>
+            {props.recheckBusy ? 'Checking…' : '↻ Re-check OpenFoodFacts'}
+          </button>
+        </div>
+      )}
+      {props.recheckNote && <div className="banner banner--warn">{props.recheckNote}</div>}
       {props.error && <div className="banner banner--error">{props.error}</div>}
 
       <div className="modal__actions">
@@ -88,6 +101,8 @@ export function AddFoodModal(props: {
   const mealLabel = MEAL_LABEL[props.mealType]
   const [tab, setTab] = useState<Tab>('search')
   const [selected, setSelected] = useState<FoodItem | null>(null)
+  // True when `selected` came from the per-user food_cache (enables "re-check OFF").
+  const [selectedFromCache, setSelectedFromCache] = useState(false)
   const [logging, setLogging] = useState(false)
   const [logError, setLogError] = useState<string | null>(null)
 
@@ -138,13 +153,22 @@ export function AddFoodModal(props: {
     setLookingUp(true)
     setBarcodeError(null)
     try {
-      const item = await lookupBarcode(trimmed)
-      if (!item) {
+      const { item, online, fromCache } = await lookupBarcode(trimmed)
+      if (item) {
+        setPendingBarcode(null)
+        setSelectedFromCache(fromCache)
+        setSelected(item)
+      } else if (online) {
         setBarcodeError(`No product found for barcode ${trimmed}.`)
         setPendingBarcode(trimmed)
       } else {
+        // Couldn't reach OpenFoodFacts — the product may well exist, so don't
+        // offer to cache a manual entry under this barcode (it would shadow the
+        // real product on every future scan).
+        setBarcodeError(
+          `Couldn't check barcode ${trimmed} — you appear to be offline. Try again, or log it via the Manual tab (it won't be saved for future scans).`
+        )
         setPendingBarcode(null)
-        setSelected(item)
       }
     } catch (err) {
       setBarcodeError(err instanceof Error ? err.message : 'Lookup failed.')
@@ -152,8 +176,33 @@ export function AddFoodModal(props: {
     setLookingUp(false)
   }
 
+  // Re-fetch a cached barcode item straight from OFF (skipCache), replacing the
+  // selected item — lookupBarcode re-caches the fresh result on success.
+  const [rechecking, setRechecking] = useState(false)
+  const [recheckNote, setRecheckNote] = useState<string | null>(null)
+  const recheck = async (): Promise<void> => {
+    if (!selected?.barcode || rechecking) return
+    setRechecking(true)
+    setRecheckNote(null)
+    try {
+      const { item, online } = await lookupBarcode(selected.barcode, { skipCache: true })
+      if (item) {
+        setSelected(item)
+        setSelectedFromCache(false)
+      } else if (online) {
+        setRecheckNote("OpenFoodFacts doesn't know this barcode — keeping your saved version.")
+      } else {
+        setRecheckNote("Couldn't reach OpenFoodFacts — keeping your saved version.")
+      }
+    } catch {
+      setRecheckNote("Couldn't reach OpenFoodFacts — keeping your saved version.")
+    }
+    setRechecking(false)
+  }
+
   const startManual = (): void => {
     if (!mName.trim()) return
+    setSelectedFromCache(false)
     setSelected({
       name: mName.trim(),
       brand: mBrand.trim() || null,
@@ -208,13 +257,21 @@ export function AddFoodModal(props: {
       <div className="modal-overlay" onClick={props.onClose}>
         <div className="modal" onClick={(e) => e.stopPropagation()}>
           <PortionStep
+            // Remount if a re-check swaps the item (its unit may flip serving↔100g,
+            // which changes what the amount field means).
+            key={`${selected.name}|${selected.unit}`}
             item={selected}
             mealLabel={mealLabel}
             busy={logging}
             error={logError}
+            onRecheck={selectedFromCache && selected.barcode ? recheck : null}
+            recheckBusy={rechecking}
+            recheckNote={recheckNote}
             onBack={() => {
               setSelected(null)
+              setSelectedFromCache(false)
               setLogError(null)
+              setRecheckNote(null)
             }}
             onAdd={log}
           />
@@ -245,7 +302,10 @@ export function AddFoodModal(props: {
             {props.planned && (
               <button
                 className="food-result food-result--planned"
-                onClick={() => setSelected(props.planned!)}
+                onClick={() => {
+                  setSelectedFromCache(false)
+                  setSelected(props.planned!)
+                }}
               >
                 <span className="food-result__name">📋 Planned: {props.planned.name}</span>
                 <span className="food-result__macros">
@@ -276,7 +336,13 @@ export function AddFoodModal(props: {
             <ul className="food-results">
               {results.map((item, i) => (
                 <li key={i}>
-                  <button className="food-result" onClick={() => setSelected(item)}>
+                  <button
+                    className="food-result"
+                    onClick={() => {
+                      setSelectedFromCache(false)
+                      setSelected(item)
+                    }}
+                  >
                     <span className="food-result__name">
                       {item.source === 'staple' && <span className="food-result__tag">staple</span>}
                       {item.name}

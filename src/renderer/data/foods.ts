@@ -58,34 +58,56 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
   return { items: merged.slice(0, 30), online }
 }
 
-/** Look up a barcode: per-user cache first, then OpenFoodFacts (and cache the result). */
-export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
-  const { data: cached } = await supabase
-    .from('food_cache')
-    .select(
-      'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit'
-    )
-    .eq('barcode', barcode)
-    .maybeSingle()
-  if (cached) {
-    return {
-      name: cached.name,
-      brand: cached.brand,
-      barcode: cached.barcode,
-      servingDesc: cached.serving_desc,
-      unit: cached.unit,
-      calories: cached.cal_per_unit,
-      protein: cached.protein_per_unit,
-      carbs: cached.carbs_per_unit,
-      fat: cached.fat_per_unit,
-      source: 'barcode'
+export interface BarcodeLookupResult {
+  item: FoodItem | null
+  /** False when OpenFoodFacts couldn't be reached — "couldn't check" is not
+   *  "not found", and the UI must not offer to cache a manual entry for a
+   *  barcode OFF may actually know. */
+  online: boolean
+  /** True when the item came from the per-user food_cache rather than OFF. */
+  fromCache: boolean
+}
+
+/** Look up a barcode: per-user cache first, then OpenFoodFacts (and cache the result).
+ *  `skipCache` forces a fresh OFF fetch — the escape hatch for stale/typo'd cache rows. */
+export async function lookupBarcode(
+  barcode: string,
+  opts: { skipCache?: boolean } = {}
+): Promise<BarcodeLookupResult> {
+  if (!opts.skipCache) {
+    const { data: cached } = await supabase
+      .from('food_cache')
+      .select(
+        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit'
+      )
+      .eq('barcode', barcode)
+      .maybeSingle()
+    if (cached) {
+      return {
+        item: {
+          name: cached.name,
+          brand: cached.brand,
+          barcode: cached.barcode,
+          servingDesc: cached.serving_desc,
+          unit: cached.unit,
+          calories: cached.cal_per_unit,
+          protein: cached.protein_per_unit,
+          carbs: cached.carbs_per_unit,
+          fat: cached.fat_per_unit,
+          source: 'barcode'
+        },
+        online: true,
+        fromCache: true
+      }
     }
   }
 
   let item: FoodItem | null = null
+  let online = false
   try {
     const res = await fetch(`${OFF_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${OFF_FIELDS}`)
     if (res.ok) {
+      online = true
       const data = (await res.json()) as { status?: number; product?: unknown }
       if (data.status === 1 && data.product) {
         item = mapOffProduct(data.product as never, 'barcode')
@@ -93,11 +115,11 @@ export async function lookupBarcode(barcode: string): Promise<FoodItem | null> {
       }
     }
   } catch {
-    // offline
+    // offline — online stays false
   }
 
   if (item) await cacheFood(item)
-  return item
+  return { item, online, fromCache: false }
 }
 
 /**
