@@ -16,10 +16,25 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
   const videoRef = useRef<HTMLVideoElement>(null)
   const detectedRef = useRef(false)
   const lastReadRef = useRef<{ code: string; count: number }>({ code: '', count: 0 })
+  const trackRef = useRef<MediaStreamTrack | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [camera, setCamera] = useState<string | null>(null)
   const [attempts, setAttempts] = useState(0)
   const [seen, setSeen] = useState<'nothing' | 'partial' | 'locking'>('nothing')
+  // Torch (flashlight) — pantry/cupboard scanning is often too dark to resolve
+  // 1D line widths. Only offered when the track reports the capability
+  // (phone back cameras; desktop webcams don't have one).
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
+
+  const toggleTorch = (): void => {
+    const next = !torchOn
+    // torch isn't in the TS lib types (same story as focusMode) — loose cast.
+    trackRef.current
+      ?.applyConstraints({ advanced: [{ torch: next } as MediaTrackConstraintSet] })
+      .then(() => setTorchOn(next))
+      .catch(() => {})
+  }
 
   useEffect(() => {
     const video = videoRef.current
@@ -48,6 +63,10 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
         stream = s
         video.srcObject = s
         const track = s.getVideoTracks()[0]
+        trackRef.current = track ?? null
+        // getCapabilities is missing on some engines (Firefox) — feature-detect.
+        const caps = (track?.getCapabilities?.() ?? {}) as { torch?: boolean }
+        if (caps.torch) setTorchAvailable(true)
         const settings = track?.getSettings() ?? {}
         setCamera(
           `${settings.width}×${settings.height}${settings.facingMode ? ` · ${settings.facingMode}` : ''}`
@@ -104,6 +123,11 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
     <div className="barcode-scanner">
       {/* playsInline keeps iOS from hijacking the preview into a fullscreen player */}
       <video ref={videoRef} className="barcode-scanner__video" autoPlay muted playsInline />
+      {torchAvailable && (
+        <button className="btn" onClick={toggleTorch}>
+          {torchOn ? '🔦 Torch off' : '🔦 Torch on'}
+        </button>
+      )}
       <p className="barcode-scanner__hint">{feedback}</p>
       <p className="barcode-scanner__hint">
         {camera ? `camera ${camera} · ` : 'camera starting… · '}
