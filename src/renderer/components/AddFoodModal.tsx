@@ -172,9 +172,13 @@ export function AddFoodModal(props: {
     setSearched(true)
   }
 
+  // Retail barcodes (EAN-8 → GTIN-14) are 8–14 digits; anything else would be a
+  // guaranteed-miss OFF call ending in a confusing "no product found".
+  const isValidBarcode = (code: string): boolean => /^\d{8,14}$/.test(code)
+
   const lookUp = async (code: string): Promise<void> => {
     const trimmed = code.trim()
-    if (!trimmed) return
+    if (!isValidBarcode(trimmed)) return
     setScanning(false)
     setLookingUp(true)
     setBarcodeError(null)
@@ -447,20 +451,32 @@ export function AddFoodModal(props: {
                 placeholder="e.g. 5000159407236"
                 value={barcodeInput}
                 inputMode="numeric"
-                onChange={(e) => setBarcodeInput(e.target.value)}
+                onChange={(e) => setBarcodeInput(e.target.value.replace(/\D/g, ''))}
                 onKeyDown={(e) => e.key === 'Enter' && lookUp(barcodeInput)}
               />
               <button
                 className="btn btn--primary"
                 onClick={() => lookUp(barcodeInput)}
-                disabled={lookingUp}
+                disabled={lookingUp || !isValidBarcode(barcodeInput.trim())}
               >
                 {lookingUp ? '…' : 'Look up'}
               </button>
             </div>
+            {barcodeInput !== '' && !isValidBarcode(barcodeInput.trim()) && (
+              <p className="empty-note">Barcodes are 8–14 digits.</p>
+            )}
             {barcodeError && (
               <div className="banner banner--warn">
                 <span>{barcodeError}</span>
+                <button
+                  className="btn"
+                  onClick={() => {
+                    setBarcodeError(null)
+                    setScanning(true)
+                  }}
+                >
+                  📷 Scan again
+                </button>
                 {pendingBarcode && (
                   <button className="btn" onClick={() => setTab('manual')}>
                     ✏️ Add it manually — saves for next scan
