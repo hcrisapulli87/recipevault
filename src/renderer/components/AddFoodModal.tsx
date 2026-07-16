@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { FoodItem, MealType } from '../../shared/types'
 import { MEAL_LABEL } from '../../shared/types'
+import { searchStaples } from '../../shared/nutrition'
 import { lookupBarcode, searchFoods, cacheFood } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
@@ -131,15 +132,34 @@ export function AddFoodModal(props: {
   const [mCarbs, setMCarbs] = useState('')
   const [mFat, setMFat] = useState('')
 
+  // Guards against out-of-order responses: only the latest search may write
+  // results (a slow earlier response must not overwrite a newer one).
+  const searchSeqRef = useRef(0)
+
+  /** Live-filter the bundled staples as the user types; the online search only
+   *  runs on Enter/Search. Also invalidates any in-flight online search. */
+  const onQueryChange = (value: string): void => {
+    setQuery(value)
+    searchSeqRef.current++
+    setSearching(false)
+    setSearched(false)
+    setSearchError(null)
+    setSearchOnline(true)
+    setResults(searchStaples(value))
+  }
+
   const runSearch = async (): Promise<void> => {
     if (!query.trim()) return
+    const seq = ++searchSeqRef.current
     setSearching(true)
     setSearchError(null)
     try {
       const { items, online } = await searchFoods(query.trim())
+      if (seq !== searchSeqRef.current) return // stale response — a newer search owns the UI
       setResults(items)
       setSearchOnline(online)
     } catch (err) {
+      if (seq !== searchSeqRef.current) return
       setSearchError(err instanceof Error ? err.message : 'Search failed.')
     }
     setSearching(false)
@@ -319,7 +339,7 @@ export function AddFoodModal(props: {
                 placeholder="Search foods (e.g. greek yogurt)…"
                 value={query}
                 autoFocus
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => onQueryChange(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               />
               <button className="btn btn--primary" onClick={runSearch} disabled={searching}>
@@ -358,6 +378,12 @@ export function AddFoodModal(props: {
                 </li>
               ))}
             </ul>
+            {!searched && !searching && query.trim() !== '' && (
+              <p className="empty-note">
+                {results.length > 0 ? 'Offline staples shown — press' : 'Press'} Enter or Search
+                for online products.
+              </p>
+            )}
             {searched && !searching && results.length === 0 && !searchError && searchOnline && (
               <p className="empty-note">No matches. Try the Manual tab.</p>
             )}
