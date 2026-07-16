@@ -67,13 +67,113 @@ function rotate90(lum: Uint8ClampedArray, w: number, h: number, out: Uint8Clampe
   }
 }
 
+// ── native BarcodeDetector fast path ─────────────────────────────────────────
+// Android Chrome ships a hardware-backed BarcodeDetector (the main scanning
+// device is the phone PWA); desktop Chromium on Windows has no backend, so the
+// zxing loop below stays the fallback. Not in the TS lib types — declared here.
+
+interface NativeBarcodeDetector {
+  detect(source: HTMLVideoElement): Promise<{ rawValue: string }[]>
+}
+interface NativeBarcodeDetectorCtor {
+  new (opts?: { formats?: string[] }): NativeBarcodeDetector
+  getSupportedFormats?: () => Promise<string[]>
+}
+
+const NATIVE_FORMATS = ['ean_13', 'ean_8', 'upc_a', 'upc_e']
+
+/** A native detector restricted to the retail formats, or null when the
+ *  platform doesn't (fully) support the API. */
+async function tryNativeDetector(): Promise<NativeBarcodeDetector | null> {
+  const Ctor = (globalThis as { BarcodeDetector?: NativeBarcodeDetectorCtor }).BarcodeDetector
+  if (!Ctor) return null
+  try {
+    const supported = (await Ctor.getSupportedFormats?.()) ?? []
+    const formats = NATIVE_FORMATS.filter((f) => supported.includes(f))
+    if (!formats.includes('ean_13')) return null
+    return new Ctor({ formats })
+  } catch {
+    return null
+  }
+}
+
+/** Decode loop over the native detector. Reports 'nothing' when no code is in
+ *  frame (the API has no 'partial' verdict). `onBroken` fires if detect() dies
+ *  at runtime so the caller can swap in the zxing loop. */
+function startNativeLoop(
+  detector: NativeBarcodeDetector,
+  video: HTMLVideoElement,
+  intervalMs: number,
+  onResult: (code: string | null, status: ScanStatus) => void,
+  onBroken: () => void
+): ScanLoop {
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const attempt = async (): Promise<void> => {
+    if (stopped) return
+    if (video.readyState < 2 || video.videoWidth === 0) {
+      timer = setTimeout(() => void attempt(), intervalMs)
+      return
+    }
+    try {
+      const codes = await detector.detect(video)
+      if (stopped) return
+      const hit = codes.find((c) => c.rawValue !== '')
+      onResult(hit ? hit.rawValue : null, hit ? 'read' : 'nothing')
+    } catch {
+      // Backend exists but can't actually detect on this device.
+      stopped = true
+      onBroken()
+      return
+    }
+    timer = setTimeout(() => void attempt(), intervalMs)
+  }
+
+  void attempt()
+  return {
+    stop: () => {
+      stopped = true
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }
+}
+
 /**
  * Repeatedly grabs frames from `video` and tries to decode a retail barcode.
  * `onResult` fires for every attempt: a code string on success, otherwise the
  * decoder's verdict ('partial' = barcode lines seen but digits unconfirmed —
  * i.e. one steady frame away; 'nothing' = no pattern in frame).
+ *
+ * Prefers the native BarcodeDetector when the platform supports it (far less
+ * CPU than the per-frame luminance + zxing pass); falls back to zxing
+ * otherwise, or if the native path breaks at runtime.
  */
 export function startScanLoop(
+  video: HTMLVideoElement,
+  intervalMs: number,
+  onResult: (code: string | null, status: ScanStatus) => void
+): ScanLoop {
+  let inner: ScanLoop | null = null
+  let stopped = false
+  void tryNativeDetector().then((native) => {
+    if (stopped) return
+    inner = native
+      ? startNativeLoop(native, video, intervalMs, onResult, () => {
+          if (!stopped) inner = startZxingLoop(video, intervalMs, onResult)
+        })
+      : startZxingLoop(video, intervalMs, onResult)
+  })
+  return {
+    stop: () => {
+      stopped = true
+      inner?.stop()
+    }
+  }
+}
+
+/** The zxing-based loop (see the header comment for why it bypasses zxing's browser layer). */
+function startZxingLoop(
   video: HTMLVideoElement,
   intervalMs: number,
   onResult: (code: string | null, status: ScanStatus) => void
