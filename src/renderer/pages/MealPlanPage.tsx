@@ -1,13 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { MEAL_LABEL } from '../../shared/types'
 import type { Day, MealPlanEntry, PlanMeal, RecipeSummary } from '../../shared/types'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
-import { PersonSwitcher } from '../components/PersonSwitcher'
-import { useHousehold } from '../hooks/useHousehold'
-import type { HouseholdUser } from '../data/users'
 
 const DAY_LABEL: Record<Day, string> = {
   monday: 'Mon',
@@ -179,27 +176,11 @@ export function MealPlanPage(props: {
 }): JSX.Element {
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
-  const users = useHousehold()
-  const [viewer, setViewer] = useState<HouseholdUser | null>(null)
-  // Until profiles load, `current` is null and we show nothing but the header.
-  const current = viewer ?? users[0] ?? null
-  const readOnly = current !== null && !current.isMe
-  const currentIdRef = useRef<string | null>(null)
-  // Updated in an effect (not during render); declared before the reload effect
-  // so it always holds the committed viewer id when reload's response lands.
-  useEffect(() => {
-    currentIdRef.current = current?.id ?? null
-  })
 
+  // One shared household plan — both users edit the same week.
   const reload = useCallback(() => {
-    const forId = currentIdRef.current
-    if (!forId) return
-    getMealPlan(forId).then((p) => {
-      // Ignore stale responses after a quick Me/partner flip.
-      if (currentIdRef.current === forId) setPlan(p)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id])
+    getMealPlan().then(setPlan)
+  }, [])
 
   useEffect(() => {
     reload()
@@ -232,30 +213,17 @@ export function MealPlanPage(props: {
     <div>
       <div className="page-header">
         <h2 className="page-header__title">This week</h2>
-        <PersonSwitcher
-          users={users}
-          selectedId={current?.id ?? ''}
-          onSelect={(u) => setViewer(u)}
-        />
-        {!readOnly && (
-          <>
-            <button
-              className="btn btn--primary"
-              onClick={() => setGroceryOpen(true)}
-              disabled={plannedRecipeIds.length === 0}
-            >
-              🛒 Send week to groceries
-            </button>
-            <button className="btn" onClick={clearAll}>
-              Clear week
-            </button>
-          </>
-        )}
+        <button
+          className="btn btn--primary"
+          onClick={() => setGroceryOpen(true)}
+          disabled={plannedRecipeIds.length === 0}
+        >
+          🛒 Send week to groceries
+        </button>
+        <button className="btn" onClick={clearAll}>
+          Clear week
+        </button>
       </div>
-
-      {readOnly && current && (
-        <p className="empty-note">Viewing {current.name}’s week — read only.</p>
-      )}
 
       <div className="board">
         {DAY_ORDER.map((day) => (
@@ -264,7 +232,7 @@ export function MealPlanPage(props: {
             day={day}
             entries={plan.filter((e) => e.day === day)}
             recipes={props.recipes}
-            readOnly={readOnly}
+            readOnly={false}
             onSet={(meal, recipeId, freeText) => setSlot(day, meal, recipeId, freeText)}
             onOpenRecipe={props.onOpenRecipe}
           />

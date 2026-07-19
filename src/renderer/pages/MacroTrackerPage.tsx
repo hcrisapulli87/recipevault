@@ -271,16 +271,11 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
     return onTableChange(['food_log'], reloadLog)
   }, [reloadLog])
 
-  // The viewed user's meal plan, for the one-tap "log the planned meal" card.
+  // The shared household meal plan, for the one-tap "log the planned meal" card.
   const [plan, setPlan] = useState<MealPlanEntry[] | null>(null)
   const reloadPlan = useCallback((): void => {
-    if (!current) return
-    const forId = current.id
-    getMealPlan(forId).then((p) => {
-      if (viewRef.current.endsWith(`|${forId}`)) setPlan(p)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id])
+    getMealPlan().then(setPlan)
+  }, [])
 
   useEffect(() => {
     reloadPlan()

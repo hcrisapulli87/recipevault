@@ -47,7 +47,7 @@ beforeEach(() => {
 
 describe('getMealPlan', () => {
   it('returns 21 blank slots (7 days × 3 meals) for an empty week, day-major order', async () => {
-    const plan = await getMealPlan('user-1')
+    const plan = await getMealPlan()
     expect(plan).toHaveLength(21)
     expect(plan.map((e) => e.day)).toEqual(DAYS.flatMap((d) => [d, d, d]))
     expect(plan.map((e) => e.meal)).toEqual(DAYS.flatMap(() => PLAN_MEALS))
@@ -59,7 +59,7 @@ describe('getMealPlan', () => {
       { day: 'monday', meal: 'dinner', recipe_id: 7, free_text: null },
       { day: 'tuesday', meal: 'breakfast', recipe_id: null, free_text: 'Overnight oats' }
     ]
-    const plan = await getMealPlan('user-1')
+    const plan = await getMealPlan()
     const monDinner = plan.find((e) => e.day === 'monday' && e.meal === 'dinner')
     const tueBreakfast = plan.find((e) => e.day === 'tuesday' && e.meal === 'breakfast')
     const monLunch = plan.find((e) => e.day === 'monday' && e.meal === 'lunch')
@@ -75,7 +75,7 @@ describe('getMealPlan', () => {
 })
 
 describe('setMeal', () => {
-  it('upserts one slot keyed by owner+day+meal, with the denormalised meal_text', async () => {
+  it('upserts one shared slot keyed by day+meal, with the denormalised meal_text', async () => {
     await setMeal({
       day: 'wednesday',
       meal: 'lunch',
@@ -92,7 +92,7 @@ describe('setMeal', () => {
           free_text: null,
           meal_text: 'Chicken wrap'
         },
-        options: { onConflict: 'owner_id,day,meal' }
+        options: { onConflict: 'day,meal' }
       }
     ])
   })

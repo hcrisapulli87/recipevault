@@ -2,14 +2,12 @@ import { supabase } from './supabase'
 import { DAYS, PLAN_MEALS } from '../../shared/types'
 import type { Day, MealPlanEntry, PlanMeal } from '../../shared/types'
 
-/** The week for one household member: 21 slots (7 days × breakfast/lunch/dinner),
- *  blanks filled in. Policies allow reading both users' plans, so scoping is
- *  explicit — pass the id from the Me/partner switcher. */
-export async function getMealPlan(ownerId: string): Promise<MealPlanEntry[]> {
+/** The shared household week: 21 slots (7 days × breakfast/lunch/dinner),
+ *  blanks filled in. One plan for both users — no owner scoping. */
+export async function getMealPlan(): Promise<MealPlanEntry[]> {
   const { data, error } = await supabase
     .from('meal_plan')
     .select('day, meal, recipe_id, free_text')
-    .eq('owner_id', ownerId)
   if (error) throw new Error(error.message)
   const bySlot = new Map((data ?? []).map((r) => [`${r.day}|${r.meal}`, r]))
   return DAYS.flatMap((day) =>
@@ -39,7 +37,7 @@ export async function setMeal(args: {
       free_text: args.freeText,
       meal_text: args.mealText
     },
-    { onConflict: 'owner_id,day,meal' }
+    { onConflict: 'day,meal' }
   )
   if (error) throw new Error(error.message)
 }
