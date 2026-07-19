@@ -62,7 +62,9 @@ html {
   background: var(--ground);
 }
 body {
-  background: var(--ground);
+  /* The ground colour lives on <html>; body stays transparent so the fixed
+     ::before wash layer (z-index -1) shows through. */
+  background: transparent;
   color: var(--ink);
   font-family:
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
@@ -82,6 +84,11 @@ body::before {
     radial-gradient(600px 420px at 12% -4%, #cfe9d8 0%, transparent 62%),
     radial-gradient(560px 460px at 100% 22%, #cfe0f7 0%, transparent 60%),
     radial-gradient(520px 420px at 40% 108%, #e8ddf3 0%, transparent 58%);
+}
+
+/* Scrollbars off — the wash + floating dock read as an app surface, not a page */
+::-webkit-scrollbar {
+  display: none;
 }
 
 .app {
