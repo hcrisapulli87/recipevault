@@ -5,7 +5,11 @@ import type { DailyTotals, LogEntry } from './types'
  * percentages. Drives the macro bars when no goals are set — the bars then read as
  * "today's macro split" instead of progress toward a target.
  */
-export function macroCalorieShares(t: DailyTotals): { protein: number; carbs: number; fat: number } {
+export function macroCalorieShares(t: DailyTotals): {
+  protein: number
+  carbs: number
+  fat: number
+} {
   const p = t.protein * 4
   const c = t.carbs * 4
   const f = t.fat * 9

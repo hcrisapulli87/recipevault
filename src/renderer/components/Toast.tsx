@@ -4,6 +4,7 @@ import type { JSX, ReactNode } from 'react'
 const ToastContext = createContext<(message: string) => void>(() => {})
 
 /** Fire-and-forget toast: dark glass pill above the dock, auto-dismisses. */
+// eslint-disable-next-line react-refresh/only-export-components -- tiny hook that belongs with its provider
 export function useToast(): (message: string) => void {
   return useContext(ToastContext)
 }

@@ -113,7 +113,12 @@ export function parseCaptionRecipe(caption: string, uploader: string | null): Dr
   let description = ''
   for (let i = 0; i < stopAt; i++) {
     const s = lines[i]
-    if (s.length >= 40 && !CTA.test(s) && !HASHTAGS.test(rawLines[i]) && !URL_RE.test(rawLines[i])) {
+    if (
+      s.length >= 40 &&
+      !CTA.test(s) &&
+      !HASHTAGS.test(rawLines[i]) &&
+      !URL_RE.test(rawLines[i])
+    ) {
       description = s
       break
     }

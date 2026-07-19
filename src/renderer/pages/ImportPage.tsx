@@ -180,27 +180,28 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
             <div key={item.id} className="import-row">
               <div className="import-row__info">
                 <span className="import-row__url">{item.url}</span>
-                <span
-                  className={`import-row__status import-row__status--${item.status}`}
-                >
+                <span className={`import-row__status import-row__status--${item.status}`}>
                   {STATUS_LABEL[item.status]}
                   {item.status === 'failed' && item.error ? ` — ${item.error}` : ''}
                 </span>
               </div>
               {item.status === 'fetched' && (
-                <button className="btn-secondary import-row__btn" onClick={() => void openFetchedItem(item)}>
+                <button
+                  className="btn-secondary import-row__btn"
+                  onClick={() => void openFetchedItem(item)}
+                >
                   Review
                 </button>
               )}
               {item.status === 'failed' && (
-                <button className="btn-secondary import-row__btn" onClick={() => void retryImport(item.id)}>
+                <button
+                  className="btn-secondary import-row__btn"
+                  onClick={() => void retryImport(item.id)}
+                >
                   Retry
                 </button>
               )}
-              <button
-                className="grocery-row__remove"
-                onClick={() => void deleteImport(item.id)}
-              >
+              <button className="grocery-row__remove" onClick={() => void deleteImport(item.id)}>
                 Remove
               </button>
             </div>

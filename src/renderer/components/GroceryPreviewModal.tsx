@@ -41,9 +41,7 @@ export function GroceryPreviewModal(props: {
     setError(null)
     try {
       await addGroceries(selected.map((it) => it.title))
-      toast(
-        `${selected.length} ingredient${selected.length === 1 ? '' : 's'} sent to groceries`
-      )
+      toast(`${selected.length} ingredient${selected.length === 1 ? '' : 's'} sent to groceries`)
       props.onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save — try again.')

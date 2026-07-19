@@ -40,7 +40,6 @@
   --over-trend: #f3c48f;
   --flame: #c2410c;
   --destructive: #c2410c;
-  --green: #34c759;
   --dark-surface: #101418; /* scanner / toast */
 
   /* Glass recipes */
@@ -57,25 +56,6 @@
   --hairline: rgba(27, 36, 48, 0.12);
   --scrim: rgba(16, 20, 24, 0.35);
 
-  /* Legacy aliases (still referenced by not-yet-converted screens; removed in the
-     final cleanup sweep). Mapped onto the glass palette so everything reads coherent. */
-  --bg-base: #eef3f0;
-  --bg-surface: rgba(255, 255, 255, 0.65);
-  --bg-elevated: rgba(255, 255, 255, 0.5);
-  --border: rgba(27, 36, 48, 0.1);
-  --accent-bright: #3a7bfd;
-  --accent-deep: #2456c4;
-  --on-accent: #ffffff;
-  --text-primary: #1b2430;
-  --text-secondary: #5a6675;
-  --text-muted: #8a95a3;
-  --red: #c2410c;
-  --amber: #b45309;
-  --blue: #5e9bfd;
-  --shadow-sm: 0 8px 24px rgba(27, 36, 48, 0.08);
-  --shadow-md: 0 12px 32px rgba(27, 36, 48, 0.1);
-  --radius: 18px;
-  --radius-btn: 14px;
 }
 
 html {
@@ -502,143 +482,6 @@ body::before {
   letter-spacing: -0.02em;
 }
 
-/* Shared bits */
-.page-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-}
-.page-header__title {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  margin-right: auto;
-}
-.text-input {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 8px 12px;
-  border-radius: var(--radius-btn);
-  font-size: 13px;
-  font-family: inherit;
-  box-shadow: var(--shadow-sm);
-}
-.text-input::placeholder {
-  color: var(--text-muted);
-}
-.text-input:focus {
-  outline: none;
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-tint);
-}
-.btn {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 8px 14px;
-  border-radius: var(--radius-btn);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition:
-    box-shadow 0.15s,
-    border-color 0.15s;
-}
-.btn:hover:not(:disabled) {
-  border-color: var(--text-muted);
-  box-shadow: var(--shadow-md);
-}
-.btn:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-.btn--primary {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: var(--on-accent);
-  font-weight: 600;
-}
-.btn--primary:hover:not(:disabled) {
-  background: var(--accent-bright);
-  border-color: var(--accent-bright);
-}
-.btn--danger {
-  color: var(--red);
-}
-.icon-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  border-radius: var(--radius-btn);
-  padding: 4px 9px;
-  font-size: 13px;
-  font-family: inherit;
-  cursor: pointer;
-}
-.icon-btn:hover:not(:disabled) {
-  color: var(--text-primary);
-  border-color: var(--accent);
-}
-.icon-btn:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-.link-btn {
-  background: none;
-  border: none;
-  color: var(--accent-deep);
-  font-size: 13px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  padding: 0;
-  text-decoration: none;
-}
-.link-btn:hover {
-  text-decoration: underline;
-}
-.empty-note {
-  color: var(--text-muted);
-  padding: 40px 0;
-  text-align: center;
-}
-.chip {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 99px;
-  padding: 4px 11px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-secondary);
-  box-shadow: var(--shadow-sm);
-}
-.banner {
-  padding: 10px 14px;
-  border-radius: var(--radius-btn);
-  font-size: 13px;
-  margin: 10px 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.banner--ok {
-  background: rgba(74, 222, 128, 0.12);
-  color: var(--green);
-}
-.banner--warn {
-  background: rgba(245, 158, 11, 0.12);
-  color: var(--amber);
-}
-.banner--error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--red);
-}
 
 /* ── Recipe library ─────────────────────────────────────────────────────── */
 .library {
@@ -2253,10 +2096,6 @@ select.input-field {
   padding: 0 14px;
 }
 
-select.text-input {
-  font-family: inherit;
-  color: var(--text-primary);
-}
 
 /* Sign-in */
 .signin {
@@ -2266,22 +2105,21 @@ select.text-input {
   flex-direction: column;
   gap: 14px;
   padding: 28px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
 }
 .signin__title {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
-  letter-spacing: -0.5px;
+  letter-spacing: -0.02em;
   text-align: center;
 }
 .signin__tagline {
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-size: 14px;
   margin-bottom: 8px;
+}
+.signin .btn-ghost {
+  align-self: center;
 }
 
 /* Groceries page */
@@ -2326,18 +2164,3 @@ select.text-input {
   border-bottom: none;
 }
 
-/* ── Mobile (phones): stacked layouts ───────────────────────────────────── */
-@media (max-width: 720px) {
-  /* Tap targets ≥ 44px, no iOS zoom-on-focus */
-  .btn,
-  .icon-btn,
-  .text-input {
-    min-height: 44px;
-  }
-  .text-input {
-    font-size: 16px;
-  }
-  .link-btn {
-    padding: 10px 4px;
-  }
-}

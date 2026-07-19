@@ -37,35 +37,35 @@ export function SignInPage(): JSX.Element {
   }
 
   return (
-    <div className="signin">
-      <h1 className="signin__title">🍳 RecipeVault</h1>
+    <div className="signin glass-hero">
+      <h1 className="signin__title">RecipeVault</h1>
       <p className="signin__tagline">Your recipes, meal plan, groceries & macros — everywhere.</p>
-      <label className="field">
-        <span className="field__label">Email</span>
+      <label className="ffield">
+        <span className="ffield__label">Email</span>
         <input
-          className="text-input"
+          className="input-field"
           type="email"
           autoFocus
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
       </label>
-      <label className="field">
-        <span className="field__label">Password</span>
+      <label className="ffield">
+        <span className="ffield__label">Password</span>
         <input
-          className="text-input"
+          className="input-field"
           type="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
       </label>
-      {error && <div className="banner banner--error">{error}</div>}
-      {notice && <div className="banner banner--ok">{notice}</div>}
-      <button className="btn btn--primary" onClick={submit} disabled={!canSubmit}>
+      {error && <div className="info-banner info-banner--warm">{error}</div>}
+      {notice && <div className="info-banner">{notice}</div>}
+      <button className="btn-primary" onClick={submit} disabled={!canSubmit}>
         {busy ? 'Signing in…' : 'Sign in'}
       </button>
-      <button className="btn" onClick={forgot} disabled={busy}>
+      <button className="btn-ghost" onClick={forgot} disabled={busy}>
         Forgot password?
       </button>
     </div>

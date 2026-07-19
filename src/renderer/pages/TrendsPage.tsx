@@ -63,9 +63,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
   return (
     <div className="trends">
       <div className="trends__title">Trends</div>
-      <div className="trends__meta">
-        Last 7 days · {current?.name ?? '…'} · estimates
-      </div>
+      <div className="trends__meta">Last 7 days · {current?.name ?? '…'} · estimates</div>
 
       <div className="trends__verdict glass-island">
         <div className="trends__verdict-line">{VERDICT_LABEL[verdict]}</div>
@@ -105,10 +103,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
                   .toLocaleDateString(undefined, { weekday: 'short' })
                   .toUpperCase()
             return (
-              <span
-                key={b.date}
-                className={`trends__day ${isToday ? 'trends__day--today' : ''}`}
-              >
+              <span key={b.date} className={`trends__day ${isToday ? 'trends__day--today' : ''}`}>
                 {label}
               </span>
             )

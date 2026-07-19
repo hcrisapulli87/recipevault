@@ -27,7 +27,7 @@ export function AuthGate({ children }: { children: ReactNode }): JSX.Element {
     })
   }, [])
 
-  if (loading) return <p className="empty-note">Loading…</p>
+  if (loading) return <p className="library__empty">Loading…</p>
   if (!session) return <SignInPage />
   if (recovering) return <SetPasswordPage onDone={() => setRecovering(false)} />
   return <>{children}</>

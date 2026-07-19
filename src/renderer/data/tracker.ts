@@ -69,7 +69,11 @@ export async function getProfile(): Promise<TrackerProfile> {
   } = await supabase.auth.getUser()
   if (!user) throw new Error('Not signed in')
 
-  const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).maybeSingle()
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', user.id)
+    .maybeSingle()
   if (error) throw new Error(error.message)
 
   if (data) {
@@ -124,7 +128,10 @@ async function getGoalsOf(ownerId: string): Promise<ProfileGoals> {
  * `isMe` routes through getProfile so a first-time user still gets their
  * profiles row auto-created; the partner's goals are read plainly.
  */
-export async function getDailyLog(date: string, owner: { id: string; isMe: boolean }): Promise<DailyLog> {
+export async function getDailyLog(
+  date: string,
+  owner: { id: string; isMe: boolean }
+): Promise<DailyLog> {
   const goals: ProfileGoals = owner.isMe
     ? await getProfile().then((p) => ({
         calGoal: p.calGoal,

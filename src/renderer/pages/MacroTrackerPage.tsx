@@ -382,9 +382,7 @@ export function MacroTrackerPage(props: {
       <div className="tracker-meals">
         {MEAL_TYPES.map((meal) => {
           const entries = log?.meals[meal] ?? []
-          const mealKcal = Math.round(
-            entries.reduce((a, e) => a + e.baseCalories * e.amount, 0)
-          )
+          const mealKcal = Math.round(entries.reduce((a, e) => a + e.baseCalories * e.amount, 0))
           return (
             <section key={meal} className="meal-card glass-island">
               <div className="meal-card__head">

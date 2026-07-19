@@ -26,31 +26,31 @@ export function SetPasswordPage({ onDone }: { onDone: () => void }): JSX.Element
   }
 
   return (
-    <div className="signin">
-      <h1 className="signin__title">🍳 RecipeVault</h1>
+    <div className="signin glass-hero">
+      <h1 className="signin__title">RecipeVault</h1>
       <p className="signin__tagline">Choose a new password for your account.</p>
-      <label className="field">
-        <span className="field__label">New password</span>
+      <label className="ffield">
+        <span className="ffield__label">New password</span>
         <input
-          className="text-input"
+          className="input-field"
           type="password"
           autoFocus
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
       </label>
-      <label className="field">
-        <span className="field__label">Confirm password</span>
+      <label className="ffield">
+        <span className="ffield__label">Confirm password</span>
         <input
-          className="text-input"
+          className="input-field"
           type="password"
           value={confirm}
           onChange={(e) => setConfirm(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && submit()}
         />
       </label>
-      {error && <div className="banner banner--error">{error}</div>}
-      <button className="btn btn--primary" onClick={submit} disabled={!canSubmit}>
+      {error && <div className="info-banner info-banner--warm">{error}</div>}
+      <button className="btn-primary" onClick={submit} disabled={!canSubmit}>
         {busy ? 'Saving…' : 'Set password'}
       </button>
     </div>

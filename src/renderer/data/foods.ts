@@ -49,7 +49,8 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
   // Dedupe on name+brand, not name alone: a branded OFF product that happens to
   // share a staple's name (e.g. "Banana · Some Brand") is a different food with
   // its own barcode/serving, and must not be swallowed by the staple.
-  const foodKey = (f: FoodItem): string => `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`
+  const foodKey = (f: FoodItem): string =>
+    `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`
   const seen = new Set(staples.map(foodKey))
   const merged = [...staples]
   for (const item of off) {
@@ -109,7 +110,9 @@ export async function lookupBarcode(
   let item: FoodItem | null = null
   let online = false
   try {
-    const res = await fetch(`${OFF_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${OFF_FIELDS}`)
+    const res = await fetch(
+      `${OFF_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${OFF_FIELDS}`
+    )
     if (res.ok) {
       online = true
       const data = (await res.json()) as { status?: number; product?: unknown }

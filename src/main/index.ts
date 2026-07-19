@@ -63,12 +63,14 @@ function fetchInstagram(url: string): Promise<IpcResult<InstagramPost>> {
 // directly (same code as the web PWA), so main just makes a window and grants
 // the camera for barcode scanning.
 async function createWindow(): Promise<void> {
+  // The glass redesign renders one centered phone-width column, so the desktop
+  // window defaults to a tall phone-ish shape instead of a wide canvas.
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 960,
+    width: 470,
+    height: 900,
+    minWidth: 390,
     minHeight: 600,
-    backgroundColor: '#16181d',
+    backgroundColor: '#eef3f0',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       contextIsolation: true,

@@ -88,7 +88,8 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
           }
           // Two agreeing reads before we trust it (a different code resets the count).
           const last = lastReadRef.current
-          lastReadRef.current = code === last.code ? { code, count: last.count + 1 } : { code, count: 1 }
+          lastReadRef.current =
+            code === last.code ? { code, count: last.count + 1 } : { code, count: 1 }
           setSeen('locking')
           if (lastReadRef.current.count >= 2) {
             detectedRef.current = true

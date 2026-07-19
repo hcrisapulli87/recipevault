@@ -59,7 +59,11 @@ export function LibraryPage(props: {
               .filter(Boolean)
               .join(' · ')
             return (
-              <button key={r.id} className="recipe-card glass-island" onClick={() => props.onOpen(r.id)}>
+              <button
+                key={r.id}
+                className="recipe-card glass-island"
+                onClick={() => props.onOpen(r.id)}
+              >
                 {r.imageUrl ? (
                   <div className="recipe-card__photo">
                     <img src={r.imageUrl} alt="" />

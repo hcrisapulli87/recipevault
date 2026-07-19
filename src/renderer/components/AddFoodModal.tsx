@@ -122,7 +122,9 @@ function ConfirmStep(props: {
           </div>
         ))}
       </div>
-      <div className="confirm__caption">Best-guess from the database — close enough is the point.</div>
+      <div className="confirm__caption">
+        Best-guess from the database — close enough is the point.
+      </div>
 
       {props.onRecheck && (
         <div className="info-banner">
@@ -176,7 +178,7 @@ export function AddFoodModal(props: {
     getRecentFoods().then(setRecents, () => {})
   }, [])
 
-  // scan tab — the camera starts as soon as the tab opens
+  // scan tab — the camera starts as soon as the tab opens (see switchTab)
   const [scanning, setScanning] = useState(false)
   const [barcodeInput, setBarcodeInput] = useState('')
   const [lookingUp, setLookingUp] = useState(false)
@@ -184,9 +186,11 @@ export function AddFoodModal(props: {
   // Set when a scan/lookup found no product — carried into the Manual tab so the
   // entry is saved into food_cache and the next scan of it resolves instantly.
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
-  useEffect(() => {
-    setScanning(tab === 'scan')
-  }, [tab])
+
+  const switchTab = (t: Tab): void => {
+    setTab(t)
+    setScanning(t === 'scan')
+  }
 
   // manual tab
   const [mName, setMName] = useState('')
@@ -378,7 +382,7 @@ export function AddFoodModal(props: {
               <button
                 key={t}
                 className={`seg__btn ${tab === t ? 'seg__btn--active' : ''}`}
-                onClick={() => setTab(t)}
+                onClick={() => switchTab(t)}
               >
                 {t === 'search' ? 'Search' : t === 'scan' ? 'Scan' : 'Manual'}
               </button>
@@ -428,15 +432,19 @@ export function AddFoodModal(props: {
                     </p>
                   )}
                   {searching && <p className="addfood__note">Searching…</p>}
-                  {searched && !searching && results.length === 0 && !searchError && searchOnline && (
-                    <p className="addfood__note">
-                      No match. Try the barcode scanner or{' '}
-                      <button className="addfood__link" onClick={() => setTab('manual')}>
-                        enter it manually
-                      </button>
-                      .
-                    </p>
-                  )}
+                  {searched &&
+                    !searching &&
+                    results.length === 0 &&
+                    !searchError &&
+                    searchOnline && (
+                      <p className="addfood__note">
+                        No match. Try the barcode scanner or{' '}
+                        <button className="addfood__link" onClick={() => switchTab('manual')}>
+                          enter it manually
+                        </button>
+                        .
+                      </p>
+                    )}
                 </>
               )}
 
@@ -478,7 +486,7 @@ export function AddFoodModal(props: {
                       Scan again
                     </button>
                     {pendingBarcode && (
-                      <button className="btn-secondary" onClick={() => setTab('manual')}>
+                      <button className="btn-secondary" onClick={() => switchTab('manual')}>
                         Add it manually — saves for next scan
                       </button>
                     )}

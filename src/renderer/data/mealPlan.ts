@@ -5,9 +5,7 @@ import type { Day, MealPlanEntry, PlanMeal } from '../../shared/types'
 /** The shared household week: 21 slots (7 days × breakfast/lunch/dinner),
  *  blanks filled in. One plan for both users — no owner scoping. */
 export async function getMealPlan(): Promise<MealPlanEntry[]> {
-  const { data, error } = await supabase
-    .from('meal_plan')
-    .select('day, meal, recipe_id, free_text')
+  const { data, error } = await supabase.from('meal_plan').select('day, meal, recipe_id, free_text')
   if (error) throw new Error(error.message)
   const bySlot = new Map((data ?? []).map((r) => [`${r.day}|${r.meal}`, r]))
   return DAYS.flatMap((day) =>

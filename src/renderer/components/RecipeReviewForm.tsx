@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
+import { ArrowUp, ArrowDown, X } from 'lucide-react'
 import type { DraftRecipe, RecipeStep } from '../../shared/types'
 import { parseIngredient } from '../../shared/ingredient-parser'
 import { saveRecipe } from '../data/recipes'
@@ -191,18 +192,22 @@ export function RecipeReviewForm(props: {
                 onChange={(e) => updateStep(idx, e.target.value)}
               />
               <div className="review-form__step-btns">
-                <button className="round-btn" aria-label="Move up" onClick={() => moveStep(idx, -1)}>
-                  ↑
+                <button
+                  className="round-btn"
+                  aria-label="Move up"
+                  onClick={() => moveStep(idx, -1)}
+                >
+                  <ArrowUp size={14} />
                 </button>
                 <button
                   className="round-btn"
                   aria-label="Move down"
                   onClick={() => moveStep(idx, 1)}
                 >
-                  ↓
+                  <ArrowDown size={14} />
                 </button>
                 <button className="round-btn" aria-label="Remove" onClick={() => removeStep(idx)}>
-                  ✕
+                  <X size={14} />
                 </button>
               </div>
             </div>
