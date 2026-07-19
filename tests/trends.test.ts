@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { summarizeWindow, loggingStreak, dayBars, shiftDate } from '../src/shared/trends'
+import { summarizeWindow, loggingStreak, dayBars, shiftDate, weekVerdict } from '../src/shared/trends'
 import type { DailyTotals } from '../src/shared/types'
 
 const T = (calories: number, protein = 0): DailyTotals => ({ calories, protein, carbs: 0, fat: 0 })
@@ -62,5 +62,28 @@ describe('dayBars', () => {
     expect(bars).toHaveLength(14)
     expect(bars[13]).toEqual({ date: TODAY, calories: 1800, logged: true })
     expect(bars[0]).toEqual({ date: shiftDate(TODAY, -13), calories: 0, logged: false })
+  })
+})
+
+describe('weekVerdict', () => {
+  const week = (kcals: number[]): Map<string, DailyTotals> =>
+    new Map(kcals.map((k, i) => [shiftDate(TODAY, -i), T(k)]))
+
+  it('is steady with no goal', () => {
+    expect(weekVerdict(week([2000]), TODAY, null)).toEqual({ verdict: 'steady', daysUnder: 0 })
+  })
+  it('is on track with ≥5 of 7 days at or under goal×1.05', () => {
+    // 5 logged at/under + 2 unlogged (count as under) = 7 under
+    const v = weekVerdict(week([2000, 2100, 2400, 2520, 1900]), TODAY, 2400)
+    expect(v).toEqual({ verdict: 'on-track', daysUnder: 7 })
+  })
+  it('is roughly on track when over-goal days crowd the week', () => {
+    const v = weekVerdict(week([3000, 3100, 2900, 2800, 2600, 2700, 2900]), TODAY, 2400)
+    expect(v.verdict).toBe('roughly')
+    expect(v.daysUnder).toBe(0)
+  })
+  it('treats goal×1.05 as still under (forgiving edge)', () => {
+    const v = weekVerdict(week([2520]), TODAY, 2400) // exactly 5% over
+    expect(v.daysUnder).toBe(7)
   })
 })

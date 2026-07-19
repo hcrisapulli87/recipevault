@@ -62,6 +62,26 @@ export interface DayBar {
   logged: boolean
 }
 
+export interface WeekVerdict {
+  verdict: 'on-track' | 'roughly' | 'steady'
+  /** Days of the last 7 at or under goal×1.05 (unlogged days count as under). */
+  daysUnder: number
+}
+
+/** The Trends verdict: "On track" needs ≥5 of the last 7 days at or under
+ *  goal×1.05; without a goal the week is just "steady" (no judgement). */
+export function weekVerdict(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  calGoal: number | null
+): WeekVerdict {
+  if (!calGoal) return { verdict: 'steady', daysUnder: 0 }
+  const daysUnder = dayBars(totalsByDate, today, 7).filter(
+    (b) => b.calories <= calGoal * 1.05
+  ).length
+  return { verdict: daysUnder >= 5 ? 'on-track' : 'roughly', daysUnder }
+}
+
 /** Last n days oldest→newest, zero-filled — the view scales/colours them. */
 export function dayBars(
   totalsByDate: Map<string, DailyTotals>,

@@ -10,6 +10,7 @@ import { RecipeDetailPage } from './pages/RecipeDetailPage'
 import { MealPlanPage } from './pages/MealPlanPage'
 import { SettingsPage } from './pages/SettingsPage'
 import { MacroTrackerPage } from './pages/MacroTrackerPage'
+import { TrendsPage } from './pages/TrendsPage'
 import { GroceriesPage } from './pages/GroceriesPage'
 import { useRecipes } from './hooks/useRecipes'
 import { useHousehold } from './hooks/useHousehold'
@@ -119,9 +120,7 @@ function AppInner(): JSX.Element {
               onAddFood={openAddFood}
             />
           ) : page === 'trends' ? (
-            <div className="glass-island" style={{ padding: 20 }}>
-              Trends is moving here — coming in a later step of this redesign.
-            </div>
+            <TrendsPage current={current} />
           ) : page === 'groceries' ? (
             <GroceriesPage />
           ) : (
