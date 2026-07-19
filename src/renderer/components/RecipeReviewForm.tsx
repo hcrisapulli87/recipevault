@@ -5,10 +5,17 @@ import { parseIngredient } from '../../shared/ingredient-parser'
 import { saveRecipe } from '../data/recipes'
 import { estimateAndSave } from '../data/macroEstimate'
 import { convertDraftToMetric } from '../../shared/unit-convert'
+import { useToast } from './Toast'
 
-const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; cls: string } | null> = {
-  structured: { text: '✓ Parsed from structured recipe data', cls: 'banner--ok' },
-  heuristic: { text: '⚠ Best-effort parse — please check everything below', cls: 'banner--warn' },
+const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; warm: boolean } | null> = {
+  structured: {
+    text: 'Scraped from link — check everything before saving. Macros are estimates.',
+    warm: false
+  },
+  heuristic: {
+    text: 'Best-effort parse — check everything before saving. Macros are estimates.',
+    warm: true
+  },
   manual: null
 }
 
@@ -17,6 +24,7 @@ export function RecipeReviewForm(props: {
   onCancel: () => void
   onSaved: (id: number) => void
 }): JSX.Element {
+  const toast = useToast()
   // American imports read in Australian units: oz/lb → g, °F → °C (exact conversions
   // only — cups/spoons stay). Runs once; the banner below says what changed.
   const [converted] = useState(() => convertDraftToMetric(props.draft))
@@ -89,6 +97,7 @@ export function RecipeReviewForm(props: {
     try {
       const id = await saveRecipe(draft)
       void estimateAndSave(id) // background best-guess macros; the detail page can redo it
+      toast('Saved to recipes')
       props.onSaved(id)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save — try again.')
@@ -98,56 +107,58 @@ export function RecipeReviewForm(props: {
 
   return (
     <div className="review-form">
-      <h2 className="page-header__title">Review recipe</h2>
-      {note && <div className={`banner ${note.cls}`}>{note.text}</div>}
+      <h2 className="review-form__title">Review recipe</h2>
+      {note && (
+        <div className={`info-banner ${note.warm ? 'info-banner--warm' : ''}`}>{note.text}</div>
+      )}
       {converted.measurements + converted.temps > 0 && (
-        <div className="banner banner--ok">
-          📏 Converted to metric: {converted.measurements} measurement
+        <div className="info-banner">
+          Converted to metric: {converted.measurements} measurement
           {converted.measurements === 1 ? '' : 's'}, {converted.temps} temperature
           {converted.temps === 1 ? '' : 's'}.
         </div>
       )}
 
-      <label className="field">
-        <span className="field__label">Title</span>
-        <input className="text-input" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <label className="ffield">
+        <span className="ffield__label">Title</span>
+        <input className="input-field" value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
 
-      <label className="field">
-        <span className="field__label">Description</span>
+      <label className="ffield">
+        <span className="ffield__label">Description</span>
         <textarea
-          className="text-input"
+          className="input-field input-field--area"
           rows={2}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
       </label>
 
-      <div className="field-row">
-        <label className="field">
-          <span className="field__label">Servings</span>
+      <div className="ffield-row">
+        <label className="ffield">
+          <span className="ffield__label">Servings</span>
           <input
-            className="text-input"
+            className="input-field"
             type="number"
             min="1"
             value={servings}
             onChange={(e) => setServings(e.target.value)}
           />
         </label>
-        <label className="field">
-          <span className="field__label">Prep (min)</span>
+        <label className="ffield">
+          <span className="ffield__label">Prep (min)</span>
           <input
-            className="text-input"
+            className="input-field"
             type="number"
             min="0"
             value={prepMin}
             onChange={(e) => setPrepMin(e.target.value)}
           />
         </label>
-        <label className="field">
-          <span className="field__label">Cook (min)</span>
+        <label className="ffield">
+          <span className="ffield__label">Cook (min)</span>
           <input
-            className="text-input"
+            className="input-field"
             type="number"
             min="0"
             value={cookMin}
@@ -156,54 +167,58 @@ export function RecipeReviewForm(props: {
         </label>
       </div>
 
-      <label className="field">
-        <span className="field__label">Ingredients (one per line)</span>
+      <label className="ffield">
+        <span className="ffield__label">Ingredients (one per line)</span>
         <textarea
-          className="text-input review-form__ingredients"
+          className="input-field input-field--area review-form__ingredients"
           rows={Math.max(6, ingredientText.split('\n').length + 1)}
           value={ingredientText}
           onChange={(e) => setIngredientText(e.target.value)}
         />
       </label>
 
-      <div className="field">
-        <span className="field__label">Steps</span>
+      <div className="ffield">
+        <span className="ffield__label">Steps</span>
         {steps.map((s, idx) => (
           <div key={idx} className="review-form__step">
             {s.section && <span className="review-form__section">{s.section}</span>}
             <div className="review-form__step-row">
               <span className="review-form__step-num">{idx + 1}.</span>
               <textarea
-                className="text-input review-form__step-text"
+                className="input-field input-field--area review-form__step-text"
                 rows={2}
                 value={s.text}
                 onChange={(e) => updateStep(idx, e.target.value)}
               />
               <div className="review-form__step-btns">
-                <button className="icon-btn" title="Move up" onClick={() => moveStep(idx, -1)}>
+                <button className="round-btn" aria-label="Move up" onClick={() => moveStep(idx, -1)}>
                   ↑
                 </button>
-                <button className="icon-btn" title="Move down" onClick={() => moveStep(idx, 1)}>
+                <button
+                  className="round-btn"
+                  aria-label="Move down"
+                  onClick={() => moveStep(idx, 1)}
+                >
                   ↓
                 </button>
-                <button className="icon-btn" title="Remove" onClick={() => removeStep(idx)}>
+                <button className="round-btn" aria-label="Remove" onClick={() => removeStep(idx)}>
                   ✕
                 </button>
               </div>
             </div>
           </div>
         ))}
-        <button className="btn" onClick={addStep}>
+        <button className="btn-secondary review-form__add-step" onClick={addStep}>
           + Add step
         </button>
       </div>
 
-      {saveError && <div className="banner banner--error">{saveError}</div>}
+      {saveError && <div className="info-banner info-banner--warm">{saveError}</div>}
       <div className="review-form__actions">
-        <button className="btn" onClick={props.onCancel} disabled={saving}>
+        <button className="btn-secondary" onClick={props.onCancel} disabled={saving}>
           Back
         </button>
-        <button className="btn btn--primary" onClick={save} disabled={saving || !title.trim()}>
+        <button className="btn-primary" onClick={save} disabled={saving || !title.trim()}>
           {saving ? 'Saving…' : 'Save recipe'}
         </button>
       </div>

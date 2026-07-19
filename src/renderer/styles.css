@@ -734,26 +734,87 @@ body::before {
   flex-shrink: 0;
 }
 
-/* Import */
-.import-page {
-  max-width: 640px;
-}
-.import-page__hint {
-  color: var(--text-secondary);
-  font-size: 13px;
-  margin: 8px 0 18px;
-}
-.import-page__row {
+/* ── Import ─────────────────────────────────────────────────────────────── */
+.import {
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  padding: 0 4px;
 }
-.import-page__url {
-  flex: 1;
-}
-.import-page__manual {
-  margin-top: 18px;
-  color: var(--text-muted);
+.import__hint {
+  color: var(--muted);
   font-size: 13px;
+  margin: 0 0 12px;
+}
+.import__fetch {
+  width: 100%;
+  margin-top: 12px;
+  min-height: 48px;
+  font-size: 15px;
+}
+.import .info-banner {
+  margin-top: 12px;
+}
+.import__queue {
+  margin-top: 14px;
+  border-radius: 20px;
+  padding: 4px 16px;
+}
+.import-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--divider);
+}
+.import-row:last-child {
+  border-bottom: none;
+}
+.import-row__info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.import-row__url {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.import-row__status {
+  font-size: 11px;
+  color: var(--muted-2);
+}
+.import-row__status--fetched {
+  color: var(--accent-dark);
+  font-weight: 700;
+}
+.import-row__status--failed {
+  color: var(--over-text);
+}
+.import-row__btn {
+  min-height: 36px;
+  font-size: 12px;
+  padding: 0 14px;
+  flex-shrink: 0;
+}
+.import__manual {
+  margin-top: 18px;
+  color: var(--muted-2);
+  font-size: 13px;
+}
+.import__caption {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.import__caption-box {
+  width: 100%;
+  resize: vertical;
 }
 /* ── Trends ─────────────────────────────────────────────────────────────── */
 .trends {
@@ -1208,89 +1269,33 @@ body::before {
 }
 
 
-/* Instagram import queue (phone submits, desktop fetches) */
-.import-queue {
-  list-style: none;
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 720px;
-}
-.import-queue__item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 10px 12px;
-}
-.import-queue__info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.import-queue__url {
-  font-size: 12px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.import-queue__status {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-.import-queue__item--fetched .import-queue__status {
-  color: var(--green);
-}
-.import-queue__item--failed .import-queue__status {
-  color: var(--red);
-}
-.import-page__caption {
-  margin-top: 10px;
-  max-width: 720px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: flex-start;
-}
-.import-page__caption-box {
-  width: 100%;
-  resize: vertical;
-  font-family: inherit;
-}
-
-/* Review form */
+/* Review form (import) */
 .review-form {
-  max-width: 720px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 0 4px;
 }
-.field {
+.review-form__title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.ffield-row {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
+  gap: 10px;
 }
-.field__label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--text-muted);
-}
-.field-row {
-  display: flex;
-  gap: 12px;
-}
-.field-row .field {
+.ffield-row .ffield {
   flex: 1;
   /* Flex items default to min-width:auto, which floors each field at the input's
-     intrinsic ~180px — three across then overflow a phone screen instead of
+     intrinsic width — three across then overflow a phone screen instead of
      shrinking. min-width:0 lets them share whatever width the row actually has. */
   min-width: 0;
+}
+.input-field--area {
+  min-height: 0;
+  padding: 10px 14px;
+  resize: vertical;
 }
 .review-form__ingredients {
   font-family: ui-monospace, monospace;
@@ -1302,9 +1307,10 @@ body::before {
 .review-form__section {
   display: block;
   font-size: 11px;
-  color: var(--accent-deep);
+  font-weight: 800;
+  color: var(--accent-dark);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.06em;
   margin-bottom: 4px;
 }
 .review-form__step-row {
@@ -1313,20 +1319,31 @@ body::before {
   align-items: flex-start;
 }
 .review-form__step-num {
-  color: var(--text-muted);
+  color: var(--muted-2);
   font-size: 13px;
-  padding-top: 9px;
+  font-weight: 700;
+  padding-top: 12px;
   width: 22px;
   text-align: right;
 }
 .review-form__step-text {
   flex: 1;
-  resize: vertical;
 }
 .review-form__step-btns {
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+}
+.review-form__step-btns .round-btn {
+  width: 30px;
+  height: 30px;
+  font-size: 12px;
+}
+.review-form__add-step {
+  align-self: flex-start;
+  min-height: 38px;
+  font-size: 12px;
+  margin-top: 4px;
 }
 .review-form__actions {
   display: flex;

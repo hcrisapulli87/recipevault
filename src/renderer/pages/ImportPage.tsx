@@ -142,86 +142,86 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
   }
 
   return (
-    <div className="import-page">
-      <h2 className="page-header__title">Import a recipe</h2>
-      <p className="import-page__hint">
-        Paste a link to any recipe page — or an Instagram reel. RecipeVault strips it down to just
-        the ingredients and steps — no ads, no life stories.
+    <div className="import">
+      <p className="import__hint">
+        Paste a recipe URL or an Instagram reel link. We&rsquo;ll scrape what we can — you review
+        before saving.
         {!window.api && ' Instagram links are fetched by your desktop app and appear below.'}
       </p>
-      <div className="import-page__row">
-        <input
-          className="text-input import-page__url"
-          placeholder="https://www.instagram.com/reel/… or any recipe page"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && fetchRecipe()}
-          disabled={loading}
-        />
-        <button
-          className="btn btn--primary"
-          onClick={fetchRecipe}
-          disabled={loading || !url.trim()}
-        >
-          {loading ? 'Fetching…' : 'Fetch recipe'}
-        </button>
-      </div>
+      <input
+        className="input-pill"
+        placeholder="https://www.instagram.com/reel/… or any recipe page"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && fetchRecipe()}
+        disabled={loading}
+      />
+      <button
+        className="btn-primary import__fetch"
+        onClick={fetchRecipe}
+        disabled={loading || !url.trim()}
+      >
+        {loading ? 'Fetching…' : 'Fetch & review'}
+      </button>
       {error && (
-        <div className="banner banner--error">
+        <div className="info-banner info-banner--warm">
           <span>{error}</span>
-          <button className="btn" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
-            Enter manually
-          </button>
+          <span className="info-banner__actions">
+            <button className="btn-secondary" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
+              Enter manually
+            </button>
+          </span>
         </div>
       )}
 
       {queue.length > 0 && (
-        <ul className="import-queue">
+        <div className="import__queue glass-island">
           {queue.map((item) => (
-            <li key={item.id} className={`import-queue__item import-queue__item--${item.status}`}>
-              <div className="import-queue__info">
-                <span className="import-queue__url">{item.url}</span>
-                <span className="import-queue__status">
+            <div key={item.id} className="import-row">
+              <div className="import-row__info">
+                <span className="import-row__url">{item.url}</span>
+                <span
+                  className={`import-row__status import-row__status--${item.status}`}
+                >
                   {STATUS_LABEL[item.status]}
                   {item.status === 'failed' && item.error ? ` — ${item.error}` : ''}
                 </span>
               </div>
               {item.status === 'fetched' && (
-                <button className="btn btn--primary" onClick={() => void openFetchedItem(item)}>
+                <button className="btn-secondary import-row__btn" onClick={() => void openFetchedItem(item)}>
                   Review
                 </button>
               )}
               {item.status === 'failed' && (
-                <button className="btn" onClick={() => void retryImport(item.id)}>
+                <button className="btn-secondary import-row__btn" onClick={() => void retryImport(item.id)}>
                   Retry
                 </button>
               )}
               <button
-                className="icon-btn"
-                title="Remove"
+                className="grocery-row__remove"
                 onClick={() => void deleteImport(item.id)}
               >
-                ✕
+                Remove
               </button>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
-      <p className="import-page__manual">
+      <p className="import__manual">
         …or{' '}
-        <button className="link-btn" onClick={() => setCaptionOpen(!captionOpen)}>
+        <button className="addfood__link" onClick={() => setCaptionOpen(!captionOpen)}>
           paste an Instagram caption
         </button>{' '}
         ·{' '}
-        <button className="link-btn" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
+        <button className="addfood__link" onClick={() => setDraft({ ...EMPTY_DRAFT })}>
           enter a recipe manually
         </button>
       </p>
       {captionOpen && (
-        <div className="import-page__caption">
+        <div className="import__caption">
           <textarea
-            className="text-input import-page__caption-box"
+            className="input-field import__caption-box"
             rows={8}
             placeholder="Paste the reel's caption here…"
             value={captionText}
@@ -229,7 +229,7 @@ export function ImportPage(props: { onSaved: (id: number) => void }): JSX.Elemen
             disabled={loading}
           />
           <button
-            className="btn btn--primary"
+            className="btn-primary"
             onClick={parseCaption}
             disabled={loading || !captionText.trim()}
           >
