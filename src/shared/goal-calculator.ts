@@ -1,13 +1,10 @@
-export type Sex = 'male' | 'female'
-export type ActivityLevel = 'sedentary' | 'light' | 'moderate' | 'active' | 'veryActive'
 export type GoalDirection = 'lose' | 'maintain' | 'gain'
 
-export interface GoalInputs {
-  sex: Sex
+export interface SimpleGoalInputs {
   age: number
-  heightCm: number
   weightKg: number
-  activity: ActivityLevel
+  /** Mifflin-St Jeor activity multiplier: 1.2 / 1.4 / 1.55 / 1.75 */
+  activity: number
   direction: GoalDirection
 }
 
@@ -18,47 +15,45 @@ export interface CalculatedGoals {
   fat: number
 }
 
-export const ACTIVITY_LABEL: Record<ActivityLevel, string> = {
-  sedentary: 'Sedentary (little exercise)',
-  light: 'Light (exercise 1–3 days/week)',
-  moderate: 'Moderate (exercise 3–5 days/week)',
-  active: 'Active (exercise 6–7 days/week)',
-  veryActive: 'Very active (hard exercise daily / physical job)'
-}
+export const ACTIVITY_OPTIONS: { value: number; label: string }[] = [
+  { value: 1.2, label: 'Mostly sitting' },
+  { value: 1.4, label: 'Lightly active' },
+  { value: 1.55, label: 'Active' },
+  { value: 1.75, label: 'Very active' }
+]
 
-const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
-  sedentary: 1.2,
-  light: 1.375,
-  moderate: 1.55,
-  active: 1.725,
-  veryActive: 1.9
-}
+export const DIRECTION_OPTIONS: { value: GoalDirection; label: string }[] = [
+  { value: 'lose', label: 'Lose slowly' },
+  { value: 'maintain', label: 'Maintain' },
+  { value: 'gain', label: 'Build' }
+]
 
-// Lose = classic ~0.5 kg/week deficit; gain = lean-bulk surplus.
+// Lose = gentle ~0.45 kg/week deficit; gain = lean-bulk surplus.
 const DIRECTION_ADJUST: Record<GoalDirection, number> = {
-  lose: -500,
+  lose: -450,
   maintain: 0,
   gain: 300
 }
 
 /**
- * Daily calorie + macro goals from body stats, best-guess estimates:
- * Mifflin-St Jeor BMR × activity factor, then protein at 1.8 g/kg,
- * fat at 27% of calories, carbs from what's left.
- * Returns null when any input is missing or out of a plausible range.
+ * Spec-simple daily goals (glass redesign): Mifflin-St Jeor with a fixed
+ * 176 cm male baseline — `10·w + 6.25·176 − 5·age + 5` — × activity, ± the
+ * direction adjustment, rounded to 50 kcal. Protein 1.8 g/kg, fat 0.9 g/kg,
+ * carbs from the remaining calories. A rough guide, not medical advice.
+ * Returns null when inputs are missing or implausible.
  */
-export function calculateGoals(i: GoalInputs): CalculatedGoals | null {
+export function calculateGoalsSimple(i: SimpleGoalInputs): CalculatedGoals | null {
   if (!(i.age >= 10 && i.age <= 120)) return null
-  if (!(i.heightCm >= 100 && i.heightCm <= 250)) return null
   if (!(i.weightKg >= 30 && i.weightKg <= 300)) return null
+  if (!(i.activity >= 1 && i.activity <= 2.5)) return null
 
-  const bmr = 10 * i.weightKg + 6.25 * i.heightCm - 5 * i.age + (i.sex === 'male' ? 5 : -161)
-  const tdee = bmr * ACTIVITY_FACTOR[i.activity]
-  const calories = Math.round((tdee + DIRECTION_ADJUST[i.direction]) / 10) * 10
+  const bmr = 10 * i.weightKg + 6.25 * 176 - 5 * i.age + 5
+  let calories = bmr * i.activity + DIRECTION_ADJUST[i.direction]
+  calories = Math.round(calories / 50) * 50
   if (calories <= 0) return null
 
   const protein = Math.round(1.8 * i.weightKg)
-  const fat = Math.round((calories * 0.27) / 9)
-  const carbs = Math.round(Math.max(0, calories - protein * 4 - fat * 9) / 4)
+  const fat = Math.round(0.9 * i.weightKg)
+  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4))
   return { calories, protein, carbs, fat }
 }
