@@ -393,65 +393,105 @@ body::before {
   color: var(--muted-3);
 }
 
-/* Sidebar — floating Studio panel */
-.sidebar {
-  width: 200px;
-  flex-shrink: 0;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  margin: 12px 0 12px 12px;
-  padding: 16px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-.sidebar__title {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
-  color: var(--text-primary);
-  padding: 0 8px;
+/* ── Floating glass dock + FAB (all form factors) ───────────────────────── */
+.dockbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  width: calc(100% - 32px);
+  max-width: 398px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  z-index: 100;
 }
-.sidebar__logo-dot {
-  width: 16px;
-  height: 16px;
-  background: var(--accent);
-  border-radius: 5px;
-  flex-shrink: 0;
+.dock {
+  flex: 1;
+  display: flex;
+  padding: 6px;
 }
-.sidebar__section {
+.dock__tab {
+  flex: 1;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-.sidebar__nav-btn {
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
   background: none;
   border: none;
-  text-align: left;
-  padding: 8px 12px;
-  border-radius: 99px;
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  border-radius: 999px;
+  color: var(--dock-inactive);
   font-family: inherit;
   cursor: pointer;
 }
-.sidebar__nav-btn:hover {
-  color: var(--text-primary);
-  background: var(--bg-elevated);
+.dock__tab--active {
+  color: var(--accent);
 }
-.sidebar__nav-btn--active {
-  color: var(--accent-deep);
+.dock__label {
+  font-size: 9.5px;
+  font-weight: 700;
+}
+
+/* Rows inside the More sheet */
+.more-rows {
+  display: flex;
+  flex-direction: column;
+}
+.more-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  padding: 13px 4px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+}
+.more-row:last-child {
+  border-bottom: none;
+}
+.more-row__glyph {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
   background: var(--accent-tint);
-  font-weight: 600;
+  color: var(--accent-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
-.sidebar__nav-icon {
-  margin-right: 8px;
+.more-row__text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.more-row__label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.more-row__sub {
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.more-row__chevron {
+  color: var(--muted-3);
+}
+
+/* Glass back button row on sub-pages (Meal plan, Groceries, Import, Settings) */
+.subpage-back {
+  margin-bottom: 12px;
+}
+.subpage-back .round-btn {
+  width: 40px;
+  height: 40px;
 }
 
 /* Shared bits */
@@ -1841,87 +1881,8 @@ select.text-input {
   color: var(--text-muted);
 }
 
-/* Mobile dock — hidden on desktop */
-.dock,
-.dock-sheet,
-.dock-sheet__backdrop {
-  display: none;
-}
-
-/* ── Mobile (phones): floating pill dock, stacked layouts ───────────────── */
+/* ── Mobile (phones): stacked layouts ───────────────────────────────────── */
 @media (max-width: 720px) {
-  .app__main {
-    padding: 16px 14px calc(84px + env(safe-area-inset-bottom));
-  }
-
-  .sidebar {
-    display: none;
-  }
-
-  /* Floating pill dock (deliberately dark in BOTH themes) */
-  .dock {
-    display: flex;
-    position: fixed;
-    left: 14px;
-    right: 14px;
-    bottom: calc(12px + env(safe-area-inset-bottom));
-    z-index: 100;
-    background: rgba(20, 22, 27, 0.94);
-    border-radius: 99px;
-    padding: 7px 9px;
-    box-shadow: 0 8px 24px rgba(16, 24, 40, 0.35);
-  }
-  .dock__tab {
-    flex: 1;
-    min-height: 44px;
-    background: none;
-    border: none;
-    border-radius: 99px;
-    font-size: 20px;
-    color: #8b8f98;
-    cursor: pointer;
-  }
-  .dock__tab--active {
-    background: var(--accent);
-    color: var(--on-accent);
-  }
-  .dock-sheet__backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 99;
-  }
-  .dock-sheet {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    position: fixed;
-    right: 14px;
-    bottom: calc(72px + env(safe-area-inset-bottom));
-    z-index: 101;
-    background: var(--bg-surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: var(--shadow-md);
-    padding: 6px;
-    min-width: 160px;
-  }
-  .dock-sheet__item {
-    background: none;
-    border: none;
-    color: var(--text-primary);
-    font-size: 14px;
-    font-family: inherit;
-    text-align: left;
-    padding: 12px 14px;
-    border-radius: 6px;
-    cursor: pointer;
-    min-height: 44px;
-  }
-  .dock-sheet__item:hover {
-    background: var(--bg-elevated);
-  }
-
   /* Tap targets ≥ 44px, no iOS zoom-on-focus */
   .btn,
   .icon-btn,

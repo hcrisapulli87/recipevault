@@ -9,7 +9,6 @@ import type {
   RecipeSummary
 } from '../../shared/types'
 import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
-import { AddFoodModal } from '../components/AddFoodModal'
 import { ProfileModal } from '../components/ProfileModal'
 import { macroCalorieShares } from '../../shared/tracker-logic'
 import {
@@ -25,7 +24,6 @@ import type { DailyTotals } from '../../shared/types'
 import type { TrackerProfile } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
 import { PersonSwitcher } from '../components/PersonSwitcher'
-import { useHousehold } from '../hooks/useHousehold'
 import type { HouseholdUser } from '../data/users'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
@@ -228,18 +226,21 @@ function TrendsView(props: {
   )
 }
 
-export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Element {
+export function MacroTrackerPage(props: {
+  recipes: RecipeSummary[]
+  users: HouseholdUser[]
+  current: HouseholdUser | null
+  readOnly: boolean
+  onSelectViewer: (user: HouseholdUser) => void
+  onAddFood: (meal: MealType, planned: FoodItem | null) => void
+}): JSX.Element {
   const [profile, setProfile] = useState<TrackerProfile | null>(null)
   const [date, setDate] = useState(todayStr())
   const [view, setView] = useState<'today' | 'trends'>('today')
   const [rangeTotals, setRangeTotals] = useState<Map<string, DailyTotals> | null>(null)
   const [log, setLog] = useState<DailyLog | null>(null)
-  const [adding, setAdding] = useState<MealType | null>(null)
   const [profileModalOpen, setProfileModalOpen] = useState(false)
-  const users = useHousehold()
-  const [viewer, setViewer] = useState<HouseholdUser | null>(null)
-  const current = viewer ?? users[0] ?? null
-  const readOnly = current !== null && !current.isMe
+  const { users, current, readOnly } = props
 
   // Flipping days or Me/partner fires overlapping fetches; only the response for
   // the view still on screen may land, otherwise the last *response* wins.
@@ -343,7 +344,7 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
           <PersonSwitcher
             users={users}
             selectedId={current?.id ?? ''}
-            onSelect={(u) => setViewer(u)}
+            onSelect={props.onSelectViewer}
           />
           {!readOnly && profile && <span className="tracker-profile-name">{profile.name}</span>}
           <button
@@ -470,7 +471,10 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
               <div className="meal-section__head">
                 <h3 className="meal-section__title">{MEAL_LABEL[meal]}</h3>
                 {!readOnly && (
-                  <button className="link-btn" onClick={() => setAdding(meal)}>
+                  <button
+                    className="link-btn"
+                    onClick={() => props.onAddFood(meal, plannedFor(meal))}
+                  >
                     ➕ Add food
                   </button>
                 )}
@@ -500,16 +504,6 @@ export function MacroTrackerPage(props: { recipes: RecipeSummary[] }): JSX.Eleme
         amount on anything that looks off.
       </p>
         </>
-      )}
-
-      {adding && (
-        <AddFoodModal
-          mealType={adding}
-          date={date}
-          planned={plannedFor(adding)}
-          onClose={() => setAdding(null)}
-          onLogged={reloadLog}
-        />
       )}
 
       {profileModalOpen && profile && (
