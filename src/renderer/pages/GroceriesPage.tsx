@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { Check } from 'lucide-react'
 import type { GroceryItem } from '../../shared/types'
 import {
   listGroceries,
@@ -10,6 +11,7 @@ import {
 } from '../data/groceries'
 import { onTableChange } from '../data/realtime'
 
+/** Shared household checklist: pill input + Add, glass island of check-circle rows. */
 export function GroceriesPage(): JSX.Element {
   const [items, setItems] = useState<GroceryItem[]>([])
   const [newItem, setNewItem] = useState('')
@@ -42,49 +44,60 @@ export function GroceriesPage(): JSX.Element {
     reload()
   }
 
+  const toGet = items.filter((it) => !it.checked).length
   const hasChecked = items.some((it) => it.checked)
 
   return (
-    <div>
-      <div className="page-header">
-        <h2 className="page-header__title">Groceries</h2>
-        <button className="btn" onClick={clear} disabled={!hasChecked}>
-          Clear checked
-        </button>
+    <div className="groceries">
+      <div className="groceries__meta-row">
+        <span className="groceries__meta">Shared list · {toGet} to get</span>
+        {hasChecked && (
+          <button className="btn-ghost" onClick={clear}>
+            Clear checked
+          </button>
+        )}
       </div>
 
-      <div className="search-row">
+      <div className="groceries__add-row">
         <input
-          className="text-input"
-          placeholder="Add an item…"
+          className="input-pill"
+          placeholder="Add an item"
           value={newItem}
           onChange={(e) => setNewItem(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && add()}
         />
-        <button className="btn btn--primary" onClick={add} disabled={!newItem.trim()}>
+        <button className="btn-primary" onClick={add} disabled={!newItem.trim()}>
           Add
         </button>
       </div>
 
       {items.length === 0 ? (
-        <p className="empty-note">
-          Your grocery list is empty. Add items above, or send a recipe&apos;s ingredients from its
+        <p className="library__empty">
+          The shared list is empty. Add items above, or send a recipe&apos;s ingredients from its
           page.
         </p>
       ) : (
-        <ul className="grocery-list grocery-page__list">
+        <div className="groceries__list glass-island">
           {items.map((it) => (
-            <li key={it.id} className="grocery-page__row">
-              <label className="grocery-list__item">
-                <input type="checkbox" checked={it.checked} onChange={() => toggle(it)} />
-                <span className={it.checked ? 'grocery-page__done' : ''}>{it.name}</span>
-              </label>
-              <button className="icon-btn" title="Remove" onClick={() => remove(it.id)}>
-                ✕
+            <div key={it.id} className="grocery-row grocery-row--static">
+              <button
+                className={`grocery-row__circle ${it.checked ? 'grocery-row__circle--on' : ''}`}
+                aria-label={it.checked ? 'Mark as to get' : 'Mark as got'}
+                onClick={() => toggle(it)}
+              >
+                {it.checked && <Check size={13} strokeWidth={3} />}
               </button>
-            </li>
+              <span
+                className={`grocery-row__label ${it.checked ? 'grocery-row__label--done' : ''}`}
+              >
+                {it.name}
+              </span>
+              <button className="grocery-row__remove" onClick={() => remove(it.id)}>
+                Remove
+              </button>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   )
