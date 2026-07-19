@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
+import { ChevronLeft, ChevronRight, Flame, Plus } from 'lucide-react'
 import type {
   DailyLog,
+  DailyTotals,
   FoodItem,
   LogEntry,
   MealPlanEntry,
@@ -9,24 +11,20 @@ import type {
   RecipeSummary
 } from '../../shared/types'
 import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
-import { ProfileModal } from '../components/ProfileModal'
 import { macroCalorieShares } from '../../shared/tracker-logic'
-import {
-  deleteLogEntry,
-  getDailyLog,
-  getDailyTotalsRange,
-  getProfile,
-  updateLogEntry
-} from '../data/tracker'
+import { deleteLogEntry, getDailyLog, getDailyTotalsRange, updateLogEntry } from '../data/tracker'
 import { getMealPlan } from '../data/mealPlan'
-import { summarizeWindow, loggingStreak, dayBars, shiftDate as shiftIso } from '../../shared/trends'
-import type { DailyTotals } from '../../shared/types'
-import type { TrackerProfile } from '../data/tracker'
+import { loggingStreak, shiftDate as shiftIso } from '../../shared/trends'
 import { onTableChange } from '../data/realtime'
 import { PersonSwitcher } from '../components/PersonSwitcher'
 import type { HouseholdUser } from '../data/users'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
+/** "142" or "6.4" — whole numbers stay whole (prototype's fmtG). */
+const fmtG = (n: number): string => {
+  const v = round1(n)
+  return v % 1 === 0 ? String(Math.round(v)) : v.toFixed(1)
+}
 
 function isoDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
@@ -39,117 +37,84 @@ function shiftDate(date: string, days: number): string {
   d.setDate(d.getDate() + days)
   return isoDate(d)
 }
-function prettyDate(date: string): string {
-  if (date === todayStr()) return 'Today'
-  if (date === shiftDate(todayStr(), -1)) return 'Yesterday'
-  return new Date(date + 'T00:00:00').toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric'
-  })
+/** "Today, 18 Jul" / "Yesterday, 17 Jul" / "Tue, 15 Jul" */
+function dateLabel(date: string): string {
+  const d = new Date(date + 'T00:00:00')
+  const dayMonth = d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  const kicker =
+    date === todayStr()
+      ? 'Today'
+      : date === shiftDate(todayStr(), -1)
+        ? 'Yesterday'
+        : d.toLocaleDateString(undefined, { weekday: 'short' })
+  return `${kicker}, ${dayMonth}`
 }
 
-function amountLabel(e: LogEntry): string {
+function portionText(e: LogEntry): string {
   if (e.unit === '100g') return `${Math.round(e.amount * 100)} g`
   const n = round1(e.amount)
-  return `${n} serving${n === 1 ? '' : 's'}`
+  return `${n % 1 === 0 ? Math.round(n) : n} serving${n === 1 ? '' : 's'}`
 }
 
-function MacroBar(props: {
-  label: string
-  value: number
-  goal: number | null
-  sharePct: number
-  unit: string
-  color: string
-}): JSX.Element {
-  // With a goal the bar tracks progress toward it; without one it falls back to
-  // this macro's share of the day's calories, so it still fills as food is logged.
-  const pct = props.goal ? Math.min(100, (props.value / props.goal) * 100) : props.sharePct
-  return (
-    <div className="macro-bar">
-      <div className="macro-bar__head">
-        <span className="macro-bar__label">{props.label}</span>
-        <span className="macro-bar__value">
-          {Math.round(props.value)}
-          {props.unit}
-          {props.goal != null
-            ? ` / ${Math.round(props.goal)}${props.unit}`
-            : props.sharePct > 0
-              ? ` · ${Math.round(props.sharePct)}% of kcal`
-              : ''}
-        </span>
-      </div>
-      <div className="macro-bar__track">
-        <div className="macro-bar__fill" style={{ width: `${pct}%`, background: props.color }} />
-      </div>
-    </div>
-  )
-}
-
+/** One food row: tap to expand the in-place − / + stepper strip (own log, today only). */
 function EntryRow(props: {
   entry: LogEntry
-  readOnly: boolean
+  canEdit: boolean
+  editing: boolean
+  onToggleEdit: () => void
   onChangeAmount: (amount: number) => void
   onDelete: () => void
 }): JSX.Element {
   const { entry } = props
-  const [editing, setEditing] = useState(false)
   const isGram = entry.unit === '100g'
-  const [value, setValue] = useState(isGram ? entry.amount * 100 : entry.amount)
-
-  const save = (): void => {
-    const amount = isGram ? value / 100 : value
-    if (amount > 0) props.onChangeAmount(amount)
-    setEditing(false)
-  }
-
+  const step = isGram ? 0.1 : 0.5 // 10 g in gram mode, half-serve otherwise
   const cals = Math.round(entry.baseCalories * entry.amount)
+  const sub = [
+    entry.brand,
+    portionText(entry),
+    `P ${fmtG(entry.baseProtein * entry.amount)} · C ${fmtG(entry.baseCarbs * entry.amount)} · F ${fmtG(entry.baseFat * entry.amount)}`
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   return (
-    <div className="food-entry">
-      <div className="food-entry__main">
-        <span className="food-entry__name">
-          {entry.name}
-          {entry.brand ? <span className="food-entry__brand"> · {entry.brand}</span> : null}
-        </span>
-        {editing ? (
-          <span className="food-entry__edit">
-            <input
-              className="text-input food-entry__amount-input"
-              type="number"
-              min="0"
-              step={isGram ? 10 : 0.5}
-              value={value}
-              autoFocus
-              onChange={(e) => setValue(Math.max(0, Number(e.target.value)))}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') save()
-                if (e.key === 'Escape') setEditing(false)
-              }}
-            />
-            <span className="food-entry__unit">{isGram ? 'g' : 'srv'}</span>
-            <button className="icon-btn" title="Save" onClick={save}>
-              ✓
-            </button>
-          </span>
-        ) : (
-          <span className="food-entry__sub">{amountLabel(entry)}</span>
-        )}
+    <div className="tracker-entry">
+      <div
+        className="tracker-entry__row"
+        role={props.canEdit ? 'button' : undefined}
+        onClick={() => {
+          if (props.canEdit) props.onToggleEdit()
+        }}
+      >
+        <div className="tracker-entry__main">
+          <div className="tracker-entry__name">{entry.name}</div>
+          <div className="tracker-entry__sub">{sub}</div>
+        </div>
+        <span className="tracker-entry__kcal">{cals}</span>
       </div>
-      <span className="food-entry__macros">
-        <span className="food-entry__cals">{cals} kcal</span>
-        <span className="food-entry__pcf">
-          P {round1(entry.baseProtein * entry.amount)} · C {round1(entry.baseCarbs * entry.amount)}{' '}
-          · F {round1(entry.baseFat * entry.amount)}
-        </span>
-      </span>
-      {!props.readOnly && (
-        <div className="food-entry__btns">
-          <button className="icon-btn" title="Edit amount" onClick={() => setEditing(true)}>
-            ✏️
+      {props.editing && (
+        <div className="tracker-entry__edit">
+          <button
+            className="round-btn tracker-entry__step"
+            aria-label="Less"
+            onClick={() => props.onChangeAmount(Math.max(step, round1(entry.amount - step)))}
+          >
+            −
           </button>
-          <button className="icon-btn" title="Remove" onClick={props.onDelete}>
-            ✕
+          <span className="tracker-entry__portion">{portionText(entry)}</span>
+          <button
+            className="round-btn tracker-entry__step"
+            aria-label="More"
+            onClick={() => props.onChangeAmount(round1(entry.amount + step))}
+          >
+            +
+          </button>
+          <span className="tracker-entry__spacer" />
+          <button className="tracker-entry__delete" onClick={props.onDelete}>
+            Delete
+          </button>
+          <button className="tracker-entry__done" onClick={props.onToggleEdit}>
+            Done
           </button>
         </div>
       )}
@@ -157,71 +122,35 @@ function EntryRow(props: {
   )
 }
 
-function TrendsView(props: {
-  totals: Map<string, DailyTotals>
-  goals: DailyLog['goals']
+/** Protein / Carbs / Fat tile inside the hero island. */
+function MacroTile(props: {
+  label: string
+  value: number
+  goal: number | null
+  sharePct: number
+  color: string
 }): JSX.Element {
-  const today = todayStr()
-  const streak = loggingStreak(props.totals, today)
-  const bars = dayBars(props.totals, today, 14)
-  const calGoal = props.goals.calories
-  const maxBar = Math.max(calGoal ? calGoal * 1.5 : 0, ...bars.map((b) => b.calories), 1)
+  const over = props.goal != null && props.value > props.goal
+  const pct =
+    props.goal != null
+      ? Math.min(100, Math.round((props.value / props.goal) * 100))
+      : Math.round(props.sharePct)
+  const valueText =
+    props.goal != null
+      ? `${fmtG(props.value)} / ${Math.round(props.goal)} g`
+      : `${fmtG(props.value)} g · ${Math.round(props.sharePct)}%`
   return (
-    <div className="trends">
-      {streak > 1 && <p className="trends__streak">🔥 {streak}-day logging streak</p>}
-      <div className="trends__cards">
-        {[7, 30].map((days) => {
-          const s = summarizeWindow(props.totals, today, days)
-          return (
-            <div key={days} className="trends__card">
-              <span className="trends__card-title">Last {days} days</span>
-              {s.avg ? (
-                <>
-                  <span className="trends__card-line">
-                    {Math.round(s.avg.calories).toLocaleString()} kcal/day
-                    {calGoal ? ` · goal ${Math.round(calGoal).toLocaleString()}` : ''}
-                  </span>
-                  <span className="trends__card-line">
-                    P {Math.round(s.avg.protein)} g/day
-                    {props.goals.protein ? ` · goal ${Math.round(props.goals.protein)}` : ''}
-                  </span>
-                </>
-              ) : (
-                <span className="trends__card-line">nothing logged</span>
-              )}
-              <span className="trends__card-meta">
-                logged {s.loggedDays} of {s.windowDays} days
-              </span>
-            </div>
-          )
-        })}
+    <div className="macro-tile glass-tile">
+      <div className="macro-tile__label">{props.label}</div>
+      <div className="macro-tile__value" style={over ? { color: 'var(--over-text)' } : undefined}>
+        {valueText}
       </div>
-      <div className="trends__bars">
-        {bars.map((b) => (
-          <div
-            key={b.date}
-            className="trends__bar-col"
-            title={`${b.date}: ${Math.round(b.calories)} kcal`}
-          >
-            <div className="trends__bar-track">
-              <div
-                className={`trends__bar-fill ${
-                  calGoal && b.calories > calGoal ? 'trends__bar-fill--over' : ''
-                }`}
-                style={{ height: `${Math.min(100, (b.calories / maxBar) * 100)}%` }}
-              />
-            </div>
-            <span
-              className={`trends__bar-day ${b.date === today ? 'trends__bar-day--today' : ''}`}
-            >
-              {'MTWTFSS'[(new Date(b.date + 'T00:00:00').getDay() + 6) % 7]}
-            </span>
-          </div>
-        ))}
+      <div className="macro-tile__track">
+        <div
+          className="macro-tile__fill"
+          style={{ width: `${pct}%`, background: over ? 'var(--over-bar)' : props.color }}
+        />
       </div>
-      <p className="plan-note">
-        Averages count logged days only — a day you didn’t log isn’t a 0-calorie day.
-      </p>
     </div>
   )
 }
@@ -234,29 +163,22 @@ export function MacroTrackerPage(props: {
   onSelectViewer: (user: HouseholdUser) => void
   onAddFood: (meal: MealType, planned: FoodItem | null) => void
 }): JSX.Element {
-  const [profile, setProfile] = useState<TrackerProfile | null>(null)
   const [date, setDate] = useState(todayStr())
-  const [view, setView] = useState<'today' | 'trends'>('today')
-  const [rangeTotals, setRangeTotals] = useState<Map<string, DailyTotals> | null>(null)
   const [log, setLog] = useState<DailyLog | null>(null)
-  const [profileModalOpen, setProfileModalOpen] = useState(false)
+  const [rangeTotals, setRangeTotals] = useState<Map<string, DailyTotals> | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
   const { users, current, readOnly } = props
 
-  // Flipping days or Me/partner fires overlapping fetches; only the response for
-  // the view still on screen may land, otherwise the last *response* wins.
+  const isToday = date === todayStr()
+  const canEdit = !readOnly && isToday
+  const minDate = shiftDate(todayStr(), -6) // spec: step back up to 6 days
+
+  // Flipping days or H/K fires overlapping fetches; only the response for the
+  // view still on screen may land, otherwise the last *response* wins.
   const viewRef = useRef('')
   useEffect(() => {
     viewRef.current = `${date}|${current?.id ?? ''}`
   })
-
-  const loadProfile = useCallback((): void => {
-    getProfile().then(setProfile)
-  }, [])
-
-  useEffect(() => {
-    loadProfile()
-    return onTableChange(['profiles'], loadProfile)
-  }, [loadProfile])
 
   const reloadLog = useCallback((): void => {
     if (!current) return
@@ -272,6 +194,21 @@ export function MacroTrackerPage(props: {
     return onTableChange(['food_log'], reloadLog)
   }, [reloadLog])
 
+  // Recent totals for the streak chip (consecutive days with ≥1 entry).
+  const reloadRange = useCallback((): void => {
+    if (!current) return
+    const forId = current.id
+    getDailyTotalsRange(forId, shiftIso(todayStr(), -29), todayStr()).then((m) => {
+      if (viewRef.current.endsWith(`|${forId}`)) setRangeTotals(m)
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
+
+  useEffect(() => {
+    reloadRange()
+    return onTableChange(['food_log'], reloadRange)
+  }, [reloadRange])
+
   // The shared household meal plan, for the one-tap "log the planned meal" card.
   const [plan, setPlan] = useState<MealPlanEntry[] | null>(null)
   const reloadPlan = useCallback((): void => {
@@ -283,22 +220,7 @@ export function MacroTrackerPage(props: {
     return onTableChange(['meal_plan'], reloadPlan)
   }, [reloadPlan])
 
-  // 30-day totals for the Trends view; refreshed live as entries change.
-  const reloadRange = useCallback((): void => {
-    if (!current || view !== 'trends') return
-    const forId = current.id
-    getDailyTotalsRange(forId, shiftIso(todayStr(), -29), todayStr()).then((m) => {
-      if (viewRef.current.endsWith(`|${forId}`)) setRangeTotals(m)
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.id, view])
-
-  useEffect(() => {
-    reloadRange()
-    return onTableChange(['food_log'], reloadRange)
-  }, [reloadRange])
-
-  /** The recipe planned for this meal on the viewed date, as a ready-to-log item. */
+  /** The recipe planned for this meal today, as a ready-to-log item. */
   const plannedFor = (meal: MealType): FoodItem | null => {
     if (meal === 'snack' || !plan) return null
     const jsDay = new Date(date + 'T00:00:00').getDay()
@@ -327,195 +249,177 @@ export function MacroTrackerPage(props: {
   }
   const deleteEntry = async (id: number): Promise<void> => {
     await deleteLogEntry(id)
+    setEditingId(null)
     reloadLog()
   }
 
   const totals = log?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
   const goals = log?.goals ?? { calories: null, protein: null, carbs: null, fat: null }
   const shares = macroCalorieShares(totals)
-  const noGoals =
-    goals.calories == null && goals.protein == null && goals.carbs == null && goals.fat == null
+  const calGoal = goals.calories
+  const streak = rangeTotals ? loggingStreak(rangeTotals, todayStr()) : 0
+  const dayEmpty =
+    log != null && MEAL_TYPES.every((m) => (log.meals[m] ?? []).length === 0) && !readOnly
+
+  const heroSub = dayEmpty
+    ? 'Nothing logged yet'
+    : calGoal == null
+      ? 'No goal set — showing energy share per macro'
+      : calGoal - totals.calories >= 0
+        ? `${Math.round(calGoal - totals.calories).toLocaleString()} left`
+        : `${Math.round(totals.calories - calGoal).toLocaleString()} over — tomorrow is a new day`
 
   return (
-    <div>
-      <div className="page-header">
-        <h2 className="page-header__title">Tracker</h2>
-        <div className="tracker-controls">
+    <div className="tracker">
+      {/* Header: date pill · streak chip · H/K switcher */}
+      <div className="tracker__top">
+        <div className="date-pill glass-pill">
+          <button
+            className="date-pill__btn"
+            aria-label="Previous day"
+            disabled={date <= minDate}
+            onClick={() => {
+              setEditingId(null)
+              setDate(shiftDate(date, -1))
+            }}
+          >
+            <ChevronLeft size={14} strokeWidth={2.4} />
+          </button>
+          <span className="date-pill__label">{dateLabel(date)}</span>
+          <button
+            className="date-pill__btn date-pill__btn--next"
+            aria-label="Next day"
+            disabled={isToday}
+            onClick={() => {
+              setEditingId(null)
+              setDate(shiftDate(date, 1))
+            }}
+          >
+            <ChevronRight size={14} strokeWidth={2.4} />
+          </button>
+        </div>
+        <div className="tracker__top-right">
+          {streak > 1 && (
+            <span className="streak-chip glass-pill">
+              <Flame size={12} strokeWidth={2.2} />
+              {streak}
+            </span>
+          )}
           <PersonSwitcher
             users={users}
             selectedId={current?.id ?? ''}
-            onSelect={props.onSelectViewer}
+            onSelect={(u) => {
+              setEditingId(null)
+              props.onSelectViewer(u)
+            }}
           />
-          {!readOnly && profile && <span className="tracker-profile-name">{profile.name}</span>}
-          <button
-            className="btn"
-            onClick={() => setView(view === 'today' ? 'trends' : 'today')}
-            title="Toggle trends view"
-          >
-            {view === 'today' ? '📈 Trends' : '📅 Today'}
-          </button>
-          {!readOnly && (
-            <button
-              className="btn"
-              onClick={() => setProfileModalOpen(true)}
-              disabled={!profile}
-              title="Edit goals"
-            >
-              ⚙️ Goals
-            </button>
-          )}
         </div>
       </div>
 
       {readOnly && current && (
-        <p className="empty-note">Viewing {current.name}’s tracker — read only.</p>
+        <div className="partner-banner">{current.name}&rsquo;s log — read-only</div>
       )}
 
-      {view === 'trends' ? (
-        rangeTotals ? (
-          <TrendsView totals={rangeTotals} goals={goals} />
-        ) : (
-          <p className="empty-note">Loading…</p>
-        )
-      ) : (
-        <>
-      <div className="date-nav">
-        <button
-          className="icon-btn"
-          onClick={() => setDate(shiftDate(date, -1))}
-          title="Previous day"
-        >
-          ◀
-        </button>
-        <span className="date-nav__label">{prettyDate(date)}</span>
-        <button
-          className="icon-btn"
-          onClick={() => setDate(shiftDate(date, 1))}
-          title="Next day"
-          disabled={date >= todayStr()}
-        >
-          ▶
-        </button>
-        {date !== todayStr() && (
-          <button className="link-btn" onClick={() => setDate(todayStr())}>
-            Jump to today
-          </button>
-        )}
-      </div>
-
-      <div className="hero-card">
-        <div
-          className="cal-ring"
-          style={{
-            background: `conic-gradient(var(--accent) ${
-              goals.calories ? Math.min(100, (totals.calories / goals.calories) * 100) : 0
-            }%, var(--bg-elevated) 0)`
-          }}
-        >
-          <div className="cal-ring__inner">
-            <span
-              className={`cal-ring__value ${
-                goals.calories != null && totals.calories > goals.calories
-                  ? 'cal-ring__value--over'
-                  : ''
-              }`}
-            >
-              {Math.round(totals.calories).toLocaleString()}
-            </span>
-            <span className="cal-ring__label">
-              {goals.calories != null
-                ? `of ${Math.round(goals.calories).toLocaleString()} kcal`
-                : 'kcal'}
-            </span>
-          </div>
+      {/* Hero island */}
+      <div className="tracker-hero glass-hero">
+        <div className="tracker-hero__eyebrow">Eaten · estimates</div>
+        <div className="tracker-hero__kcal-row">
+          <span className="tracker-hero__kcal">{Math.round(totals.calories).toLocaleString()}</span>
+          <span className="tracker-hero__goal">
+            {calGoal != null ? `/ ${Math.round(calGoal).toLocaleString()} kcal` : 'kcal eaten'}
+          </span>
         </div>
-        <div className="hero-card__bars">
-          <MacroBar
+        {calGoal != null && (
+          <div className="tracker-hero__track">
+            <div
+              className="tracker-hero__fill"
+              style={{ width: `${Math.min(100, Math.round((totals.calories / calGoal) * 100))}%` }}
+            />
+          </div>
+        )}
+        <div className="tracker-hero__sub">{heroSub}</div>
+        <div className="tracker-hero__tiles">
+          <MacroTile
             label="Protein"
             value={totals.protein}
             goal={goals.protein}
             sharePct={shares.protein}
-            unit="g"
-            color="var(--blue)"
+            color="var(--protein)"
           />
-          <MacroBar
+          <MacroTile
             label="Carbs"
             value={totals.carbs}
             goal={goals.carbs}
             sharePct={shares.carbs}
-            unit="g"
-            color="var(--green)"
+            color="var(--carbs)"
           />
-          <MacroBar
+          <MacroTile
             label="Fat"
             value={totals.fat}
             goal={goals.fat}
             sharePct={shares.fat}
-            unit="g"
-            color="var(--amber)"
+            color="var(--fat)"
           />
-          {noGoals && (
-            <p className="hero-card__hint">
-              No goals set — bars show today’s macro split.
-              {!readOnly && ' Set or calculate goals via ⚙️ Goals.'}
-            </p>
-          )}
         </div>
       </div>
 
-      <div className="meal-grid">
+      {/* Empty-day nudge (own log only) */}
+      {dayEmpty && isToday && (
+        <div className="tracker-empty glass-island">
+          <div className="tracker-empty__title">Nothing logged yet</div>
+          <p className="tracker-empty__copy">
+            {streak > 1
+              ? `Log the first food of the day to keep the ${streak}-day streak going.`
+              : 'Log the first food of the day — close enough is the point.'}
+          </p>
+          <button className="btn-primary" onClick={() => props.onAddFood('breakfast', null)}>
+            + Log a food
+          </button>
+        </div>
+      )}
+
+      {/* Meal cards — always all four */}
+      <div className="tracker-meals">
         {MEAL_TYPES.map((meal) => {
           const entries = log?.meals[meal] ?? []
+          const mealKcal = Math.round(
+            entries.reduce((a, e) => a + e.baseCalories * e.amount, 0)
+          )
           return (
-            <section key={meal} className="meal-section">
-              <div className="meal-section__head">
-                <h3 className="meal-section__title">{MEAL_LABEL[meal]}</h3>
-                {!readOnly && (
+            <section key={meal} className="meal-card glass-island">
+              <div className="meal-card__head">
+                <span className="meal-card__title">
+                  {MEAL_LABEL[meal]} <span className="meal-card__kcal">· {mealKcal} kcal</span>
+                </span>
+                {canEdit && (
                   <button
-                    className="link-btn"
+                    className="meal-card__add"
+                    aria-label={`Add to ${MEAL_LABEL[meal]}`}
                     onClick={() => props.onAddFood(meal, plannedFor(meal))}
                   >
-                    ➕ Add food
+                    <Plus size={15} strokeWidth={2.6} />
                   </button>
                 )}
               </div>
               {entries.length === 0 ? (
-                <p className="meal-section__empty">Nothing logged yet.</p>
+                <div className="meal-card__empty">Nothing yet</div>
               ) : (
-                <div className="meal-section__entries">
-                  {entries.map((e) => (
-                    <EntryRow
-                      key={e.id}
-                      entry={e}
-                      readOnly={readOnly}
-                      onChangeAmount={(amount) => changeAmount(e.id, amount)}
-                      onDelete={() => deleteEntry(e.id)}
-                    />
-                  ))}
-                </div>
+                entries.map((e) => (
+                  <EntryRow
+                    key={e.id}
+                    entry={e}
+                    canEdit={canEdit}
+                    editing={editingId === e.id}
+                    onToggleEdit={() => setEditingId(editingId === e.id ? null : e.id)}
+                    onChangeAmount={(amount) => changeAmount(e.id, amount)}
+                    onDelete={() => deleteEntry(e.id)}
+                  />
+                ))
               )}
             </section>
           )
         })}
       </div>
-
-      <p className="tracker-note">
-        Macros are best-guess estimates from a built-in food list and OpenFoodFacts — tweak the
-        amount on anything that looks off.
-      </p>
-        </>
-      )}
-
-      {profileModalOpen && profile && (
-        <ProfileModal
-          profile={profile}
-          onClose={() => setProfileModalOpen(false)}
-          onSaved={() => {
-            loadProfile()
-            reloadLog()
-          }}
-        />
-      )}
     </div>
   )
 }

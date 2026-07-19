@@ -2,8 +2,9 @@ import type { JSX } from 'react'
 import type { HouseholdUser } from '../data/users'
 
 /**
- * Me/partner toggle for pages with a read-only household view. Renders nothing
- * until both profiles exist (the partner's row appears on their first sign-in).
+ * H/K switcher: glass pill of initial circles; the active person is a dark ink
+ * circle with white text. Renders nothing until both profiles exist (the
+ * partner's row appears on their first sign-in).
  */
 export function PersonSwitcher(props: {
   users: HouseholdUser[]
@@ -12,14 +13,16 @@ export function PersonSwitcher(props: {
 }): JSX.Element | null {
   if (props.users.length < 2) return null
   return (
-    <div className="tabs">
+    <div className="person-switch glass-pill">
       {props.users.map((u) => (
         <button
           key={u.id}
-          className={`tabs__tab ${u.id === props.selectedId ? 'tabs__tab--active' : ''}`}
+          className={`person-switch__btn ${u.id === props.selectedId ? 'person-switch__btn--active' : ''}`}
+          aria-label={u.name}
+          title={u.name}
           onClick={() => props.onSelect(u)}
         >
-          {u.isMe ? 'Me' : u.name}
+          {(u.name || '?').trim().charAt(0).toUpperCase()}
         </button>
       ))}
     </div>
