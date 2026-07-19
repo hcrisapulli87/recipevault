@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { X } from 'lucide-react'
 import type { Recipe } from '../../shared/types'
 
+/** Fullscreen blue cooking field: giant step numeral, one step at a time. */
 export function CookingMode(props: { recipe: Recipe; onClose: () => void }): JSX.Element {
   const [current, setCurrent] = useState(0)
-  const [done, setDone] = useState<Set<number>>(new Set())
   const steps = props.recipe.steps
+  const isLast = current === steps.length - 1
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -17,73 +19,44 @@ export function CookingMode(props: { recipe: Recipe; onClose: () => void }): JSX
     return () => window.removeEventListener('keydown', onKey)
   }, [props, steps.length])
 
-  if (steps.length === 0) {
-    return (
-      <div className="cooking">
-        <button className="cooking__close" onClick={props.onClose} title="Exit (Esc)">
-          ✕
-        </button>
-        <p className="empty-note">This recipe has no steps yet — edit it to add some.</p>
-      </div>
-    )
-  }
-
-  const toggleDone = (idx: number): void => {
-    const next = new Set(done)
-    if (next.has(idx)) {
-      next.delete(idx)
-    } else {
-      next.add(idx)
-    }
-    setDone(next)
-  }
-
   const step = steps[current]
 
   return (
     <div className="cooking">
-      <button className="cooking__close" onClick={props.onClose} title="Exit (Esc)">
-        ✕
-      </button>
-      <header className="cooking__header">
-        <h2>{props.recipe.title}</h2>
+      <div className="cooking__top">
+        <span className="cooking__recipe">{props.recipe.title}</span>
+        <button className="cooking__close" aria-label="Exit cooking mode" onClick={props.onClose}>
+          <X size={18} strokeWidth={2.4} />
+        </button>
+      </div>
+
+      <div className="cooking__center">
+        <div className="cooking__num">{String(current + 1).padStart(2, '0')}</div>
+        <div className="cooking__text">
+          {step.section ? <span className="cooking__section">{step.section} — </span> : null}
+          {step.text}
+        </div>
+      </div>
+
+      <div className="cooking__footer">
         <span className="cooking__progress">
           Step {current + 1} of {steps.length}
-          {step.section ? ` — ${step.section}` : ''}
         </span>
-      </header>
-
-      <button
-        className={`cooking__step ${done.has(current) ? 'cooking__step--done' : ''}`}
-        onClick={() => toggleDone(current)}
-        title="Click to mark done"
-      >
-        {step.text}
-      </button>
-
-      <footer className="cooking__nav">
-        <button className="btn" onClick={() => setCurrent(current - 1)} disabled={current === 0}>
-          ← Previous
-        </button>
-        <div className="cooking__dots">
-          {steps.map((_, idx) => (
-            <button
-              key={idx}
-              className={`cooking__dot ${idx === current ? 'cooking__dot--current' : ''} ${
-                done.has(idx) ? 'cooking__dot--done' : ''
-              }`}
-              onClick={() => setCurrent(idx)}
-            />
-          ))}
-        </div>
         <button
-          className="btn btn--primary"
-          onClick={() => setCurrent(current + 1)}
-          disabled={current === steps.length - 1}
+          className="cooking__back"
+          style={current === 0 ? { opacity: 0.4 } : undefined}
+          disabled={current === 0}
+          onClick={() => setCurrent(current - 1)}
         >
-          Next →
+          Back
         </button>
-      </footer>
+        <button
+          className="cooking__next"
+          onClick={() => (isLast ? props.onClose() : setCurrent(current + 1))}
+        >
+          {isLast ? 'Done' : 'Next'}
+        </button>
+      </div>
     </div>
   )
 }

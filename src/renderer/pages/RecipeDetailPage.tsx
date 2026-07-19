@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { ChevronLeft } from 'lucide-react'
 import type { Recipe, RecipeEstimate } from '../../shared/types'
 import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
 import type { EstimateDetail } from '../../shared/macro-estimator'
@@ -10,6 +11,7 @@ import { hasImperialUnits } from '../../shared/unit-convert'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { useHousehold } from '../hooks/useHousehold'
+import { recipeInitial, recipeTone } from '../lib/recipeTone'
 
 function formatIngredient(ing: Recipe['ingredients'][number], factor: number): string {
   const scaled = scaleIngredient(ing, factor)
@@ -50,10 +52,11 @@ export function RecipeDetailPage(props: {
     })
   }, [props.recipeId])
 
-  if (!recipe || servings === null) return <p className="empty-note">Loading…</p>
+  if (!recipe || servings === null) return <p className="library__empty">Loading…</p>
 
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
+  const isOwner = me != null && recipe.ownerId === me.id
 
   const convertMetric = async (): Promise<void> => {
     if (!recipe) return
@@ -89,126 +92,150 @@ export function RecipeDetailPage(props: {
   }
 
   return (
-    <div className="detail">
-      <button className="link-btn" onClick={props.onBack}>
-        ← All recipes
-      </button>
-
-      <div className="detail__hero">
-        {recipe.imageUrl && <img className="detail__image" src={recipe.imageUrl} alt="" />}
-        <div className="detail__head">
-          <h2 className="detail__title">{recipe.title}</h2>
-          {recipe.description && <p className="detail__description">{recipe.description}</p>}
-          <div className="detail__chips">
-            {ownerName && <span className="chip">👤 added by {ownerName}</span>}
-            {recipe.prepMin !== null && <span className="chip">Prep {recipe.prepMin} min</span>}
-            {recipe.cookMin !== null && <span className="chip">Cook {recipe.cookMin} min</span>}
-            {recipe.totalMin !== null && <span className="chip">Total {recipe.totalMin} min</span>}
-            {recipe.sourceUrl && (
-              <button
-                className="link-btn"
-                onClick={() => window.open(recipe.sourceUrl!, '_blank', 'noopener')}
-              >
-                Source ↗
-              </button>
-            )}
-          </div>
-          <div className="est-block">
-            {est ? (
-              <>
-                <span className="est-block__line">
-                  ≈ {Math.round(est.calories)} kcal · P {est.protein} / C {est.carbs} / F{' '}
-                  {est.fat} g per serve{est.assumedServings ? ' (assumes 4 serves)' : ''}
-                </span>
-                <span className="est-block__meta">
-                  best guess — matched {est.matched} of {est.total} ingredients
-                </span>
-              </>
-            ) : (
-              <span className="est-block__meta">No macro estimate yet.</span>
-            )}
-            {me && recipe.ownerId === me.id && (
-              <button className="link-btn" onClick={recalc} disabled={estimating}>
-                {estimating ? 'Estimating…' : est ? '♻️ Recalculate' : 'Estimate macros'}
-              </button>
-            )}
-            {estDetail && (
-              <ul className="est-breakdown">
-                {estDetail.map((d, i) => (
-                  <li key={i} className={d.matched ? '' : 'est-breakdown__miss'}>
-                    {d.matched
-                      ? `${d.name} — ${Math.round(d.grams ?? 0)} g · ${d.calories} kcal`
-                      : `${d.name} — not matched`}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-          <div className="detail__actions">
-            <button
-              className="btn btn--primary"
-              onClick={() => setCooking(true)}
-              disabled={recipe.steps.length === 0}
-              title={recipe.steps.length === 0 ? 'This recipe has no steps' : undefined}
-            >
-              🍳 Cook
-            </button>
-            <button className="btn" onClick={() => setGroceryOpen(true)}>
-              🛒 Send ingredients to groceries
-            </button>
-            {me && recipe.ownerId === me.id && hasImperialUnits(recipe) && (
-              <button className="btn" onClick={convertMetric} disabled={converting}>
-                {converting ? 'Converting…' : '📏 Convert to metric'}
-              </button>
-            )}
-            {/* Delete is owner-only; RLS refuses it server-side regardless. */}
-            {me && recipe.ownerId === me.id && (
-              <button className="btn btn--danger" onClick={remove}>
-                Delete
-              </button>
-            )}
-          </div>
-        </div>
+    <div className="rdetail">
+      {/* 200px tone/photo header with the glass back button */}
+      <div
+        className="rdetail__header"
+        style={
+          recipe.imageUrl
+            ? undefined
+            : { background: `linear-gradient(160deg, ${recipeTone(recipe.title)}, #eef3f0 260%)` }
+        }
+      >
+        {recipe.imageUrl ? (
+          <img className="rdetail__photo" src={recipe.imageUrl} alt="" />
+        ) : (
+          <span className="rdetail__initial">{recipeInitial(recipe.title)}</span>
+        )}
+        <button className="rdetail__back" aria-label="Back" onClick={props.onBack}>
+          <ChevronLeft size={18} strokeWidth={2.4} />
+        </button>
       </div>
 
-      <div className="detail__columns">
-        <section className="detail__ingredients">
-          <div className="detail__section-head">
-            <h3>Ingredients</h3>
-            <div className="servings-stepper">
+      <div className="rdetail__body">
+        <h2 className="rdetail__title">{recipe.title}</h2>
+        {recipe.description && <p className="rdetail__description">{recipe.description}</p>}
+
+        <div className="rdetail__chips">
+          {recipe.totalMin !== null && <span className="glass-chip">{recipe.totalMin} min</span>}
+          {est && (
+            <span className="glass-chip">~{Math.round(est.calories)} kcal / serve · est.</span>
+          )}
+          {ownerName && <span className="glass-chip glass-chip--tint">Added by {ownerName}</span>}
+          {recipe.sourceUrl && (
+            <button
+              className="glass-chip glass-chip--link"
+              onClick={() => window.open(recipe.sourceUrl!, '_blank', 'noopener')}
+            >
+              Source ↗
+            </button>
+          )}
+        </div>
+
+        {est && (
+          <div className="rdetail__macros">
+            <span>P {est.protein} g</span>
+            <span>C {est.carbs} g</span>
+            <span>F {est.fat} g</span>
+            <span className="rdetail__macros-note">per serve</span>
+          </div>
+        )}
+
+        <section className="rdetail__island glass-island">
+          <div className="rdetail__island-head">
+            <span className="rdetail__island-title">Ingredients</span>
+            <div className="rdetail__scaler">
               <button
-                className="icon-btn"
+                className="round-btn rdetail__scale-btn"
+                aria-label="Fewer serves"
                 onClick={() => setServings(Math.max(1, servings - 1))}
                 disabled={servings <= 1}
               >
                 −
               </button>
-              <span className="servings-stepper__count">{servings} servings</span>
-              <button className="icon-btn" onClick={() => setServings(servings + 1)}>
+              <span className="rdetail__scale-label">
+                {servings} serve{servings === 1 ? '' : 's'}
+              </span>
+              <button
+                className="round-btn rdetail__scale-btn"
+                aria-label="More serves"
+                onClick={() => setServings(servings + 1)}
+              >
                 +
               </button>
             </div>
           </div>
-          <ul className="ingredient-list">
-            {recipe.ingredients.map((ing) => (
-              <li key={ing.position}>{formatIngredient(ing, factor)}</li>
-            ))}
-          </ul>
+          {recipe.ingredients.map((ing) => (
+            <div key={ing.position} className="rdetail__ingredient">
+              {formatIngredient(ing, factor)}
+            </div>
+          ))}
         </section>
 
-        <section className="detail__steps">
-          <h3>Steps</h3>
-          <ol className="step-list">
-            {recipe.steps.map((s, idx) => (
-              <li key={s.position}>
-                {s.section && (idx === 0 || recipe.steps[idx - 1].section !== s.section) && (
-                  <span className="step-list__section">{s.section}</span>
-                )}
-                {s.text}
+        <section className="rdetail__island glass-island">
+          <div className="rdetail__island-title">Method</div>
+          {recipe.steps.map((s, idx) => (
+            <div key={s.position}>
+              {s.section && (idx === 0 || recipe.steps[idx - 1].section !== s.section) && (
+                <div className="rdetail__section">{s.section}</div>
+              )}
+              <div className="rdetail__step">
+                <span className="rdetail__step-num">{String(idx + 1).padStart(2, '0')}</span>
+                <span className="rdetail__step-text">{s.text}</span>
+              </div>
+            </div>
+          ))}
+          {recipe.steps.length === 0 && (
+            <div className="meal-card__empty">No steps saved for this recipe.</div>
+          )}
+        </section>
+
+        <button
+          className="btn-primary rdetail__cook"
+          onClick={() => setCooking(true)}
+          disabled={recipe.steps.length === 0}
+        >
+          Start cooking mode
+        </button>
+
+        {/* Secondary actions (estimate/convert/delete are owner-only; RLS enforces it server-side too) */}
+        <div className="rdetail__actions">
+          <button className="btn-ghost" onClick={() => setGroceryOpen(true)}>
+            Send ingredients to groceries
+          </button>
+          {isOwner && (
+            <button className="btn-ghost" onClick={recalc} disabled={estimating}>
+              {estimating ? 'Estimating…' : est ? 'Recalculate estimate' : 'Estimate macros'}
+            </button>
+          )}
+          {isOwner && hasImperialUnits(recipe) && (
+            <button className="btn-ghost" onClick={convertMetric} disabled={converting}>
+              {converting ? 'Converting…' : 'Convert to metric'}
+            </button>
+          )}
+          {isOwner && (
+            <button className="btn-ghost btn-ghost--destructive" onClick={remove}>
+              Delete recipe
+            </button>
+          )}
+        </div>
+        {est && (
+          <p className="rdetail__est-meta">
+            Best guess — matched {est.matched} of {est.total} ingredients
+            {est.assumedServings ? ' (assumes 4 serves)' : ''}.
+          </p>
+        )}
+        {estDetail && (
+          <ul className="rdetail__est-breakdown">
+            {estDetail.map((d, i) => (
+              <li key={i} className={d.matched ? '' : 'rdetail__est-miss'}>
+                {d.matched
+                  ? `${d.name} — ${Math.round(d.grams ?? 0)} g · ${d.calories} kcal`
+                  : `${d.name} — not matched`}
               </li>
             ))}
-          </ol>
-        </section>
+          </ul>
+        )}
       </div>
 
       {cooking && <CookingMode recipe={recipe} onClose={() => setCooking(false)} />}
