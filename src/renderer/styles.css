@@ -714,13 +714,344 @@ body::before {
   color: var(--text-muted);
   font-size: 13px;
 }
-/* One-tap "log the planned meal" card at the top of Add Food */
-.food-result--planned {
-  border: 1.5px solid var(--accent);
-  background: var(--accent-tint);
-  border-radius: var(--radius);
-  margin-bottom: 10px;
+/* ── Add Food sheet ─────────────────────────────────────────────────────── */
+.sheet__body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+.addfood {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+.addfood__tabs {
+  flex: none;
+  margin-bottom: 14px;
+}
+.addfood__pane {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+.addfood__head {
+  margin-top: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(27, 36, 48, 0.1);
+}
+.addfood__note {
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.addfood__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  color: inherit;
+  cursor: pointer;
+}
+.addfood__caption {
+  font-size: 11px;
+  color: var(--muted-3);
+  margin-top: auto;
+  padding-top: 16px;
+}
+.addfood__barcode-row {
+  display: flex;
+  gap: 8px;
+}
+.addfood__barcode-row .input-pill {
+  flex: 1;
+  min-width: 0;
+}
+.addfood__continue {
   width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+}
+
+/* Food result rows */
+.food-row,
+.planned-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 10px 0;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  color: inherit;
+}
+.planned-row {
+  background: var(--accent-tint);
+  border: 1px solid rgba(43, 100, 224, 0.15);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+.food-row__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.food-row__name {
+  font-size: 14px;
+  font-weight: 700;
+}
+.food-row__sub {
+  font-size: 11.5px;
+  color: var(--muted-2);
+}
+.food-row__kcal {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* Tinted info banner (blue, gentle) + warm variant for soft errors */
+.info-banner {
+  padding: 9px 14px;
+  background: rgba(43, 100, 224, 0.1);
+  color: var(--accent-dark);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 14px;
+  border: 1px solid rgba(43, 100, 224, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.info-banner--warm {
+  background: rgba(240, 163, 94, 0.16);
+  border-color: rgba(240, 163, 94, 0.3);
+  color: var(--over-text);
+}
+.info-banner__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Manual-entry form fields */
+.ffield {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ffield__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ffield-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+/* Confirm step */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  min-height: 0;
+}
+.confirm__back {
+  align-self: flex-start;
+  padding: 4px 0;
+}
+.confirm__food {
+  margin-top: 6px;
+}
+.confirm__name {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+}
+.confirm__meta {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin-top: 3px;
+}
+.confirm__eyebrow {
+  margin: 16px 0 8px;
+}
+.seg__btn--small {
+  font-size: 11px;
+}
+.confirm__amount {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.confirm__step {
+  width: 44px;
+  height: 44px;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+.confirm__amount-label {
+  font-size: 22px;
+  font-weight: 800;
+  min-width: 96px;
+  text-align: center;
+}
+.confirm__serve-note {
+  font-size: 12px;
+  color: var(--muted-2);
+  margin-top: 8px;
+}
+.confirm__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+}
+.confirm__tile {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(27, 36, 48, 0.08);
+  border-radius: 16px;
+  padding: 10px 12px;
+}
+.confirm__tile-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+.confirm__tile-value {
+  font-size: 18px;
+  font-weight: 800;
+}
+.confirm__caption {
+  font-size: 11px;
+  color: var(--muted-3);
+  margin-top: 6px;
+}
+.confirm .info-banner {
+  margin-top: 12px;
+}
+.confirm__add {
+  width: 100%;
+  min-height: 50px;
+  margin-top: 16px;
+  font-size: 15px;
+}
+
+/* Scan viewfinder: dark island, frame guide, animated scan line, torch */
+@keyframes scanline {
+  0% {
+    top: 12%;
+  }
+  50% {
+    top: 84%;
+  }
+  100% {
+    top: 12%;
+  }
+}
+.scan-viewfinder {
+  position: relative;
+  border-radius: 24px;
+  background: var(--dark-surface);
+  overflow: hidden;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+.scan-viewfinder__video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.scan-viewfinder__frame {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  top: 12%;
+  bottom: 16%;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 20px;
+  pointer-events: none;
+}
+.scan-viewfinder__line {
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  height: 2px;
+  background: #5e9bfd;
+  box-shadow: 0 0 12px #5e9bfd;
+  animation: scanline 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+.scan-viewfinder__torch {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.scan-viewfinder__torch--on {
+  background: #fff;
+  color: var(--dark-surface);
+}
+.scan-viewfinder__feedback {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  background: linear-gradient(transparent, rgba(16, 20, 24, 0.6));
+}
+.scan-viewfinder__meta {
+  font-size: 10px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.45);
+}
+.scan-error {
+  padding: 9px 14px;
+  background: rgba(240, 163, 94, 0.16);
+  border: 1px solid rgba(240, 163, 94, 0.3);
+  color: var(--over-text);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 14px;
 }
 
 /* Macro estimate (best guess) on the recipe detail page */
@@ -1746,93 +2077,6 @@ select.text-input {
 }
 .search-row .text-input {
   flex: 1;
-}
-.food-results {
-  list-style: none;
-  margin-top: 12px;
-  max-height: 320px;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.food-result {
-  width: 100%;
-  text-align: left;
-  background: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-  cursor: pointer;
-  color: inherit;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.food-result:hover {
-  border-color: var(--accent);
-}
-.food-result__name {
-  font-size: 13px;
-  font-weight: 600;
-}
-.food-result__brand {
-  font-weight: 400;
-  color: var(--text-muted);
-}
-.food-result__macros {
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-.food-result__tag {
-  background: var(--accent);
-  color: var(--on-accent);
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 4px;
-  padding: 1px 5px;
-  margin-right: 6px;
-  text-transform: uppercase;
-}
-.food-pick {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  margin-bottom: 14px;
-}
-.food-pick__name {
-  font-size: 14px;
-  font-weight: 600;
-}
-.food-pick__brand {
-  font-weight: 400;
-  color: var(--text-muted);
-}
-.food-pick__serving {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-.food-preview {
-  justify-content: center;
-  font-weight: 600;
-}
-.barcode-scanner {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-}
-.barcode-scanner__video {
-  width: 100%;
-  max-height: 240px;
-  background: #000;
-  border-radius: 8px;
-  object-fit: cover;
-}
-.barcode-scanner__hint {
-  font-size: 12px;
-  color: var(--text-muted);
 }
 
 /* Sign-in */

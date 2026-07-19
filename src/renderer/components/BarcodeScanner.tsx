@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
+import { Zap } from 'lucide-react'
 import { startScanLoop } from '../lib/barcodeDecoder'
 
 /**
@@ -108,7 +109,7 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  if (error) return <div className="banner banner--warn">{error}</div>
+  if (error) return <div className="scan-error">{error}</div>
 
   const feedback =
     seen === 'locking'
@@ -117,22 +118,30 @@ export function BarcodeScanner(props: { onDetected: (code: string) => void }): J
         ? 'Almost — barcode spotted, hold steady and let it focus…'
         : attempts > 20
           ? 'No barcode found yet — move closer (10–15 cm) and check the lighting.'
-          : 'Point the barcode at the camera…'
+          : 'Point at a barcode'
 
   return (
-    <div className="barcode-scanner">
+    <div className="scan-viewfinder">
       {/* playsInline keeps iOS from hijacking the preview into a fullscreen player */}
-      <video ref={videoRef} className="barcode-scanner__video" autoPlay muted playsInline />
+      <video ref={videoRef} className="scan-viewfinder__video" autoPlay muted playsInline />
+      <div className="scan-viewfinder__frame" />
+      <div className="scan-viewfinder__line" />
       {torchAvailable && (
-        <button className="btn" onClick={toggleTorch}>
-          {torchOn ? '🔦 Torch off' : '🔦 Torch on'}
+        <button
+          className={`scan-viewfinder__torch ${torchOn ? 'scan-viewfinder__torch--on' : ''}`}
+          aria-label={torchOn ? 'Torch off' : 'Torch on'}
+          onClick={toggleTorch}
+        >
+          <Zap size={18} />
         </button>
       )}
-      <p className="barcode-scanner__hint">{feedback}</p>
-      <p className="barcode-scanner__hint">
-        {camera ? `camera ${camera} · ` : 'camera starting… · '}
-        {attempts} scan attempts
-      </p>
+      <div className="scan-viewfinder__feedback">
+        <span>{feedback}</span>
+        <span className="scan-viewfinder__meta">
+          {camera ? `camera ${camera} · ` : 'camera starting… · '}
+          {attempts} scan attempts
+        </span>
+      </div>
     </div>
   )
 }

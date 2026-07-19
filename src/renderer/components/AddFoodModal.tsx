@@ -1,28 +1,45 @@
 import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
 import type { FoodItem, MealType } from '../../shared/types'
-import { MEAL_LABEL } from '../../shared/types'
+import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
 import { lookupBarcode, searchFoods, cacheFood, getRecentFoods } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
+import { BottomSheet } from './BottomSheet'
+import { useToast } from './Toast'
 
-type Tab = 'search' | 'barcode' | 'manual'
+type Tab = 'search' | 'scan' | 'manual'
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
+const fmtG = (n: number): string => {
+  const v = round1(n)
+  return v % 1 === 0 ? String(Math.round(v)) : v.toFixed(1)
+}
 
-function macroLine(item: FoodItem, factor = 1): string {
+function foodSub(item: FoodItem): string {
+  return [item.brand, item.servingDesc].filter(Boolean).join(' · ')
+}
+
+/** One tappable food row: name + brand·serve meta, kcal right-aligned. */
+function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): JSX.Element {
   return (
-    `${Math.round(item.calories * factor)} kcal · ` +
-    `P ${round1(item.protein * factor)} / C ${round1(item.carbs * factor)} / F ${round1(item.fat * factor)} g`
+    <button className="food-row" onClick={props.onPick}>
+      <span className="food-row__main">
+        <span className="food-row__name">{props.item.name}</span>
+        <span className="food-row__sub">{props.note ?? foodSub(props.item)}</span>
+      </span>
+      <span className="food-row__kcal">{Math.round(props.item.calories)}</span>
+    </button>
   )
 }
 
-/** Choose how much was eaten, preview the macros, then log it. */
-function PortionStep(props: {
+/** Confirm step: meal segmented, − / + amount steppers, live macro tiles, Add. */
+function ConfirmStep(props: {
   item: FoodItem
-  mealLabel: string
+  meal: MealType
+  onMeal: (m: MealType) => void
   busy: boolean
   error: string | null
   onBack: () => void
@@ -33,62 +50,99 @@ function PortionStep(props: {
   recheckNote?: string | null
 }): JSX.Element {
   const isGram = props.item.unit === '100g'
+  // Grams for per-100g items (step 10 g), serves otherwise (step 0.5).
   const [value, setValue] = useState(isGram ? 100 : 1)
+  const step = isGram ? 10 : 0.5
   const amount = isGram ? value / 100 : value
+  const factor = amount
+
+  const amountText = isGram
+    ? `${Math.round(value)} g`
+    : `${value % 1 === 0 ? Math.round(value) : value.toFixed(1)} serve${value === 1 ? '' : 's'}`
 
   return (
-    <>
-      <h3 className="modal__title">Add to {props.mealLabel}</h3>
-      <div className="food-pick">
-        <span className="food-pick__name">
-          {props.item.name}
-          {props.item.brand ? (
-            <span className="food-pick__brand"> · {props.item.brand}</span>
-          ) : null}
-        </span>
-        {props.item.servingDesc && (
-          <span className="food-pick__serving">{props.item.servingDesc}</span>
-        )}
+    <div className="confirm">
+      <button className="btn-ghost confirm__back" onClick={props.onBack} disabled={props.busy}>
+        ← Back to search
+      </button>
+      <div className="confirm__food">
+        <div className="confirm__name">{props.item.name}</div>
+        <div className="confirm__meta">
+          {foodSub(props.item) || (isGram ? 'per 100 g' : 'per serve')}
+        </div>
       </div>
 
-      <label className="field">
-        <span className="field__label">{isGram ? 'Grams' : 'Servings'}</span>
-        <input
-          className="text-input"
-          type="number"
-          min="0"
-          step={isGram ? 10 : 0.5}
-          value={value}
-          autoFocus
-          onChange={(e) => setValue(Math.max(0, Number(e.target.value)))}
-        />
-      </label>
+      <div className="eyebrow confirm__eyebrow">Meal</div>
+      <div className="seg">
+        {MEAL_TYPES.map((m) => (
+          <button
+            key={m}
+            className={`seg__btn seg__btn--small ${props.meal === m ? 'seg__btn--active' : ''}`}
+            onClick={() => props.onMeal(m)}
+          >
+            {MEAL_LABEL[m].toUpperCase()}
+          </button>
+        ))}
+      </div>
 
-      <div className="banner banner--ok food-preview">{macroLine(props.item, amount)}</div>
+      <div className="eyebrow confirm__eyebrow">Amount</div>
+      <div className="confirm__amount">
+        <button
+          className="round-btn confirm__step"
+          aria-label="Less"
+          onClick={() => setValue(Math.max(step, round1(value - step)))}
+        >
+          −
+        </button>
+        <span className="confirm__amount-label">{amountText}</span>
+        <button
+          className="round-btn confirm__step"
+          aria-label="More"
+          onClick={() => setValue(round1(value + step))}
+        >
+          +
+        </button>
+      </div>
+      {props.item.servingDesc && (
+        <div className="confirm__serve-note">1 serve = {props.item.servingDesc}</div>
+      )}
+
+      <div className="confirm__tiles">
+        {(
+          [
+            ['KCAL', Math.round(props.item.calories * factor).toLocaleString()],
+            ['P', fmtG(props.item.protein * factor)],
+            ['C', fmtG(props.item.carbs * factor)],
+            ['F', fmtG(props.item.fat * factor)]
+          ] as const
+        ).map(([label, v]) => (
+          <div key={label} className="confirm__tile">
+            <div className="confirm__tile-label">{label}</div>
+            <div className="confirm__tile-value">{v}</div>
+          </div>
+        ))}
+      </div>
+      <div className="confirm__caption">Best-guess from the database — close enough is the point.</div>
+
       {props.onRecheck && (
-        <div className="banner banner--warn">
+        <div className="info-banner">
           <span>Saved from an earlier scan — macros may be out of date.</span>
-          <button className="btn" onClick={props.onRecheck} disabled={props.recheckBusy}>
+          <button className="btn-secondary" onClick={props.onRecheck} disabled={props.recheckBusy}>
             {props.recheckBusy ? 'Checking…' : '↻ Re-check OpenFoodFacts'}
           </button>
         </div>
       )}
-      {props.recheckNote && <div className="banner banner--warn">{props.recheckNote}</div>}
-      {props.error && <div className="banner banner--error">{props.error}</div>}
+      {props.recheckNote && <div className="info-banner">{props.recheckNote}</div>}
+      {props.error && <div className="info-banner info-banner--warm">{props.error}</div>}
 
-      <div className="modal__actions">
-        <button className="btn" onClick={props.onBack} disabled={props.busy}>
-          Back
-        </button>
-        <button
-          className="btn btn--primary"
-          onClick={() => props.onAdd(amount)}
-          disabled={amount <= 0 || props.busy}
-        >
-          {props.busy ? 'Adding…' : 'Add'}
-        </button>
-      </div>
-    </>
+      <button
+        className="btn-primary confirm__add"
+        onClick={() => props.onAdd(amount)}
+        disabled={amount <= 0 || props.busy}
+      >
+        {props.busy ? 'Adding…' : `Add to ${MEAL_LABEL[props.meal]}`}
+      </button>
+    </div>
   )
 }
 
@@ -99,7 +153,8 @@ export function AddFoodModal(props: {
   onClose: () => void
   onLogged: () => void
 }): JSX.Element {
-  const mealLabel = MEAL_LABEL[props.mealType]
+  const toast = useToast()
+  const [meal, setMeal] = useState<MealType>(props.mealType)
   const [tab, setTab] = useState<Tab>('search')
   const [selected, setSelected] = useState<FoodItem | null>(null)
   // True when `selected` came from the per-user food_cache (enables "re-check OFF").
@@ -121,7 +176,7 @@ export function AddFoodModal(props: {
     getRecentFoods().then(setRecents, () => {})
   }, [])
 
-  // barcode tab
+  // scan tab — the camera starts as soon as the tab opens
   const [scanning, setScanning] = useState(false)
   const [barcodeInput, setBarcodeInput] = useState('')
   const [lookingUp, setLookingUp] = useState(false)
@@ -129,10 +184,14 @@ export function AddFoodModal(props: {
   // Set when a scan/lookup found no product — carried into the Manual tab so the
   // entry is saved into food_cache and the next scan of it resolves instantly.
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
+  useEffect(() => {
+    setScanning(tab === 'scan')
+  }, [tab])
 
   // manual tab
   const [mName, setMName] = useState('')
   const [mBrand, setMBrand] = useState('')
+  const [mServeG, setMServeG] = useState('')
   const [mCal, setMCal] = useState('')
   const [mProtein, setMProtein] = useState('')
   const [mCarbs, setMCarbs] = useState('')
@@ -188,6 +247,7 @@ export function AddFoodModal(props: {
         setPendingBarcode(null)
         setSelectedFromCache(fromCache)
         setSelected(item)
+        toast(`Barcode matched: ${item.name}`)
       } else if (online) {
         setBarcodeError(`No product found for barcode ${trimmed}.`)
         setPendingBarcode(trimmed)
@@ -237,7 +297,7 @@ export function AddFoodModal(props: {
       name: mName.trim(),
       brand: mBrand.trim() || null,
       barcode: pendingBarcode,
-      servingDesc: null,
+      servingDesc: Number(mServeG) > 0 ? `${Number(mServeG)} g` : null,
       unit: 'serving',
       calories: Number(mCal) || 0,
       protein: Number(mProtein) || 0,
@@ -251,7 +311,7 @@ export function AddFoodModal(props: {
     if (!selected || logging) return
     const entry: NewLogEntry = {
       date: props.date,
-      mealType: props.mealType,
+      mealType: meal,
       name: selected.name,
       brand: selected.brand,
       amount,
@@ -274,6 +334,7 @@ export function AddFoodModal(props: {
           // cache is best-effort; the entry itself is already logged
         }
       }
+      toast(`Added to ${MEAL_LABEL[meal]}`)
       props.onLogged()
       props.onClose()
     } catch (err) {
@@ -282,304 +343,265 @@ export function AddFoodModal(props: {
     }
   }
 
-  if (selected) {
-    return (
-      <div className="modal-overlay" onClick={props.onClose}>
-        <div className="modal" onClick={(e) => e.stopPropagation()}>
-          <PortionStep
-            // Remount if a re-check swaps the item (its unit may flip serving↔100g,
-            // which changes what the amount field means).
-            key={`${selected.name}|${selected.unit}`}
-            item={selected}
-            mealLabel={mealLabel}
-            busy={logging}
-            error={logError}
-            onRecheck={selectedFromCache && selected.barcode ? recheck : null}
-            recheckBusy={rechecking}
-            recheckNote={recheckNote}
-            onBack={() => {
-              setSelected(null)
-              setSelectedFromCache(false)
-              setLogError(null)
-              setRecheckNote(null)
-            }}
-            onAdd={log}
-          />
-        </div>
-      </div>
-    )
+  const pick = (item: FoodItem, fromCache = false): void => {
+    setSelectedFromCache(fromCache)
+    setSelected(item)
   }
 
   return (
-    <div className="modal-overlay" onClick={props.onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal__title">Add food · {mealLabel}</h3>
-
-        <div className="tabs">
-          {(['search', 'barcode', 'manual'] as Tab[]).map((t) => (
-            <button
-              key={t}
-              className={`tabs__tab ${tab === t ? 'tabs__tab--active' : ''}`}
-              onClick={() => setTab(t)}
-            >
-              {t === 'search' ? '🔍 Search' : t === 'barcode' ? '📷 Barcode' : '✏️ Manual'}
-            </button>
-          ))}
-        </div>
-
-        {tab === 'search' && (
-          <>
-            {props.planned && (
+    <BottomSheet title="Add food" tall onClose={props.onClose}>
+      {selected ? (
+        <ConfirmStep
+          // Remount if a re-check swaps the item (its unit may flip serving↔100g,
+          // which changes what the amount field means).
+          key={`${selected.name}|${selected.unit}`}
+          item={selected}
+          meal={meal}
+          onMeal={setMeal}
+          busy={logging}
+          error={logError}
+          onRecheck={selectedFromCache && selected.barcode ? recheck : null}
+          recheckBusy={rechecking}
+          recheckNote={recheckNote}
+          onBack={() => {
+            setSelected(null)
+            setSelectedFromCache(false)
+            setLogError(null)
+            setRecheckNote(null)
+          }}
+          onAdd={log}
+        />
+      ) : (
+        <div className="addfood">
+          <div className="seg addfood__tabs">
+            {(['search', 'scan', 'manual'] as Tab[]).map((t) => (
               <button
-                className="food-result food-result--planned"
-                onClick={() => {
-                  setSelectedFromCache(false)
-                  setSelected(props.planned!)
-                }}
+                key={t}
+                className={`seg__btn ${tab === t ? 'seg__btn--active' : ''}`}
+                onClick={() => setTab(t)}
               >
-                <span className="food-result__name">📋 Planned: {props.planned.name}</span>
-                <span className="food-result__macros">
-                  {macroLine(props.planned)} — tap to log
-                </span>
+                {t === 'search' ? 'Search' : t === 'scan' ? 'Scan' : 'Manual'}
               </button>
-            )}
-            <div className="search-row">
+            ))}
+          </div>
+
+          {tab === 'search' && (
+            <div className="addfood__pane">
               <input
-                className="text-input"
-                placeholder="Search foods (e.g. greek yogurt)…"
+                className="input-pill"
+                placeholder="Search foods (AU database)"
                 value={query}
                 autoFocus
                 onChange={(e) => onQueryChange(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && runSearch()}
               />
-              <button className="btn btn--primary" onClick={runSearch} disabled={searching}>
-                {searching ? '…' : 'Search'}
-              </button>
-            </div>
-            {query.trim() === '' && recents.length > 0 && (
-              <>
-                <p className="modal__hint">Recently logged:</p>
-                <ul className="food-results">
+
+              {props.planned && query.trim() === '' && (
+                <button className="planned-row" onClick={() => pick(props.planned!)}>
+                  <span className="food-row__main">
+                    <span className="food-row__name">Planned: {props.planned.name}</span>
+                    <span className="food-row__sub">{props.planned.servingDesc}</span>
+                  </span>
+                  <span className="food-row__kcal">{Math.round(props.planned.calories)}</span>
+                </button>
+              )}
+
+              {query.trim() === '' && recents.length > 0 && (
+                <>
+                  <div className="addfood__head eyebrow">Recents</div>
                   {recents.map((item, i) => (
-                    <li key={i}>
-                      <button
-                        className="food-result"
-                        onClick={() => {
-                          setSelectedFromCache(false)
-                          setSelected(item)
-                        }}
-                      >
-                        <span className="food-result__name">
-                          <span className="food-result__tag">recent</span>
-                          {item.name}
-                          {item.brand ? (
-                            <span className="food-result__brand"> · {item.brand}</span>
-                          ) : null}
-                        </span>
-                        <span className="food-result__macros">
-                          {macroLine(item)}
-                          {item.servingDesc ? ` — ${item.servingDesc}` : ''}
-                        </span>
-                      </button>
-                    </li>
+                    <FoodRow key={i} item={item} onPick={() => pick(item)} />
                   ))}
-                </ul>
-              </>
-            )}
-            {searchError && <div className="banner banner--error">{searchError}</div>}
-            {searched && !searching && !searchOnline && (
-              <div className="banner banner--warn">
-                Online food search is unavailable right now — only the offline staples list was
-                searched.
-              </div>
-            )}
-            <ul className="food-results">
-              {results.map((item, i) => (
-                <li key={i}>
-                  <button
-                    className="food-result"
-                    onClick={() => {
-                      setSelectedFromCache(false)
-                      setSelected(item)
-                    }}
-                  >
-                    <span className="food-result__name">
-                      {item.source === 'staple' && <span className="food-result__tag">staple</span>}
-                      {item.name}
-                      {item.brand ? (
-                        <span className="food-result__brand"> · {item.brand}</span>
-                      ) : null}
-                    </span>
-                    <span className="food-result__macros">
-                      {macroLine(item)}
-                      {item.servingDesc ? ` — ${item.servingDesc}` : ''}
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-            {!searched && !searching && query.trim() !== '' && (
-              <p className="empty-note">
-                {results.length > 0 ? 'Offline staples shown — press' : 'Press'} Enter or Search
-                for online products.
+                </>
+              )}
+
+              {query.trim() !== '' && (
+                <>
+                  <div className="addfood__head eyebrow">Results</div>
+                  {results.map((item, i) => (
+                    <FoodRow key={i} item={item} onPick={() => pick(item)} />
+                  ))}
+                  {!searched && !searching && (
+                    <p className="addfood__note">
+                      {results.length > 0 ? 'Offline staples shown — press' : 'Press'} Enter to
+                      search online products.
+                    </p>
+                  )}
+                  {searching && <p className="addfood__note">Searching…</p>}
+                  {searched && !searching && results.length === 0 && !searchError && searchOnline && (
+                    <p className="addfood__note">
+                      No match. Try the barcode scanner or{' '}
+                      <button className="addfood__link" onClick={() => setTab('manual')}>
+                        enter it manually
+                      </button>
+                      .
+                    </p>
+                  )}
+                </>
+              )}
+
+              {searchError && <div className="info-banner info-banner--warm">{searchError}</div>}
+              {searched && !searching && !searchOnline && (
+                <div className="info-banner">
+                  Online food search is unavailable right now — only the offline staples list was
+                  searched.
+                </div>
+              )}
+
+              <p className="addfood__caption">
+                Open food database (AU-first) · staples bundled for offline · values are estimates
               </p>
-            )}
-            {searched && !searching && results.length === 0 && !searchError && searchOnline && (
-              <p className="empty-note">No matches. Try the Manual tab.</p>
-            )}
-          </>
-        )}
+            </div>
+          )}
 
-        {tab === 'barcode' && (
-          <>
-            {scanning ? (
-              <>
+          {tab === 'scan' && (
+            <div className="addfood__pane">
+              {scanning ? (
                 <BarcodeScanner onDetected={(code) => lookUp(code)} />
-                <button className="btn" onClick={() => setScanning(false)}>
-                  Stop camera
+              ) : (
+                <button className="btn-secondary" onClick={() => setScanning(true)}>
+                  Restart camera
                 </button>
-              </>
-            ) : (
-              <button className="btn btn--primary" onClick={() => setScanning(true)}>
-                📷 Scan with camera
-              </button>
-            )}
-            <p className="modal__hint">…or type the barcode number:</p>
-            <div className="search-row">
-              <input
-                className="text-input"
-                placeholder="e.g. 5000159407236"
-                value={barcodeInput}
-                inputMode="numeric"
-                onChange={(e) => setBarcodeInput(e.target.value.replace(/\D/g, ''))}
-                onKeyDown={(e) => e.key === 'Enter' && lookUp(barcodeInput)}
-              />
-              <button
-                className="btn btn--primary"
-                onClick={() => lookUp(barcodeInput)}
-                disabled={lookingUp || !isValidBarcode(barcodeInput.trim())}
-              >
-                {lookingUp ? '…' : 'Look up'}
-              </button>
-            </div>
-            {barcodeInput !== '' && !isValidBarcode(barcodeInput.trim()) && (
-              <p className="empty-note">Barcodes are 8–14 digits.</p>
-            )}
-            {barcodeError && (
-              <div className="banner banner--warn">
-                <span>{barcodeError}</span>
+              )}
+              {lookingUp && <p className="addfood__note">Looking it up…</p>}
+              {barcodeError && (
+                <div className="info-banner info-banner--warm">
+                  <span>{barcodeError}</span>
+                  <span className="info-banner__actions">
+                    <button
+                      className="btn-secondary"
+                      onClick={() => {
+                        setBarcodeError(null)
+                        setScanning(true)
+                      }}
+                    >
+                      Scan again
+                    </button>
+                    {pendingBarcode && (
+                      <button className="btn-secondary" onClick={() => setTab('manual')}>
+                        Add it manually — saves for next scan
+                      </button>
+                    )}
+                  </span>
+                </div>
+              )}
+              <div className="addfood__barcode-row">
+                <input
+                  className="input-pill"
+                  placeholder="…or type the barcode"
+                  value={barcodeInput}
+                  inputMode="numeric"
+                  onChange={(e) => setBarcodeInput(e.target.value.replace(/\D/g, ''))}
+                  onKeyDown={(e) => e.key === 'Enter' && lookUp(barcodeInput)}
+                />
                 <button
-                  className="btn"
-                  onClick={() => {
-                    setBarcodeError(null)
-                    setScanning(true)
-                  }}
+                  className="btn-secondary"
+                  onClick={() => lookUp(barcodeInput)}
+                  disabled={lookingUp || !isValidBarcode(barcodeInput.trim())}
                 >
-                  📷 Scan again
+                  {lookingUp ? '…' : 'Look up'}
                 </button>
-                {pendingBarcode && (
-                  <button className="btn" onClick={() => setTab('manual')}>
-                    ✏️ Add it manually — saves for next scan
-                  </button>
-                )}
               </div>
-            )}
-          </>
-        )}
+              {barcodeInput !== '' && !isValidBarcode(barcodeInput.trim()) && (
+                <p className="addfood__note">Barcodes are 8–14 digits.</p>
+              )}
+            </div>
+          )}
 
-        {tab === 'manual' && (
-          <>
-            {pendingBarcode && (
-              <div className="banner banner--ok">
-                <span>
-                  Will be saved for barcode <strong>{pendingBarcode}</strong> — next scan is
-                  instant.
-                </span>
-                <button className="btn" onClick={() => setPendingBarcode(null)}>
-                  Detach
-                </button>
+          {tab === 'manual' && (
+            <div className="addfood__pane">
+              {pendingBarcode && (
+                <div className="info-banner">
+                  <span>
+                    Barcode not in the database yet — save it once and it&rsquo;s cached for next
+                    time ({pendingBarcode}).
+                  </span>
+                  <button className="btn-secondary" onClick={() => setPendingBarcode(null)}>
+                    Detach
+                  </button>
+                </div>
+              )}
+              <label className="ffield">
+                <span className="ffield__label">Food name</span>
+                <input
+                  className="input-field"
+                  value={mName}
+                  placeholder="e.g. Protein bar"
+                  autoFocus
+                  onChange={(e) => setMName(e.target.value)}
+                />
+              </label>
+              <label className="ffield">
+                <span className="ffield__label">Brand (optional)</span>
+                <input
+                  className="input-field"
+                  value={mBrand}
+                  onChange={(e) => setMBrand(e.target.value)}
+                />
+              </label>
+              <div className="ffield-grid">
+                <label className="ffield">
+                  <span className="ffield__label">Serving size (g)</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mServeG}
+                    onChange={(e) => setMServeG(e.target.value)}
+                  />
+                </label>
+                <label className="ffield">
+                  <span className="ffield__label">kcal / serve</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mCal}
+                    onChange={(e) => setMCal(e.target.value)}
+                  />
+                </label>
+                <label className="ffield">
+                  <span className="ffield__label">Protein (g)</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mProtein}
+                    onChange={(e) => setMProtein(e.target.value)}
+                  />
+                </label>
+                <label className="ffield">
+                  <span className="ffield__label">Carbs (g)</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mCarbs}
+                    onChange={(e) => setMCarbs(e.target.value)}
+                  />
+                </label>
+                <label className="ffield">
+                  <span className="ffield__label">Fat (g)</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mFat}
+                    onChange={(e) => setMFat(e.target.value)}
+                  />
+                </label>
               </div>
-            )}
-            <label className="field">
-              <span className="field__label">Food name</span>
-              <input
-                className="text-input"
-                value={mName}
-                autoFocus
-                onChange={(e) => setMName(e.target.value)}
-              />
-            </label>
-            <label className="field">
-              <span className="field__label">Brand (optional)</span>
-              <input
-                className="text-input"
-                value={mBrand}
-                onChange={(e) => setMBrand(e.target.value)}
-              />
-            </label>
-            <div className="field-row">
-              <label className="field">
-                <span className="field__label">Calories</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min="0"
-                  value={mCal}
-                  onChange={(e) => setMCal(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span className="field__label">Protein (g)</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min="0"
-                  value={mProtein}
-                  onChange={(e) => setMProtein(e.target.value)}
-                />
-              </label>
-            </div>
-            <div className="field-row">
-              <label className="field">
-                <span className="field__label">Carbs (g)</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min="0"
-                  value={mCarbs}
-                  onChange={(e) => setMCarbs(e.target.value)}
-                />
-              </label>
-              <label className="field">
-                <span className="field__label">Fat (g)</span>
-                <input
-                  className="text-input"
-                  type="number"
-                  min="0"
-                  value={mFat}
-                  onChange={(e) => setMFat(e.target.value)}
-                />
-              </label>
-            </div>
-            <div className="modal__actions">
-              <button className="btn" onClick={props.onClose}>
-                Cancel
-              </button>
-              <button className="btn btn--primary" onClick={startManual} disabled={!mName.trim()}>
+              <button
+                className="btn-primary addfood__continue"
+                onClick={startManual}
+                disabled={!mName.trim()}
+              >
                 Continue
               </button>
             </div>
-          </>
-        )}
-
-        {tab !== 'manual' && (
-          <div className="modal__actions">
-            <button className="btn" onClick={props.onClose}>
-              Cancel
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
+          )}
+        </div>
+      )}
+    </BottomSheet>
   )
 }
