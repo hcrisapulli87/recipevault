@@ -14,54 +14,94 @@
   font-display: swap;
 }
 
-/* ── Studio Light (default) ─────────────────────────────────────────────── */
+/* ── Glass (light) — the one theme. Frosted islands over a pastel wash. ──
+   Tokens from docs/design/glass-redesign/README.md (approved spec). */
 :root {
-  --bg-base: #f2f4f7;
-  --bg-surface: #ffffff;
-  --bg-elevated: #eef0f4;
-  --border: #e8eaee;
-  --accent: #e87f22;
-  --accent-bright: #f6902f; /* hover on accent surfaces */
-  --accent-deep: #c2620e; /* accent-colored TEXT (contrast-safe per theme) */
-  --accent-tint: #fdeedd; /* accent-tinted backgrounds (nav pill, badges) */
-  --on-accent: #ffffff; /* text on solid accent */
-  --text-primary: #101828;
-  --text-secondary: #667085;
-  --text-muted: #98a2b3;
-  --green: #10b981;
-  --red: #e5483f;
-  --amber: #f59e0b;
-  --blue: #3b82f6;
-  --shadow-sm: 0 1px 3px rgba(16, 24, 40, 0.1);
-  --shadow-md: 0 4px 12px rgba(16, 24, 40, 0.14);
-  --scrim: rgba(16, 18, 22, 0.6);
-  --radius: 8px;
-  --radius-btn: 7px;
+  /* Text */
+  --ink: #1b2430; /* primary */
+  --muted: #5a6675; /* secondary */
+  --muted-2: #8a95a3; /* tertiary / entry meta */
+  --muted-3: #9aa5b1; /* placeholder / disabled */
+  --dock-inactive: #7b8794;
+
+  /* Ground + accent */
+  --ground: #eef3f0;
+  --accent: #2b64e0;
+  --accent-dark: #2456c4; /* pressed / accent-colored text */
+  --accent-grad: linear-gradient(160deg, #3a7bfd, #2b64e0);
+  --accent-tint: rgba(43, 100, 224, 0.12);
+
+  /* Macros + status */
+  --protein: #34c759;
+  --carbs: #5e9bfd;
+  --fat: #a78bdf;
+  --over-bar: #f0a35e; /* over-goal: gentle amber, never red-alarm */
+  --over-text: #b45309;
+  --over-trend: #f3c48f;
+  --flame: #c2410c;
+  --destructive: #c2410c;
+  --green: #34c759;
+  --dark-surface: #101418; /* scanner / toast */
+
+  /* Glass recipes */
+  --glass-bg: rgba(255, 255, 255, 0.6);
+  --glass-border: rgba(255, 255, 255, 0.75);
+  --glass-shadow: 0 12px 32px rgba(27, 36, 48, 0.08);
+  --hero-shadow: 0 16px 40px rgba(27, 36, 48, 0.1);
+  --pill-bg: rgba(255, 255, 255, 0.55);
+  --pill-border: rgba(255, 255, 255, 0.7);
+  --pill-shadow: 0 8px 24px rgba(27, 36, 48, 0.08);
+  --tile-bg: rgba(255, 255, 255, 0.65);
+  --tile-border: rgba(255, 255, 255, 0.8);
+  --divider: rgba(27, 36, 48, 0.07);
+  --hairline: rgba(27, 36, 48, 0.12);
+  --scrim: rgba(16, 20, 24, 0.35);
+
+  /* Legacy aliases (still referenced by not-yet-converted screens; removed in the
+     final cleanup sweep). Mapped onto the glass palette so everything reads coherent. */
+  --bg-base: #eef3f0;
+  --bg-surface: rgba(255, 255, 255, 0.65);
+  --bg-elevated: rgba(255, 255, 255, 0.5);
+  --border: rgba(27, 36, 48, 0.1);
+  --accent-bright: #3a7bfd;
+  --accent-deep: #2456c4;
+  --on-accent: #ffffff;
+  --text-primary: #1b2430;
+  --text-secondary: #5a6675;
+  --text-muted: #8a95a3;
+  --red: #c2410c;
+  --amber: #b45309;
+  --blue: #5e9bfd;
+  --shadow-sm: 0 8px 24px rgba(27, 36, 48, 0.08);
+  --shadow-md: 0 12px 32px rgba(27, 36, 48, 0.1);
+  --radius: 18px;
+  --radius-btn: 14px;
 }
 
-/* ── Studio Dark ────────────────────────────────────────────────────────── */
-/* Panels rely on hairline borders, not shadows (shadows don't read on dark). */
-[data-theme='dark'] {
-  --bg-base: #101216;
-  --bg-surface: #191c21;
-  --bg-elevated: #20242b;
-  --border: rgba(255, 255, 255, 0.07);
-  --accent-deep: #f6a35a;
-  --accent-tint: rgba(232, 127, 34, 0.16);
-  --text-primary: #ecedef;
-  --text-secondary: #9ba0aa;
-  --text-muted: #6b707a;
-  --shadow-sm: none;
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.5);
-  --scrim: rgba(0, 0, 0, 0.65);
+html {
+  background: var(--ground);
 }
-
 body {
-  background: var(--bg-base);
-  color: var(--text-primary);
-  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--ground);
+  color: var(--ink);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+}
+/* Fixed pastel wash behind all content (spec: three soft radials). A dedicated
+   fixed layer instead of body background-attachment — iOS Safari ignores `fixed`
+   attachment, a transformed-free fixed div does not scroll-glitch. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(600px 420px at 12% -4%, #cfe9d8 0%, transparent 62%),
+    radial-gradient(560px 460px at 100% 22%, #cfe0f7 0%, transparent 60%),
+    radial-gradient(520px 420px at 40% 108%, #e8ddf3 0%, transparent 58%);
 }
 
 .app {
@@ -75,10 +115,282 @@ body {
   flex: 1;
   overflow: hidden;
 }
+/* One centered phone-width column everywhere — the Electron desktop window gets
+   the same glass UI, just floating on a wider wash. */
 .app__main {
   flex: 1;
   overflow-y: auto;
-  padding: 24px 28px;
+  padding: 16px 16px calc(120px + env(safe-area-inset-bottom));
+}
+.app__main > * {
+  max-width: 430px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ── Glass primitives ───────────────────────────────────────────────────── */
+.glass-island {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  box-shadow: var(--glass-shadow);
+}
+.glass-hero {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  border: 1px solid var(--glass-border);
+  border-radius: 28px;
+  box-shadow: var(--hero-shadow);
+}
+.glass-pill {
+  background: var(--pill-bg);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--pill-border);
+  border-radius: 999px;
+  box-shadow: var(--pill-shadow);
+}
+.glass-tile {
+  background: var(--tile-bg);
+  border: 1px solid var(--tile-border);
+  border-radius: 18px;
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Buttons */
+.btn-primary {
+  background: var(--accent-grad);
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  font-family: inherit;
+  min-height: 46px;
+  padding: 0 22px;
+  cursor: pointer;
+  box-shadow: 0 10px 24px rgba(43, 100, 224, 0.35);
+}
+.btn-primary:active {
+  background: var(--accent-dark);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 13px;
+  font-family: inherit;
+  min-height: 44px;
+  padding: 0 18px;
+  cursor: pointer;
+}
+.btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 10px 6px;
+}
+.btn-ghost--destructive {
+  color: var(--destructive);
+}
+
+/* Segmented control: recessed track, solid blue selected pill */
+.seg {
+  display: flex;
+  background: rgba(27, 36, 48, 0.06);
+  border-radius: 999px;
+  padding: 3px;
+}
+.seg__btn {
+  flex: 1;
+  min-height: 38px;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.seg__btn--active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+/* Round icon buttons (steppers, close, quick-add) */
+.round-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid var(--hairline);
+  color: var(--ink);
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.round-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.round-btn--tinted {
+  background: var(--accent-tint);
+  border: none;
+  color: var(--accent-dark);
+}
+
+/* FAB */
+.fab {
+  width: 58px;
+  height: 58px;
+  border-radius: 999px;
+  border: none;
+  background: var(--accent-grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow:
+    0 14px 30px rgba(43, 100, 224, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+/* Bottom sheets */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: var(--scrim);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.sheet {
+  width: 100%;
+  max-width: 430px;
+  max-height: 92vh;
+  background: rgba(255, 255, 255, 0.87);
+  -webkit-backdrop-filter: blur(30px);
+  backdrop-filter: blur(30px);
+  border-radius: 28px 28px 0 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 -12px 40px rgba(27, 36, 48, 0.16);
+  padding: 18px 16px calc(20px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  animation: sheet-up 0.22s ease-out;
+}
+.sheet--tall {
+  height: 88vh;
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(24px);
+    opacity: 0.6;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.sheet__title {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Toast: dark glass pill above the dock */
+.toast {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(104px + env(safe-area-inset-bottom));
+  z-index: 300;
+  background: rgba(16, 20, 24, 0.85);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 12px 20px;
+  box-shadow: 0 12px 32px rgba(16, 20, 24, 0.35);
+  pointer-events: none;
+  white-space: nowrap;
+  animation: sheet-up 0.2s ease-out;
+}
+
+/* Pill inputs (search / single-line) */
+.input-pill {
+  width: 100%;
+  min-height: 46px;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 0 18px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--ink);
+}
+.input-pill::placeholder {
+  color: var(--muted-3);
+}
+.input-pill:focus,
+.input-field:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: transparent;
+}
+/* Form-field inputs (14px radius per spec) */
+.input-field {
+  width: 100%;
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(27, 36, 48, 0.1);
+  border-radius: 14px;
+  padding: 0 14px;
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--ink);
+}
+.input-field::placeholder {
+  color: var(--muted-3);
 }
 
 /* Sidebar — floating Studio panel */
