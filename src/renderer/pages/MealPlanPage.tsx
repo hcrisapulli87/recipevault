@@ -2,19 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { MEAL_LABEL } from '../../shared/types'
 import type { Day, MealPlanEntry, PlanMeal, RecipeSummary } from '../../shared/types'
+import { BottomSheet } from '../components/BottomSheet'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { getMealPlan, setMeal, clearWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
-
-const DAY_LABEL: Record<Day, string> = {
-  monday: 'Mon',
-  tuesday: 'Tue',
-  wednesday: 'Wed',
-  thursday: 'Thu',
-  friday: 'Fri',
-  saturday: 'Sat',
-  sunday: 'Sun'
-}
 
 const DAY_ORDER: Day[] = [
   'monday',
@@ -25,150 +16,22 @@ const DAY_ORDER: Day[] = [
   'saturday',
   'sunday'
 ]
+const SLOT_KEY: Record<PlanMeal, string> = { breakfast: 'B', lunch: 'L', dinner: 'D' }
+const PLAN_SLOTS: PlanMeal[] = ['breakfast', 'lunch', 'dinner']
 
-const todayDay = (): Day => {
-  // getDay(): 0=Sunday … 6=Saturday; our week starts Monday.
-  const jsDay = new Date().getDay()
-  return DAY_ORDER[(jsDay + 6) % 7]
+/** Date of this week's Monday (week starts Monday). */
+function mondayOfThisWeek(): Date {
+  const d = new Date()
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
 }
-
-function CellActions(props: { onEdit: () => void; onClear: () => void }): JSX.Element {
-  return (
-    <div className="board-card__btns">
-      <button className="icon-btn" title="Edit" onClick={props.onEdit}>
-        ✏️
-      </button>
-      <button className="icon-btn" title="Clear" onClick={props.onClear}>
-        ✕
-      </button>
-    </div>
-  )
+function addDays(d: Date, n: number): Date {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
 }
-
-function MealSlot(props: {
-  entry: MealPlanEntry
-  recipes: RecipeSummary[]
-  readOnly: boolean
-  onSet: (recipeId: number | null, freeText: string | null) => void
-  onOpenRecipe: (id: number) => void
-}): JSX.Element {
-  const [editing, setEditing] = useState(false)
-  const [query, setQuery] = useState('')
-  const { entry, recipes } = props
-
-  const recipe = entry.recipeId !== null ? recipes.find((r) => r.id === entry.recipeId) : undefined
-  const matches =
-    query.trim() === ''
-      ? recipes
-      : recipes.filter((r) => r.title.toLowerCase().includes(query.toLowerCase()))
-
-  const choose = (recipeId: number | null, freeText: string | null): void => {
-    props.onSet(recipeId, freeText)
-    setEditing(false)
-    setQuery('')
-  }
-
-  return (
-    <div className="board-slot">
-      <span className="board-slot__label">{MEAL_LABEL[entry.meal]}</span>
-
-      {recipe ? (
-        <div className="board-card board-card--recipe">
-          <button
-            className="board-card__open"
-            onClick={() => props.onOpenRecipe(recipe.id)}
-            title="Open recipe"
-          >
-            {recipe.imageUrl ? (
-              <img className="board-card__image" src={recipe.imageUrl} alt="" />
-            ) : (
-              <div className="board-card__image board-card__image--empty">🍽️</div>
-            )}
-            <span className="board-card__title">{recipe.title}</span>
-          </button>
-          {!props.readOnly && (
-            <CellActions onEdit={() => setEditing(true)} onClear={() => choose(null, null)} />
-          )}
-        </div>
-      ) : entry.freeText ? (
-        <div className="board-card board-card--text">
-          <span className="board-card__title">{entry.freeText}</span>
-          <span className="board-card__meta">free text</span>
-          {!props.readOnly && (
-            <CellActions onEdit={() => setEditing(true)} onClear={() => choose(null, null)} />
-          )}
-        </div>
-      ) : props.readOnly ? (
-        <div className="board-card board-card--blank">—</div>
-      ) : (
-        <button className="board-card board-card--empty" onClick={() => setEditing(true)}>
-          +
-        </button>
-      )}
-
-      {editing && (
-        <div className="board-cell__editor">
-          <input
-            autoFocus
-            className="text-input"
-            placeholder="Search recipes or type a meal…"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setEditing(false)
-              if (e.key === 'Enter' && query.trim()) choose(null, query.trim())
-            }}
-          />
-          {matches.length > 0 && (
-            <ul className="board-cell__suggestions">
-              {matches.slice(0, 6).map((r) => (
-                <li key={r.id}>
-                  <button className="board-cell__suggestion" onClick={() => choose(r.id, null)}>
-                    📖 {r.title}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {query.trim() && (
-            <button className="link-btn" onClick={() => choose(null, query.trim())}>
-              Use “{query.trim()}” as free text ↵
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DayColumn(props: {
-  day: Day
-  entries: MealPlanEntry[]
-  recipes: RecipeSummary[]
-  readOnly: boolean
-  onSet: (meal: PlanMeal, recipeId: number | null, freeText: string | null) => void
-  onOpenRecipe: (id: number) => void
-}): JSX.Element {
-  const isToday = props.day === todayDay()
-  return (
-    <div className={`board-cell ${isToday ? 'board-cell--today' : ''}`}>
-      <span className="board-cell__day">
-        {DAY_LABEL[props.day]}
-        {isToday && <span className="board-cell__today-tag"> · today</span>}
-      </span>
-      {props.entries.map((entry) => (
-        <MealSlot
-          key={entry.meal}
-          entry={entry}
-          recipes={props.recipes}
-          readOnly={props.readOnly}
-          onSet={(recipeId, freeText) => props.onSet(entry.meal, recipeId, freeText)}
-          onOpenRecipe={props.onOpenRecipe}
-        />
-      ))}
-    </div>
-  )
-}
+const dayNum = (d: Date): number => d.getDate()
+const monthShort = (d: Date): string => d.toLocaleDateString(undefined, { month: 'short' })
 
 export function MealPlanPage(props: {
   recipes: RecipeSummary[]
@@ -176,8 +39,11 @@ export function MealPlanPage(props: {
 }): JSX.Element {
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
+  const [editing, setEditing] = useState<{ day: Day; meal: PlanMeal } | null>(null)
+  const [freeText, setFreeText] = useState('')
 
-  // One shared household plan — both users edit the same week.
+  // One shared household plan — both users edit the same week (Supabase realtime
+  // keeps the two phones in sync).
   const reload = useCallback(() => {
     getMealPlan().then(setPlan)
   }, [])
@@ -191,11 +57,13 @@ export function MealPlanPage(props: {
     day: Day,
     meal: PlanMeal,
     recipeId: number | null,
-    freeText: string | null
+    text: string | null
   ): Promise<void> => {
     const mealText =
-      recipeId !== null ? (props.recipes.find((r) => r.id === recipeId)?.title ?? null) : freeText
-    await setMeal({ day, meal, recipeId, freeText, mealText })
+      recipeId !== null ? (props.recipes.find((r) => r.id === recipeId)?.title ?? null) : text
+    await setMeal({ day, meal, recipeId, freeText: text, mealText })
+    setEditing(null)
+    setFreeText('')
     reload()
   }
 
@@ -205,44 +73,129 @@ export function MealPlanPage(props: {
     reload()
   }
 
+  const slotFor = (day: Day, meal: PlanMeal): MealPlanEntry | undefined =>
+    plan.find((e) => e.day === day && e.meal === meal)
+
   const plannedRecipeIds = [
     ...new Set(plan.filter((e) => e.recipeId !== null).map((e) => e.recipeId as number))
   ]
 
+  const monday = mondayOfThisWeek()
+  const sunday = addDays(monday, 6)
+  const weekLabel = `Mon ${dayNum(monday)} – Sun ${dayNum(sunday)} ${monthShort(sunday)}`
+
+  const editingEntry = editing ? slotFor(editing.day, editing.meal) : undefined
+
   return (
-    <div>
-      <div className="page-header">
-        <h2 className="page-header__title">This week</h2>
+    <div className="plan">
+      <div className="plan__meta-row">
+        <span className="plan__meta">{weekLabel} · shared</span>
         <button
-          className="btn btn--primary"
+          className="btn-secondary plan__send"
           onClick={() => setGroceryOpen(true)}
           disabled={plannedRecipeIds.length === 0}
         >
-          🛒 Send week to groceries
-        </button>
-        <button className="btn" onClick={clearAll}>
-          Clear week
+          Send week to groceries
         </button>
       </div>
 
-      <div className="board">
-        {DAY_ORDER.map((day) => (
-          <DayColumn
-            key={day}
-            day={day}
-            entries={plan.filter((e) => e.day === day)}
-            recipes={props.recipes}
-            readOnly={false}
-            onSet={(meal, recipeId, freeText) => setSlot(day, meal, recipeId, freeText)}
-            onOpenRecipe={props.onOpenRecipe}
-          />
-        ))}
-      </div>
+      {DAY_ORDER.map((day, i) => {
+        const date = addDays(monday, i)
+        return (
+          <div key={day} className="plan-day glass-island">
+            <div className="plan-day__label">
+              {date.toLocaleDateString(undefined, { weekday: 'short' })} {dayNum(date)}
+            </div>
+            {PLAN_SLOTS.map((meal) => {
+              const entry = slotFor(day, meal)
+              const recipe =
+                entry?.recipeId != null
+                  ? props.recipes.find((r) => r.id === entry.recipeId)
+                  : undefined
+              const filled = recipe != null || Boolean(entry?.freeText)
+              return (
+                <div
+                  key={meal}
+                  className="plan-slot"
+                  role="button"
+                  onClick={() => {
+                    setEditing({ day, meal })
+                    setFreeText(entry?.freeText ?? '')
+                  }}
+                >
+                  <span className="plan-slot__key">{SLOT_KEY[meal]}</span>
+                  <span
+                    className={`plan-slot__text ${filled ? 'plan-slot__text--filled' : ''} ${recipe ? 'plan-slot__text--recipe' : ''}`}
+                  >
+                    {recipe?.title ?? entry?.freeText ?? `Add ${meal}`}
+                  </span>
+                  {recipe && <span className="plan-slot__chip">recipe</span>}
+                </div>
+              )
+            })}
+          </div>
+        )
+      })}
 
-      <p className="plan-note">
-        Your meal plan syncs across all your devices. Discord bot sync (via the cloud) is coming
-        soon.
-      </p>
+      <button className="btn-ghost btn-ghost--destructive plan__clear" onClick={clearAll}>
+        Clear week
+      </button>
+
+      {editing && (
+        <BottomSheet
+          title={`${editing.day.charAt(0).toUpperCase() + editing.day.slice(1, 3)} · ${MEAL_LABEL[editing.meal]}`}
+          onClose={() => setEditing(null)}
+        >
+          <div className="plan-edit">
+            <input
+              className="input-pill"
+              placeholder="Free text (e.g. Leftovers)"
+              value={freeText}
+              autoFocus
+              onChange={(e) => setFreeText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && freeText.trim())
+                  setSlot(editing.day, editing.meal, null, freeText.trim())
+              }}
+            />
+            <div className="plan-edit__actions">
+              <button
+                className="btn-primary"
+                disabled={!freeText.trim()}
+                onClick={() => setSlot(editing.day, editing.meal, null, freeText.trim())}
+              >
+                Save
+              </button>
+              {(editingEntry?.recipeId != null || editingEntry?.freeText) && (
+                <button
+                  className="btn-ghost btn-ghost--destructive"
+                  onClick={() => setSlot(editing.day, editing.meal, null, null)}
+                >
+                  Clear slot
+                </button>
+              )}
+            </div>
+            <div className="eyebrow plan-edit__head">Or pick a recipe</div>
+            <div className="plan-edit__recipes">
+              {props.recipes.map((r) => (
+                <button
+                  key={r.id}
+                  className="plan-edit__recipe"
+                  onClick={() => setSlot(editing.day, editing.meal, r.id, null)}
+                >
+                  <span>{r.title}</span>
+                  {r.est && (
+                    <span className="plan-edit__kcal">~{Math.round(r.est.calories)} kcal</span>
+                  )}
+                </button>
+              ))}
+              {props.recipes.length === 0 && (
+                <p className="addfood__note">No saved recipes yet — import one first.</p>
+              )}
+            </div>
+          </div>
+        </BottomSheet>
+      )}
 
       {groceryOpen && (
         <GroceryPreviewModal

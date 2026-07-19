@@ -70,13 +70,19 @@ function AppInner(): JSX.Element {
   }
 
   const isSubPage = !TOP_TABS.includes(page)
+  const subPageTitle: Partial<Record<Page, string>> = {
+    plan: 'Meal plan',
+    groceries: 'Groceries',
+    import: 'Import recipe',
+    settings: 'Settings'
+  }
 
   return (
     <div className="app">
       <div className="app__body">
         <main className="app__main">
           {isSubPage && (
-            <div className="subpage-back">
+            <div className="subpage-head">
               <button
                 className="round-btn glass-pill"
                 aria-label="Back"
@@ -84,6 +90,7 @@ function AppInner(): JSX.Element {
               >
                 <ChevronLeft size={20} />
               </button>
+              <span className="subpage-head__title">{subPageTitle[page]}</span>
             </div>
           )}
           {page === 'library' && selectedRecipeId !== null ? (

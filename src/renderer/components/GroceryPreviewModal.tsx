@@ -1,14 +1,23 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
+import { Check } from 'lucide-react'
 import { previewGroceries, addGroceries } from '../data/groceries'
+import { BottomSheet } from './BottomSheet'
+import { useToast } from './Toast'
 
-type Phase = 'loading' | 'review' | 'saving' | 'done'
+type Phase = 'loading' | 'review' | 'saving'
 
+/**
+ * Review sheet for "send to groceries": merged, deduped ingredients arrive
+ * ticked; untick cupboard staples, send the rest. Ends in a toast, not a
+ * confirmation screen.
+ */
 export function GroceryPreviewModal(props: {
   recipeIds: number[]
   scales: Record<number, number>
   onClose: () => void
 }): JSX.Element {
+  const toast = useToast()
   const [phase, setPhase] = useState<Phase>('loading')
   const [items, setItems] = useState<{ title: string; checked: boolean }[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -32,7 +41,10 @@ export function GroceryPreviewModal(props: {
     setError(null)
     try {
       await addGroceries(selected.map((it) => it.title))
-      setPhase('done')
+      toast(
+        `${selected.length} ingredient${selected.length === 1 ? '' : 's'} sent to groceries`
+      )
+      props.onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save — try again.')
       setPhase('review')
@@ -40,65 +52,49 @@ export function GroceryPreviewModal(props: {
   }
 
   return (
-    <div className="modal-overlay" onClick={props.onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h3 className="modal__title">🛒 Add to grocery list</h3>
+    <BottomSheet title="Send to groceries" onClose={props.onClose}>
+      {phase === 'loading' && <p className="addfood__note">Working out the list…</p>}
 
-        {phase === 'loading' && <p className="empty-note">Working out the list…</p>}
-
-        {(phase === 'review' || phase === 'saving') && (
-          <>
-            {items.length === 0 ? (
-              <p className="empty-note">No ingredients to add.</p>
-            ) : (
-              <>
-                <p className="modal__hint">Untick anything you already have in the cupboard:</p>
-                <ul className="grocery-list">
-                  {items.map((it, idx) => (
-                    <li key={idx}>
-                      <label className="grocery-list__item">
-                        <input
-                          type="checkbox"
-                          checked={it.checked}
-                          onChange={() => toggle(idx)}
-                          disabled={phase === 'saving'}
-                        />
-                        <span>{it.title}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-            {error && <div className="banner banner--error">{error}</div>}
-            <div className="modal__actions">
-              <button className="btn" onClick={props.onClose} disabled={phase === 'saving'}>
-                Cancel
-              </button>
-              <button
-                className="btn btn--primary"
-                onClick={add}
-                disabled={phase === 'saving' || selected.length === 0}
-              >
-                {phase === 'saving'
-                  ? 'Adding…'
-                  : `Add ${selected.length} item${selected.length === 1 ? '' : 's'}`}
-              </button>
-            </div>
-          </>
-        )}
-
-        {phase === 'done' && (
-          <>
-            <div className="banner banner--ok">Added to your grocery list.</div>
-            <div className="modal__actions">
-              <button className="btn btn--primary" onClick={props.onClose}>
-                Done
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+      {phase !== 'loading' && (
+        <div className="grocery-preview">
+          {items.length === 0 ? (
+            <p className="addfood__note">No ingredients to add.</p>
+          ) : (
+            <>
+              <p className="grocery-preview__hint">
+                Untick anything you already have in the cupboard:
+              </p>
+              <div className="grocery-preview__list">
+                {items.map((it, idx) => (
+                  <button
+                    key={idx}
+                    className="grocery-row"
+                    disabled={phase === 'saving'}
+                    onClick={() => toggle(idx)}
+                  >
+                    <span
+                      className={`grocery-row__circle ${it.checked ? 'grocery-row__circle--on' : ''}`}
+                    >
+                      {it.checked && <Check size={13} strokeWidth={3} />}
+                    </span>
+                    <span className="grocery-row__label">{it.title}</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+          {error && <div className="info-banner info-banner--warm">{error}</div>}
+          <button
+            className="btn-primary grocery-preview__send"
+            onClick={add}
+            disabled={phase === 'saving' || selected.length === 0}
+          >
+            {phase === 'saving'
+              ? 'Sending…'
+              : `Send ${selected.length} item${selected.length === 1 ? '' : 's'}`}
+          </button>
+        </div>
+      )}
+    </BottomSheet>
   )
 }

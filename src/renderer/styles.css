@@ -485,13 +485,21 @@ body::before {
   color: var(--muted-3);
 }
 
-/* Glass back button row on sub-pages (Meal plan, Groceries, Import, Settings) */
-.subpage-back {
-  margin-bottom: 12px;
+/* Glass back button + title row on sub-pages (Meal plan, Groceries, Import, Settings) */
+.subpage-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 8px 0 12px;
 }
-.subpage-back .round-btn {
+.subpage-head .round-btn {
   width: 40px;
   height: 40px;
+}
+.subpage-head__title {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 /* Shared bits */
@@ -1618,205 +1626,197 @@ body::before {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
-/* Meal plan — Week Board (7 columns desktop, stacked list on phones) */
-.board {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
+/* ── Meal plan (shared week) ────────────────────────────────────────────── */
+.plan {
+  display: flex;
+  flex-direction: column;
+}
+.plan__meta-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   gap: 10px;
-  align-items: start;
+  margin: 0 4px 12px;
 }
-.board-cell {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-/* One breakfast/lunch/dinner slot inside a day column. Relative so the
-   editor popover anchors under the slot being edited, not the whole day. */
-.board-slot {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.board-slot__label {
-  font-size: 9px;
+.plan__meta {
+  font-size: 12px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-  color: var(--text-muted);
-  opacity: 0.8;
+  color: var(--muted);
 }
-.board-cell__day {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.7px;
-  color: var(--text-muted);
+.plan__send {
+  min-height: 38px;
+  font-size: 12px;
+  padding: 0 14px;
 }
-.board-cell--today .board-cell__day,
-.board-cell__today-tag {
-  color: var(--accent-deep);
+.plan-day {
+  border-radius: 20px;
+  padding: 10px 16px;
+  margin-bottom: 10px;
 }
-.board-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  overflow: hidden;
-  position: relative;
-  min-height: 92px;
-  display: flex;
-  flex-direction: column;
+.plan-day__label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--muted);
+  padding: 2px 0 4px;
 }
-/* Today = tinted column (a ring on all three slot cards was too noisy).
-   Negative margin cancels the padding so the column stays aligned with the rest. */
-.board-cell--today {
-  background: var(--accent-tint);
-  border-radius: var(--radius);
-  padding: 6px;
-  margin: -6px;
-}
-.board-card__open {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  color: inherit;
-  font-family: inherit;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-}
-.board-card__image {
-  width: 100%;
-  height: 64px;
-  object-fit: cover;
-  display: block;
-}
-.board-card__image--empty {
+.plan-slot {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: var(--bg-elevated);
-  font-size: 22px;
-  opacity: 0.5;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider);
+  cursor: pointer;
+  min-height: 40px;
 }
-.board-card__title {
-  font-size: 11px;
-  font-weight: 600;
-  padding: 6px 8px;
+.plan-slot__key {
+  width: 26px;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted-3);
+}
+.plan-slot__text {
+  flex: 1;
+  font-size: 13px;
+  color: var(--muted-3);
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  white-space: nowrap;
 }
-.board-card--text {
-  padding: 8px;
-  justify-content: center;
+.plan-slot__text--filled {
+  color: var(--ink);
 }
-.board-card--text .board-card__title {
-  padding: 0;
-  color: var(--text-secondary);
+.plan-slot__text--recipe {
+  font-weight: 700;
 }
-.board-card__meta {
+.plan-slot__chip {
   font-size: 9px;
-  color: var(--text-muted);
-  padding: 2px 0 0;
+  font-weight: 800;
+  background: var(--accent-tint);
+  color: var(--accent-dark);
+  border-radius: 999px;
+  padding: 2px 8px;
+  flex-shrink: 0;
 }
-.board-card--empty {
-  border: 1.5px dashed var(--border);
-  background: none;
-  box-shadow: none;
-  color: var(--text-muted);
-  font-size: 18px;
-  cursor: pointer;
-  align-items: center;
-  justify-content: center;
-  font-family: inherit;
-}
-.board-card--empty:hover {
-  border-color: var(--accent);
-  color: var(--accent-deep);
-}
-.board-card--blank {
-  align-items: center;
-  justify-content: center;
-  color: var(--text-muted);
-  box-shadow: none;
-  background: none;
-  border-style: dashed;
-}
-.board-card__btns {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  display: none;
-  gap: 3px;
-}
-.board-card:hover .board-card__btns {
-  display: flex;
-}
-.board-card__btns .icon-btn {
-  background: var(--bg-surface);
-  padding: 1px 6px;
-  font-size: 11px;
-}
-/* Editor popover under the cell */
-.board-cell__editor {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  z-index: 20;
-  width: 240px;
+.plan__clear {
+  align-self: center;
   margin-top: 4px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
-  padding: 8px;
+}
+
+/* Slot editor sheet */
+.plan-edit {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  min-height: 0;
 }
-.board-cell:nth-child(n + 5) .board-cell__editor {
-  left: auto;
-  right: 0; /* keep the popover on-screen for Fri–Sun columns */
-}
-.board-cell__suggestions {
-  list-style: none;
+.plan-edit__actions {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
 }
-.board-cell__suggestion {
-  background: var(--bg-elevated);
+.plan-edit__head {
+  margin-top: 16px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(27, 36, 48, 0.1);
+}
+.plan-edit__recipes {
+  overflow-y: auto;
+  max-height: 40vh;
+}
+.plan-edit__recipe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 0;
+  min-height: 44px;
   border: none;
-  color: var(--text-primary);
-  text-align: left;
-  padding: 6px 10px;
-  border-radius: 5px;
-  font-size: 12px;
+  border-bottom: 1px solid var(--divider);
+  background: none;
   font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
+}
+.plan-edit__kcal {
+  font-size: 11px;
+  color: var(--muted-2);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* Grocery preview sheet (send-to-groceries review) */
+.grocery-preview {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.grocery-preview__hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+.grocery-preview__list {
+  overflow-y: auto;
+  max-height: 50vh;
+}
+.grocery-preview__send {
+  margin-top: 14px;
   width: 100%;
 }
-.board-cell__suggestion:hover {
-  background: var(--accent-tint);
-  color: var(--accent-deep);
+.grocery-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 0;
+  min-height: 48px;
+  border: none;
+  border-bottom: 1px solid var(--divider);
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
 }
-.plan-note {
-  margin-top: 20px;
-  color: var(--text-muted);
-  font-size: 12px;
-  max-width: 720px;
+.grocery-row__circle {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border: 1.5px solid rgba(27, 36, 48, 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  display: grid;
+  place-items: center;
 }
-.plan-note code {
-  background: var(--bg-elevated);
-  padding: 1px 5px;
-  border-radius: 4px;
+.grocery-row__circle--on {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.grocery-row__label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+}
+.grocery-row__label--done {
+  text-decoration: line-through;
+  color: var(--muted-3);
+}
+.grocery-row__remove {
+  border: none;
+  background: none;
+  color: var(--muted-3);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 8px 0 8px 8px;
 }
 
 /* Grocery modal */
@@ -2333,40 +2333,6 @@ select.text-input {
   }
   .link-btn {
     padding: 10px 4px;
-  }
-
-  /* Week Board → stacked day list (each day now holds 3 slot rows) */
-  .board {
-    grid-template-columns: 1fr;
-    gap: 16px;
-  }
-  .board-card {
-    flex-direction: row;
-    align-items: center;
-    min-height: 56px;
-  }
-  .board-card__open {
-    flex-direction: row;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-  }
-  .board-card__image {
-    width: 56px;
-    height: 46px;
-    border-radius: 6px;
-    margin: 5px 0 5px 6px;
-    flex-shrink: 0;
-  }
-  .board-card__btns {
-    display: flex;
-    position: static;
-    margin-right: 6px;
-  }
-  .board-cell__editor {
-    position: static;
-    width: 100%;
-    margin-top: 6px;
   }
 
   .modal {
