@@ -25,7 +25,8 @@ export interface FoodSearchResult {
   online: boolean
 }
 
-/** Bundled offline staples first, then the AU-first proxy search. Degrades to staples offline. */
+/** Generic AU foods (relevance-ranked, offline) first, then AU-first branded
+ *  OpenFoodFacts hits beneath them. Degrades to generics-only when OFF is down. */
 export async function searchFoods(query: string): Promise<FoodSearchResult> {
   const staples = searchStaples(query)
 
@@ -46,11 +47,13 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
     // offline — staples still returned
   }
 
-  // Dedupe on name+brand, not name alone: a branded OFF product that happens to
-  // share a staple's name (e.g. "Banana · Some Brand") is a different food with
-  // its own barcode/serving, and must not be swallowed by the staple.
+  // Dedupe by barcode when present (globally unique), else name+brand: a branded
+  // OFF product that happens to share a generic's name ("Banana · Some Brand") is
+  // a different food with its own barcode/serving and must not be swallowed. The
+  // unified key also closes the old client/proxy key mismatch that let branded
+  // duplicates slip through.
   const foodKey = (f: FoodItem): string =>
-    `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`
+    f.barcode ? `bc:${f.barcode}` : `${f.name.toLowerCase()}|${(f.brand ?? '').toLowerCase()}`
   const seen = new Set(staples.map(foodKey))
   const merged = [...staples]
   for (const item of off) {
@@ -60,7 +63,9 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
       seen.add(k)
     }
   }
-  return { items: merged.slice(0, 30), online }
+  // Generics are already capped in searchStaples; a roomy overall cap keeps
+  // branded products visible below them.
+  return { items: merged.slice(0, 40), online }
 }
 
 export interface BarcodeLookupResult {
@@ -155,6 +160,17 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
     const key = `${r.name.toLowerCase()}|${(r.brand ?? '').toLowerCase()}`
     if (seen.has(key)) continue
     seen.add(key)
+    // 100 g entries carry a per-100 g basis, so recents re-logged from them keep
+    // the grams⇄serving flexibility (new logs are stored as 100 g).
+    const per100g =
+      r.unit === '100g'
+        ? {
+            calories: r.base_calories,
+            protein: r.base_protein,
+            carbs: r.base_carbs,
+            fat: r.base_fat
+          }
+        : undefined
     out.push({
       name: r.name,
       brand: r.brand,
@@ -165,7 +181,8 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
       protein: r.base_protein,
       carbs: r.base_carbs,
       fat: r.base_fat,
-      source: 'recent'
+      source: 'recent',
+      per100g
     })
     if (out.length >= limit) break
   }

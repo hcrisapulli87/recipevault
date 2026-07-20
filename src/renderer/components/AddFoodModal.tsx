@@ -22,6 +22,25 @@ function foodSub(item: FoodItem): string {
   return [item.brand, item.servingDesc].filter(Boolean).join(' · ')
 }
 
+/** What actually gets logged: the day view multiplies base_* × amount. */
+export interface LogBasis {
+  unit: string
+  baseCalories: number
+  baseProtein: number
+  baseCarbs: number
+  baseFat: number
+  amount: number
+}
+
+/** Per-100 g basis for an item, when one can be established (enables grams⇄serving). */
+function per100gOf(item: FoodItem): { calories: number; protein: number; carbs: number; fat: number } | null {
+  if (item.per100g) return item.per100g
+  if (item.unit === '100g') {
+    return { calories: item.calories, protein: item.protein, carbs: item.carbs, fat: item.fat }
+  }
+  return null
+}
+
 /** One tappable food row: name + brand·serve meta, kcal right-aligned. */
 function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): JSX.Element {
   return (
@@ -35,7 +54,7 @@ function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): 
   )
 }
 
-/** Confirm step: meal segmented, − / + amount steppers, live macro tiles, Add. */
+/** Confirm step: meal segmented, flexible grams⇄serving amount, live macro tiles, Add. */
 function ConfirmStep(props: {
   item: FoodItem
   meal: MealType
@@ -43,22 +62,83 @@ function ConfirmStep(props: {
   busy: boolean
   error: string | null
   onBack: () => void
-  onAdd: (amount: number) => void
+  onAdd: (basis: LogBasis) => void
   /** Set when the item came from the barcode cache — offers a fresh OFF fetch. */
   onRecheck?: (() => void) | null
   recheckBusy?: boolean
   recheckNote?: string | null
 }): JSX.Element {
-  const isGram = props.item.unit === '100g'
-  // Grams for per-100g items (step 10 g), serves otherwise (step 0.5).
-  const [value, setValue] = useState(isGram ? 100 : 1)
-  const step = isGram ? 10 : 0.5
-  const amount = isGram ? value / 100 : value
-  const factor = amount
+  const p100 = per100gOf(props.item)
+  const measures = props.item.measures ?? []
+  // Flexible when we have a per-100 g basis: the user can log by grams OR by any
+  // known serving. Without a basis (legacy cache/manual serving items) we keep the
+  // old per-serving stepper.
+  const flexible = p100 !== null
 
-  const amountText = isGram
-    ? `${Math.round(value)} g`
-    : `${value % 1 === 0 ? Math.round(value) : value.toFixed(1)} serve${value === 1 ? '' : 's'}`
+  // Flexible state: grams is the single source of truth; serving mode drives it
+  // through a chosen measure × count.
+  const [mode, setMode] = useState<'g' | 'serving'>(measures.length ? 'serving' : 'g')
+  const [grams, setGrams] = useState<number>(measures[0]?.grams ?? 100)
+  const [measureIdx, setMeasureIdx] = useState(0)
+  const [count, setCount] = useState(1)
+
+  // Legacy state: serves (or grams for a bare 100 g item with no basis — unreachable
+  // here since 100 g always yields a basis, but kept for safety).
+  const legacyIsGram = props.item.unit === '100g'
+  const [legacyValue, setLegacyValue] = useState(legacyIsGram ? 100 : 1)
+
+  const pickMeasure = (i: number): void => {
+    setMeasureIdx(i)
+    setCount(1)
+    setGrams(measures[i].grams)
+  }
+  const stepServing = (delta: number): void => {
+    const c = Math.max(0.5, round1(count + delta))
+    setCount(c)
+    setGrams(round1(measures[measureIdx].grams * c))
+  }
+
+  // Resolve the effective macros + the basis to log.
+  let macros: { calories: number; protein: number; carbs: number; fat: number }
+  let basis: LogBasis
+  let amountValid: boolean
+  if (flexible && p100) {
+    const g = mode === 'g' ? grams : round1(measures[measureIdx].grams * count)
+    const f = g / 100
+    macros = {
+      calories: p100.calories * f,
+      protein: p100.protein * f,
+      carbs: p100.carbs * f,
+      fat: p100.fat * f
+    }
+    // Stored canonically as 100 g so history + edit steppers work unchanged.
+    basis = {
+      unit: '100g',
+      baseCalories: p100.calories,
+      baseProtein: p100.protein,
+      baseCarbs: p100.carbs,
+      baseFat: p100.fat,
+      amount: g / 100
+    }
+    amountValid = g > 0
+  } else {
+    const factor = legacyIsGram ? legacyValue / 100 : legacyValue
+    macros = {
+      calories: props.item.calories * factor,
+      protein: props.item.protein * factor,
+      carbs: props.item.carbs * factor,
+      fat: props.item.fat * factor
+    }
+    basis = {
+      unit: props.item.unit,
+      baseCalories: props.item.calories,
+      baseProtein: props.item.protein,
+      baseCarbs: props.item.carbs,
+      baseFat: props.item.fat,
+      amount: factor
+    }
+    amountValid = factor > 0
+  }
 
   return (
     <div className="confirm">
@@ -67,9 +147,7 @@ function ConfirmStep(props: {
       </button>
       <div className="confirm__food">
         <div className="confirm__name">{props.item.name}</div>
-        <div className="confirm__meta">
-          {foodSub(props.item) || (isGram ? 'per 100 g' : 'per serve')}
-        </div>
+        <div className="confirm__meta">{foodSub(props.item) || 'per 100 g'}</div>
       </div>
 
       <div className="eyebrow confirm__eyebrow">Meal</div>
@@ -86,34 +164,119 @@ function ConfirmStep(props: {
       </div>
 
       <div className="eyebrow confirm__eyebrow">Amount</div>
-      <div className="confirm__amount">
-        <button
-          className="round-btn confirm__step"
-          aria-label="Less"
-          onClick={() => setValue(Math.max(step, round1(value - step)))}
-        >
-          −
-        </button>
-        <span className="confirm__amount-label">{amountText}</span>
-        <button
-          className="round-btn confirm__step"
-          aria-label="More"
-          onClick={() => setValue(round1(value + step))}
-        >
-          +
-        </button>
-      </div>
-      {props.item.servingDesc && (
-        <div className="confirm__serve-note">1 serve = {props.item.servingDesc}</div>
+
+      {flexible ? (
+        <>
+          {measures.length > 0 && (
+            <div className="seg confirm__mode">
+              <button
+                className={`seg__btn seg__btn--small ${mode === 'serving' ? 'seg__btn--active' : ''}`}
+                onClick={() => setMode('serving')}
+              >
+                SERVING
+              </button>
+              <button
+                className={`seg__btn seg__btn--small ${mode === 'g' ? 'seg__btn--active' : ''}`}
+                onClick={() => setMode('g')}
+              >
+                GRAMS
+              </button>
+            </div>
+          )}
+
+          {mode === 'serving' && measures.length > 0 ? (
+            <>
+              {measures.length > 1 && (
+                <div className="confirm__chips">
+                  {measures.map((m, i) => (
+                    <button
+                      key={i}
+                      className={`chip ${i === measureIdx ? 'chip--active' : ''}`}
+                      onClick={() => pickMeasure(i)}
+                    >
+                      {m.desc} · {Math.round(m.grams)} g
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="confirm__amount">
+                <button className="round-btn confirm__step" aria-label="Less" onClick={() => stepServing(-0.5)}>
+                  −
+                </button>
+                <span className="confirm__amount-label">
+                  {count % 1 === 0 ? count : count.toFixed(1)} × {measures[measureIdx].desc}
+                </span>
+                <button className="round-btn confirm__step" aria-label="More" onClick={() => stepServing(0.5)}>
+                  +
+                </button>
+              </div>
+              <div className="confirm__serve-note">
+                = {Math.round(measures[measureIdx].grams * count)} g
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="confirm__amount">
+                <button
+                  className="round-btn confirm__step"
+                  aria-label="Less"
+                  onClick={() => setGrams(Math.max(10, round1(grams - 10)))}
+                >
+                  −
+                </button>
+                <span className="confirm__amount-label">{Math.round(grams)} g</span>
+                <button
+                  className="round-btn confirm__step"
+                  aria-label="More"
+                  onClick={() => setGrams(round1(grams + 10))}
+                >
+                  +
+                </button>
+              </div>
+              {measures.length === 0 && (
+                <div className="confirm__serve-note">No serving size on record — log by weight.</div>
+              )}
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <div className="confirm__amount">
+            <button
+              className="round-btn confirm__step"
+              aria-label="Less"
+              onClick={() =>
+                setLegacyValue(Math.max(legacyIsGram ? 10 : 0.5, round1(legacyValue - (legacyIsGram ? 10 : 0.5))))
+              }
+            >
+              −
+            </button>
+            <span className="confirm__amount-label">
+              {legacyIsGram
+                ? `${Math.round(legacyValue)} g`
+                : `${legacyValue % 1 === 0 ? legacyValue : legacyValue.toFixed(1)} serve${legacyValue === 1 ? '' : 's'}`}
+            </span>
+            <button
+              className="round-btn confirm__step"
+              aria-label="More"
+              onClick={() => setLegacyValue(round1(legacyValue + (legacyIsGram ? 10 : 0.5)))}
+            >
+              +
+            </button>
+          </div>
+          {props.item.servingDesc && !legacyIsGram && (
+            <div className="confirm__serve-note">1 serve = {props.item.servingDesc}</div>
+          )}
+        </>
       )}
 
       <div className="confirm__tiles">
         {(
           [
-            ['KCAL', Math.round(props.item.calories * factor).toLocaleString()],
-            ['P', fmtG(props.item.protein * factor)],
-            ['C', fmtG(props.item.carbs * factor)],
-            ['F', fmtG(props.item.fat * factor)]
+            ['KCAL', Math.round(macros.calories).toLocaleString()],
+            ['P', fmtG(macros.protein)],
+            ['C', fmtG(macros.carbs)],
+            ['F', fmtG(macros.fat)]
           ] as const
         ).map(([label, v]) => (
           <div key={label} className="confirm__tile">
@@ -139,8 +302,8 @@ function ConfirmStep(props: {
 
       <button
         className="btn-primary confirm__add"
-        onClick={() => props.onAdd(amount)}
-        disabled={amount <= 0 || props.busy}
+        onClick={() => props.onAdd(basis)}
+        disabled={!amountValid || props.busy}
       >
         {props.busy ? 'Adding…' : `Add to ${MEAL_LABEL[props.meal]}`}
       </button>
@@ -297,33 +460,46 @@ export function AddFoodModal(props: {
   const startManual = (): void => {
     if (!mName.trim()) return
     setSelectedFromCache(false)
+    const serveG = Number(mServeG)
+    const cal = Number(mCal) || 0
+    const protein = Number(mProtein) || 0
+    const carbs = Number(mCarbs) || 0
+    const fat = Number(mFat) || 0
+    // With a serving weight we can express a per-100 g basis, unlocking the
+    // grams⇄serving picker; without one it's a per-serve-only entry.
+    const hasServe = serveG > 0
+    const to100 = (v: number): number => (v * 100) / serveG
     setSelected({
       name: mName.trim(),
       brand: mBrand.trim() || null,
       barcode: pendingBarcode,
-      servingDesc: Number(mServeG) > 0 ? `${Number(mServeG)} g` : null,
+      servingDesc: hasServe ? `${serveG} g` : null,
       unit: 'serving',
-      calories: Number(mCal) || 0,
-      protein: Number(mProtein) || 0,
-      carbs: Number(mCarbs) || 0,
-      fat: Number(mFat) || 0,
-      source: 'manual'
+      calories: cal,
+      protein,
+      carbs,
+      fat,
+      source: 'manual',
+      per100g: hasServe
+        ? { calories: to100(cal), protein: to100(protein), carbs: to100(carbs), fat: to100(fat) }
+        : undefined,
+      measures: hasServe ? [{ desc: '1 serve', grams: serveG }] : []
     })
   }
 
-  const log = async (amount: number): Promise<void> => {
+  const log = async (basis: LogBasis): Promise<void> => {
     if (!selected || logging) return
     const entry: NewLogEntry = {
       date: props.date,
       mealType: meal,
       name: selected.name,
       brand: selected.brand,
-      amount,
-      unit: selected.unit,
-      baseCalories: selected.calories,
-      baseProtein: selected.protein,
-      baseCarbs: selected.carbs,
-      baseFat: selected.fat,
+      amount: basis.amount,
+      unit: basis.unit,
+      baseCalories: basis.baseCalories,
+      baseProtein: basis.baseProtein,
+      baseCarbs: basis.baseCarbs,
+      baseFat: basis.baseFat,
       barcode: selected.barcode,
       source: selected.source
     }
@@ -457,7 +633,8 @@ export function AddFoodModal(props: {
               )}
 
               <p className="addfood__caption">
-                Open food database (AU-first) · staples bundled for offline · values are estimates
+                Generic foods: Australian Food Composition Database (FSANZ, CC BY) · branded from Open
+                Food Facts · values are estimates
               </p>
             </div>
           )}

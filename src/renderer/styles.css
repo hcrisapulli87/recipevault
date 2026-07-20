@@ -984,6 +984,30 @@ body::before {
   color: var(--muted-2);
   margin-top: 8px;
 }
+.confirm__mode {
+  margin-bottom: 12px;
+}
+.confirm__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.chip {
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.chip--active {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent-dark);
+}
 .confirm__tiles {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

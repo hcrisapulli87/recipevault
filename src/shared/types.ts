@@ -151,6 +151,12 @@ export interface Profile {
 
 export type ProfileGoals = Pick<Profile, 'calGoal' | 'proteinGoal' | 'carbsGoal' | 'fatGoal'>
 
+/** A known serving size: a human label plus its weight in grams. */
+export interface FoodMeasure {
+  desc: string
+  grams: number
+}
+
 /** A food's macros expressed per ONE unit (one serving, or per 100 g). */
 export interface FoodItem {
   name: string
@@ -163,6 +169,11 @@ export interface FoodItem {
   carbs: number
   fat: number
   source: 'staple' | 'search' | 'barcode' | 'manual' | 'plan' | 'recent'
+  /** Canonical per-100 g macros when known — lets the Add flow log in grams OR by
+   *  serving regardless of `unit`. Absent for legacy/cache items with no basis. */
+  per100g?: Per100g
+  /** Real serving sizes for the grams⇄serving picker; empty/absent → grams only. */
+  measures?: FoodMeasure[]
 }
 
 /** A logged item. Macros are stored per-unit; the day's total is base_* × amount. */

@@ -30,7 +30,10 @@ describe('mapOffProduct', () => {
       protein: 17,
       carbs: 6,
       fat: 0.7,
-      source: 'barcode'
+      source: 'barcode',
+      // Canonical per-100 g basis + serving measure enable the grams⇄serving picker.
+      per100g: { calories: 59, protein: 10, carbs: 3.6, fat: 0.4 },
+      measures: [{ desc: '170 g', grams: 170 }]
     })
   })
 
@@ -87,18 +90,25 @@ describe('mapOffProduct', () => {
   })
 })
 
-describe('searchStaples', () => {
-  it('finds staples by substring, scaled to their serving', () => {
+describe('searchStaples (AU generic foods)', () => {
+  it('finds generics by substring, on a per-100 g basis', () => {
     const results = searchStaples('chicken')
     expect(results.length).toBeGreaterThan(0)
-    expect(results.every((r) => r.source === 'staple' && r.unit === 'serving')).toBe(true)
+    expect(results.every((r) => r.source === 'staple' && r.unit === '100g')).toBe(true)
+    expect(results.every((r) => r.per100g && r.calories === r.per100g.calories)).toBe(true)
     expect(results.some((r) => r.name.toLowerCase().includes('chicken'))).toBe(true)
   })
 
-  it('scales per-100 g data to the serving size', () => {
-    // Banana: 118 g serving, 89 kcal/100 g -> 89 * 1.18 = 105 kcal
-    const banana = searchStaples('banana')[0]
-    expect(banana.calories).toBe(105)
+  it('ranks a head-name hit above a deep substring match', () => {
+    // "Pasta, …" must beat "…with pasta…" — this is the fix for "pasta → branded junk".
+    const top = searchStaples('pasta')[0]
+    expect(top.name.toLowerCase().startsWith('pasta')).toBe(true)
+  })
+
+  it('carries real serving measures for common foods (grams fallback otherwise)', () => {
+    const pasta = searchStaples('pasta').find((r) => /boiled/i.test(r.name))
+    expect(pasta?.measures?.length).toBeGreaterThan(0)
+    expect(pasta?.measures?.every((m) => m.grams > 0 && m.desc)).toBe(true)
   })
 
   it('returns nothing for an empty query', () => {

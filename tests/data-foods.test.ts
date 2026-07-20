@@ -53,7 +53,7 @@ afterEach(() => {
 })
 
 describe('searchFoods', () => {
-  it('queries the proxy and merges staples first, deduped by name+brand', async () => {
+  it('ranks AU generics first, branded OFF hits below, deduped by barcode', async () => {
     let requested = ''
     vi.stubGlobal('fetch', async (url: string) => {
       requested = String(url)
@@ -62,11 +62,10 @@ describe('searchFoods', () => {
         json: async () => ({
           ok: true,
           products: [
-            // Unbranded product colliding with the bundled "Banana" staple — deduped.
-            offProduct({ product_name: 'Banana', brands: undefined }),
-            // Branded same-name product: a different food (own barcode/serving) — kept.
-            offProduct({ product_name: 'Banana' }),
-            offProduct()
+            offProduct({ product_name: 'Banana Bread', code: '111' }),
+            // Same barcode twice — the duplicate must collapse.
+            offProduct({ product_name: 'Banana Smoothie', code: '222' }),
+            offProduct({ product_name: 'Banana Smoothie (dup)', code: '222' })
           ]
         })
       }
@@ -74,11 +73,16 @@ describe('searchFoods', () => {
     const { items, online } = await searchFoods('banana')
     expect(requested).toContain('/api/food-search?q=banana')
     expect(online).toBe(true)
-    const bananas = items.filter((r) => r.name.toLowerCase() === 'banana')
-    expect(bananas).toHaveLength(2)
-    expect(bananas[0].source).toBe('staple') // staple wins the unbranded collision
-    expect(bananas[1].brand).toBe('Sirena') // branded variant survives the merge
-    expect(items.some((r) => r.name === 'Tuna in Oil' && r.brand === 'Sirena')).toBe(true)
+
+    // Generics (bundled AU foods, source 'staple') come first; branded 'search'
+    // hits appear only after them.
+    const firstBranded = items.findIndex((r) => r.source === 'search')
+    expect(firstBranded).toBeGreaterThan(0)
+    expect(items.slice(0, firstBranded).every((r) => r.source === 'staple')).toBe(true)
+    expect(items.some((r) => r.name.toLowerCase().startsWith('banana'))).toBe(true)
+
+    // Barcode 222 appeared twice upstream but survives once.
+    expect(items.filter((r) => r.barcode === '222')).toHaveLength(1)
   })
 
   it('degrades to staples and reports online:false when the proxy is unreachable', async () => {
