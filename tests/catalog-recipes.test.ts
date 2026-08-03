@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import catalog from '../src/shared/data/catalog-recipes.json'
+import { CATALOG_RECIPES } from '../src/shared/data/catalog-recipes'
+import type { CatalogRecipe } from '../src/shared/data/catalog-recipes'
 import { CUISINES, DIET_TAGS, EFFORTS, MEAL_TYPES } from '../src/shared/types'
 import { parseIngredient } from '../src/shared/ingredient-parser'
 import { staplePer100g } from '../src/shared/nutrition'
@@ -10,25 +11,7 @@ import { staplePer100g } from '../src/shared/nutrition'
  * `reheat` produces an unsafe meal plan, not a cosmetic blemish.
  */
 
-interface CatalogRecipe {
-  slug: string
-  title: string
-  cuisine: string
-  dietTags: string[]
-  mealSlots: string[]
-  effort: string
-  keepsDays: number
-  batchFriendly: boolean
-  reheat: string
-  servings: number
-  prepMin: number
-  cookMin: number
-  description: string
-  ingredients: string[]
-  steps: string[]
-}
-
-const RECIPES = catalog as CatalogRecipe[]
+const RECIPES = CATALOG_RECIPES
 const REHEATS = ['microwave', 'oven', 'cold', 'fresh-only']
 
 describe('catalog shape', () => {

@@ -1,0 +1,735 @@
+[
+  {
+    "slug": "overnight-oats-berries",
+    "title": "Overnight Oats with Berries",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "cold",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 0,
+    "description": "Make four jars on Sunday night and breakfast is decided until Wednesday. No cooking whatsoever.",
+    "ingredients": [
+      "300 g rolled oats",
+      "700 ml milk",
+      "300 g greek yoghurt",
+      "3 tbsp honey",
+      "300 g mixed berries",
+      "2 tbsp chia seeds"
+    ],
+    "steps": [
+      "Divide the oats and chia seeds between four jars.",
+      "Pour in the milk and add the yoghurt and honey. Stir each one properly — dry pockets stay dry overnight.",
+      "Top with the berries, seal, and refrigerate at least 6 hours.",
+      "Eat cold, loosening with a splash of milk if it has set too firm."
+    ]
+  },
+  {
+    "slug": "peanut-butter-banana-oats",
+    "title": "Peanut Butter and Banana Overnight Oats",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "cold",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 0,
+    "description": "The higher-protein version. Add the banana in the morning or it browns in the jar.",
+    "ingredients": [
+      "300 g rolled oats",
+      "700 ml milk",
+      "300 g greek yoghurt",
+      "120 g peanut butter",
+      "3 tbsp honey",
+      "4 bananas, sliced",
+      "1 tsp cinnamon"
+    ],
+    "steps": [
+      "Warm the peanut butter slightly so it stirs in rather than clumping.",
+      "Mix the oats, milk, yoghurt, peanut butter, honey and cinnamon and divide between four jars.",
+      "Refrigerate at least 6 hours.",
+      "Slice the banana over the top the morning you eat it."
+    ]
+  },
+  {
+    "slug": "egg-and-vegetable-muffins",
+    "title": "Egg and Vegetable Muffins",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "easy",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 6,
+    "prepMin": 15,
+    "cookMin": 25,
+    "description": "Twelve baked egg cups from one tray. Grab two on the way out, hot or cold, for three days.",
+    "ingredients": [
+      "10 eggs",
+      "2 tbsp olive oil",
+      "1 red capsicum, finely diced",
+      "1 brown onion, finely diced",
+      "150 g baby spinach, chopped",
+      "150 g cheddar cheese, grated",
+      "100 ml milk",
+      "1 tsp smoked paprika"
+    ],
+    "steps": [
+      "Heat the oven to 180°C and oil a 12-hole muffin tin thoroughly.",
+      "Soften the onion and capsicum in the oil for 6 minutes, then wilt the spinach through. Cool slightly.",
+      "Beat the eggs with the milk, paprika and plenty of salt, then stir in the vegetables and cheese.",
+      "Fill each hole three quarters full and bake 22 minutes until puffed and just set.",
+      "Cool 5 minutes before lifting them out, or they tear."
+    ]
+  },
+  {
+    "slug": "greek-yoghurt-honey-bowl",
+    "title": "Greek Yoghurt with Honey and Walnuts",
+    "cuisine": "greek",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "cold",
+    "servings": 1,
+    "prepMin": 3,
+    "cookMin": 0,
+    "description": "Three ingredients, three minutes, and more protein than most cooked breakfasts.",
+    "ingredients": [
+      "200 g greek yoghurt",
+      "1 tbsp honey",
+      "30 g walnuts, chopped",
+      "1 tsp cinnamon"
+    ],
+    "steps": [
+      "Spoon the yoghurt into a bowl.",
+      "Pour the honey over and scatter the walnuts and cinnamon."
+    ]
+  },
+  {
+    "slug": "scrambled-eggs-on-toast",
+    "title": "Scrambled Eggs on Toast",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 2,
+    "cookMin": 8,
+    "description": "Low heat and constant movement is the whole technique. Reheated scrambled egg is rubber, so make what you will eat.",
+    "ingredients": [
+      "6 eggs",
+      "30 g butter",
+      "2 tbsp milk",
+      "4 slices wholemeal bread",
+      "1 tsp black pepper"
+    ],
+    "steps": [
+      "Beat the eggs with the milk and a good pinch of salt.",
+      "Melt the butter in a cold pan over low heat, then pour the eggs in.",
+      "Stir constantly with a spatula, pulling the set curds in from the edges, for about 5 minutes.",
+      "Take the pan off the heat while the eggs still look slightly underdone — they carry on cooking.",
+      "Pile onto toast and grind pepper over."
+    ]
+  },
+  {
+    "slug": "banana-oat-pancakes",
+    "title": "Banana Oat Pancakes",
+    "cuisine": "american",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast"],
+    "effort": "easy",
+    "keepsDays": 2,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 20,
+    "description": "Blended in one go, no separate flour. Stack the spares between paper and they keep two days.",
+    "ingredients": [
+      "200 g rolled oats",
+      "4 bananas",
+      "4 eggs",
+      "200 ml milk",
+      "2 tsp baking powder",
+      "1 tsp cinnamon",
+      "30 g butter",
+      "3 tbsp honey",
+      "200 g mixed berries"
+    ],
+    "steps": [
+      "Blend the oats to a rough flour, then add the bananas, eggs, milk, baking powder and cinnamon and blend smooth.",
+      "Rest the batter 5 minutes — it thickens noticeably.",
+      "Cook in butter over medium heat, a ladle at a time, until bubbles hold on the surface, then flip.",
+      "Serve with honey and berries."
+    ]
+  },
+  {
+    "slug": "shakshuka-breakfast",
+    "title": "Breakfast Shakshuka for One",
+    "cuisine": "middle-eastern",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 1,
+    "prepMin": 3,
+    "cookMin": 10,
+    "description": "Built from a jar of sauce you already made. Two eggs poached in ten minutes.",
+    "ingredients": [
+      "200 g canned diced tomatoes",
+      "2 eggs",
+      "1 tbsp olive oil",
+      "1 clove garlic, crushed",
+      "1 tsp ground cumin",
+      "1 tsp smoked paprika",
+      "40 g feta, crumbled",
+      "1 slice wholemeal bread"
+    ],
+    "steps": [
+      "Fry the garlic and spices in the oil for 30 seconds.",
+      "Add the tomatoes and simmer 4 minutes until thickened.",
+      "Make two wells, crack the eggs in, cover, and cook 5 minutes.",
+      "Scatter the feta over and serve with the toast."
+    ]
+  },
+  {
+    "slug": "bacon-and-egg-roll",
+    "title": "Bacon and Egg Roll",
+    "cuisine": "american",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 3,
+    "cookMin": 10,
+    "description": "The weekend one. Ten minutes and it has to be eaten straight away.",
+    "ingredients": [
+      "150 g bacon",
+      "4 eggs",
+      "2 bread rolls",
+      "1 tbsp butter",
+      "2 tbsp tomato sauce"
+    ],
+    "steps": [
+      "Fry the bacon until the edges crisp, then set aside in the pan's warm corner.",
+      "Fry the eggs in the bacon fat, basting the whites, until the yolk is still soft.",
+      "Butter the split rolls and toast them cut-side down in the same pan.",
+      "Build with bacon, egg and tomato sauce."
+    ]
+  },
+  {
+    "slug": "smoothie-berry-protein",
+    "title": "Berry Protein Smoothie",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "cold",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 0,
+    "description": "Two minutes in a blender. Drink it immediately — it separates within the hour.",
+    "ingredients": [
+      "300 g mixed berries",
+      "2 bananas",
+      "300 g greek yoghurt",
+      "300 ml milk",
+      "2 tbsp honey",
+      "40 g rolled oats"
+    ],
+    "steps": [
+      "Put everything in a blender with the liquid at the bottom.",
+      "Blend 60 seconds until completely smooth.",
+      "Loosen with more milk if it is too thick to drink."
+    ]
+  },
+  {
+    "slug": "avocado-and-feta-toast",
+    "title": "Avocado and Feta Toast",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 3,
+    "description": "Five minutes. Avocado goes brown quickly, so there is no making this ahead.",
+    "ingredients": [
+      "1 avocado",
+      "100 g feta, crumbled",
+      "4 slices wholemeal bread",
+      "1 lemon, juiced",
+      "1 tbsp olive oil",
+      "1 tsp chilli flakes"
+    ],
+    "steps": [
+      "Toast the bread.",
+      "Mash the avocado roughly with the lemon juice and salt — leave some texture.",
+      "Spread thickly, then crumble the feta over.",
+      "Finish with the oil and chilli flakes."
+    ]
+  },
+  {
+    "slug": "porridge-with-honey",
+    "title": "Porridge with Honey and Banana",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "microwave",
+    "servings": 2,
+    "prepMin": 2,
+    "cookMin": 8,
+    "description": "The cheapest breakfast there is. Eight minutes on the stove, or three in a microwave.",
+    "ingredients": [
+      "120 g rolled oats",
+      "600 ml milk",
+      "2 tbsp honey",
+      "2 bananas, sliced",
+      "1 tsp cinnamon",
+      "30 g walnuts, chopped"
+    ],
+    "steps": [
+      "Simmer the oats with the milk and a pinch of salt for 6 minutes, stirring, until thick.",
+      "Take off the heat and rest 2 minutes — it thickens further.",
+      "Top with the banana, honey, cinnamon and walnuts."
+    ]
+  },
+  {
+    "slug": "breakfast-burrito",
+    "title": "Breakfast Burrito",
+    "cuisine": "mexican",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "easy",
+    "keepsDays": 2,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 15,
+    "description": "Roll four, wrap them in foil, and reheat one each morning. The one make-ahead hot breakfast that genuinely works.",
+    "ingredients": [
+      "8 eggs, beaten",
+      "200 g bacon, diced",
+      "4 tortillas",
+      "400 g canned black beans, drained",
+      "150 g cheddar cheese, grated",
+      "1 tbsp olive oil",
+      "1 tsp smoked paprika",
+      "4 spring onions, sliced"
+    ],
+    "steps": [
+      "Fry the bacon until crisp, then set aside.",
+      "Warm the beans with the paprika and mash roughly.",
+      "Scramble the eggs in the oil over low heat, stopping while still soft.",
+      "Lay beans, egg, bacon, cheese and spring onion down the middle of each tortilla, fold the ends in and roll tightly.",
+      "Toast seam-side down in a dry pan for 2 minutes.",
+      "To store: wrap each in foil and reheat 90 seconds in a microwave."
+    ]
+  },
+  {
+    "slug": "chia-pudding-mango",
+    "title": "Chia Pudding",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "minimal",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "cold",
+    "servings": 4,
+    "prepMin": 5,
+    "cookMin": 0,
+    "description": "Five minutes of stirring, three days of breakfasts. Stir once after ten minutes or the seeds clump at the bottom.",
+    "ingredients": [
+      "120 g chia seeds",
+      "700 ml milk",
+      "3 tbsp honey",
+      "1 tsp vanilla extract",
+      "300 g mixed berries",
+      "40 g almonds, chopped"
+    ],
+    "steps": [
+      "Whisk the chia seeds into the milk with the honey and vanilla.",
+      "Leave 10 minutes, then whisk again — this is the step that decides whether it sets evenly.",
+      "Divide between four jars and refrigerate at least 4 hours.",
+      "Top with berries and almonds before eating."
+    ]
+  },
+  {
+    "slug": "mushrooms-on-toast",
+    "title": "Garlic Mushrooms on Toast",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 10,
+    "description": "Get the pan properly hot and do not crowd it, or the mushrooms stew instead of browning.",
+    "ingredients": [
+      "400 g mushrooms, sliced",
+      "30 g butter",
+      "1 tbsp olive oil",
+      "3 cloves garlic, crushed",
+      "4 slices wholemeal bread",
+      "1 handful parsley, chopped",
+      "40 g parmesan, grated"
+    ],
+    "steps": [
+      "Heat the butter and oil until foaming, then add the mushrooms in one layer and leave them alone for 3 minutes.",
+      "Toss and cook a further 4 minutes until deep brown.",
+      "Add the garlic for the last 30 seconds and season well.",
+      "Pile onto toast with the parsley and parmesan."
+    ]
+  },
+  {
+    "slug": "baked-beans-on-toast",
+    "title": "Homemade Baked Beans on Toast",
+    "cuisine": "american",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 4,
+    "prepMin": 5,
+    "cookMin": 25,
+    "description": "Better than the tin and barely more work. Make a batch and reheat a ladle at a time all week.",
+    "ingredients": [
+      "800 g canned cannellini beans, drained",
+      "1 tbsp olive oil",
+      "1 brown onion, finely diced",
+      "3 cloves garlic, crushed",
+      "2 tbsp tomato paste",
+      "400 g canned diced tomatoes",
+      "1 tbsp brown sugar",
+      "1 tbsp red wine vinegar",
+      "1 tsp smoked paprika",
+      "8 slices wholemeal bread"
+    ],
+    "steps": [
+      "Soften the onion in the oil for 8 minutes, then add the garlic, paprika and tomato paste.",
+      "Add the tomatoes, sugar and vinegar and simmer 10 minutes.",
+      "Fold the beans through and cook 8 minutes more, crushing a few against the pan to thicken.",
+      "Season hard and spoon over toast."
+    ]
+  },
+  {
+    "slug": "bircher-muesli",
+    "title": "Bircher Muesli",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 3,
+    "batchFriendly": true,
+    "reheat": "cold",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 0,
+    "description": "Grated apple does the sweetening, so it needs very little honey. Keeps three days and softens as it goes.",
+    "ingredients": [
+      "300 g rolled oats",
+      "500 ml milk",
+      "250 g greek yoghurt",
+      "3 apples, grated",
+      "2 tbsp honey",
+      "60 g almonds, chopped",
+      "1 lemon, juiced",
+      "1 tsp cinnamon"
+    ],
+    "steps": [
+      "Toss the grated apple with the lemon juice straight away so it does not brown.",
+      "Mix the oats, milk, yoghurt, honey and cinnamon, then fold the apple through.",
+      "Refrigerate overnight.",
+      "Loosen with milk and scatter the almonds over before eating."
+    ]
+  },
+  {
+    "slug": "spinach-and-feta-omelette",
+    "title": "Spinach and Feta Omelette",
+    "cuisine": "greek",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 1,
+    "prepMin": 3,
+    "cookMin": 6,
+    "description": "Six minutes, thirty grams of protein. Take it off the heat while the middle still looks wet.",
+    "ingredients": [
+      "3 eggs",
+      "60 g baby spinach",
+      "50 g feta, crumbled",
+      "1 tbsp olive oil",
+      "1 tsp black pepper"
+    ],
+    "steps": [
+      "Wilt the spinach in the oil for 1 minute and push it to one side of the pan.",
+      "Beat the eggs with salt and pour them in.",
+      "Draw the setting edges into the middle and tilt the pan so the raw egg runs out.",
+      "Scatter the feta over, fold in half while the centre is still slightly soft, and slide onto a plate."
+    ]
+  },
+  {
+    "slug": "toast-with-peanut-butter-and-banana",
+    "title": "Peanut Butter and Banana Toast",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 1,
+    "prepMin": 3,
+    "cookMin": 2,
+    "description": "Three minutes standing at the bench. Sometimes that is the entire requirement.",
+    "ingredients": [
+      "2 slices wholemeal bread",
+      "2 tbsp peanut butter",
+      "1 banana, sliced",
+      "1 tsp honey",
+      "1 tsp cinnamon"
+    ],
+    "steps": [
+      "Toast the bread and spread with the peanut butter while it is still hot so it melts in.",
+      "Lay the banana over and finish with honey and cinnamon."
+    ]
+  },
+  {
+    "slug": "breakfast-quesadilla",
+    "title": "Breakfast Quesadilla",
+    "cuisine": "mexican",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 10,
+    "description": "Egg and cheese pressed between tortillas. Ten minutes, and it must be eaten crisp.",
+    "ingredients": [
+      "4 eggs, beaten",
+      "4 tortillas",
+      "150 g cheddar cheese, grated",
+      "1 tbsp butter",
+      "4 spring onions, sliced",
+      "1 tsp smoked paprika"
+    ],
+    "steps": [
+      "Scramble the eggs softly in the butter with the paprika.",
+      "Spread over two tortillas with the cheese and spring onion, then top with the others.",
+      "Toast in a dry pan for 3 minutes a side, pressing down with a spatula, until the cheese has melted and the outside is crisp.",
+      "Cut into wedges."
+    ]
+  },
+  {
+    "slug": "smoked-salmon-bagel",
+    "title": "Smoked Salmon Bagel",
+    "cuisine": "american",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "cold",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 2,
+    "description": "No cooking beyond the toaster. High protein and on the table in five minutes.",
+    "ingredients": [
+      "2 bagels",
+      "150 g smoked salmon",
+      "100 g cream cheese",
+      "1 red onion, thinly sliced",
+      "2 tbsp capers",
+      "1 lemon, juiced",
+      "1 handful dill, chopped"
+    ],
+    "steps": [
+      "Split and toast the bagels.",
+      "Spread thickly with cream cheese.",
+      "Lay the salmon over, then the onion, capers and dill.",
+      "Squeeze the lemon over and grind on plenty of pepper."
+    ]
+  },
+  {
+    "slug": "sweet-potato-hash-with-eggs",
+    "title": "Sweet Potato Hash with Eggs",
+    "cuisine": "american",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "easy",
+    "keepsDays": 2,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 4,
+    "prepMin": 10,
+    "cookMin": 25,
+    "description": "The hash keeps two days; crack fresh eggs over it each morning. A weekend breakfast that stretches into the week.",
+    "ingredients": [
+      "800 g sweet potato, diced small",
+      "3 tbsp olive oil",
+      "1 red onion, diced",
+      "1 red capsicum, diced",
+      "200 g bacon, diced",
+      "3 cloves garlic, crushed",
+      "1 tbsp smoked paprika",
+      "8 eggs",
+      "4 spring onions, sliced"
+    ],
+    "steps": [
+      "Fry the bacon in a wide pan until its fat runs, then set aside.",
+      "Add the oil and the sweet potato in one layer and leave it alone for 5 minutes so it browns rather than steams.",
+      "Toss, add the onion and capsicum, and cook 10 minutes more.",
+      "Add the garlic, paprika and bacon and season well.",
+      "Make eight wells, crack in the eggs, cover, and cook 6 minutes.",
+      "Finish with spring onion."
+    ]
+  },
+  {
+    "slug": "yoghurt-granola-parfait",
+    "title": "Yoghurt and Granola Parfait",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast", "snack"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "cold",
+    "servings": 1,
+    "prepMin": 3,
+    "cookMin": 0,
+    "description": "Assembled in three minutes. Layer it just before eating so the granola stays crunchy.",
+    "ingredients": [
+      "200 g greek yoghurt",
+      "60 g granola",
+      "100 g mixed berries",
+      "1 tbsp honey"
+    ],
+    "steps": [
+      "Spoon half the yoghurt into a glass, then half the granola and berries.",
+      "Repeat, and finish with the honey."
+    ]
+  },
+  {
+    "slug": "cheese-and-tomato-toastie",
+    "title": "Cheese and Tomato Toastie",
+    "cuisine": "other",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast", "lunch"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 5,
+    "cookMin": 8,
+    "description": "Butter the outside of the bread, not the pan — that is the whole trick to an even crust.",
+    "ingredients": [
+      "4 slices wholemeal bread",
+      "200 g cheddar cheese, grated",
+      "2 tomatoes, sliced",
+      "2 tbsp butter",
+      "1 tbsp dijon mustard"
+    ],
+    "steps": [
+      "Salt the tomato slices and pat them dry.",
+      "Spread mustard on the inside faces, then add cheese and tomato and close.",
+      "Butter the outside of both slices.",
+      "Toast in a dry pan over medium-low heat for 4 minutes a side, pressing down, until deep gold."
+    ]
+  },
+  {
+    "slug": "boiled-eggs-and-soldiers",
+    "title": "Boiled Eggs with Toast Soldiers",
+    "cuisine": "other",
+    "dietTags": ["balanced", "high-protein"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 0,
+    "batchFriendly": false,
+    "reheat": "fresh-only",
+    "servings": 2,
+    "prepMin": 2,
+    "cookMin": 7,
+    "description": "Six minutes exactly, from boiling water, for a runny yolk and a set white.",
+    "ingredients": [
+      "4 eggs",
+      "4 slices wholemeal bread",
+      "2 tbsp butter",
+      "1 tsp black pepper"
+    ],
+    "steps": [
+      "Lower the eggs into already-boiling water and set a timer for 6 minutes.",
+      "Toast and butter the bread and cut it into strips.",
+      "Sit the eggs in cups, take the tops off, and season."
+    ]
+  },
+  {
+    "slug": "breakfast-couscous-with-fruit",
+    "title": "Warm Breakfast Couscous",
+    "cuisine": "middle-eastern",
+    "dietTags": ["balanced"],
+    "mealSlots": ["breakfast"],
+    "effort": "minimal",
+    "keepsDays": 2,
+    "batchFriendly": true,
+    "reheat": "microwave",
+    "servings": 4,
+    "prepMin": 5,
+    "cookMin": 5,
+    "description": "Couscous needs only boiling liquid, so this is faster than porridge and keeps two days.",
+    "ingredients": [
+      "250 g couscous",
+      "500 ml milk",
+      "3 tbsp honey",
+      "1 tsp cinnamon",
+      "100 g dried apricots, chopped",
+      "60 g almonds, chopped",
+      "2 apples, diced"
+    ],
+    "steps": [
+      "Bring the milk to a simmer with the honey and cinnamon.",
+      "Pour it over the couscous and apricots, cover, and leave 5 minutes.",
+      "Fork through to separate the grains.",
+      "Top with the apple and almonds."
+    ]
+  }
+]

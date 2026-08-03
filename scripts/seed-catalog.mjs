@@ -74,6 +74,7 @@ await require('esbuild').build({
       export { parseIngredient } from './src/shared/ingredient-parser'
       export { staplePer100g } from './src/shared/nutrition'
       export { estimateRecipeMacros } from './src/shared/macro-estimator'
+      export { CATALOG_RECIPES } from './src/shared/data/catalog-recipes'
     `,
     resolveDir: resolve('.'),
     loader: 'ts'
@@ -86,13 +87,13 @@ await require('esbuild').build({
   logLevel: 'warning'
 })
 
-const { parseIngredient, staplePer100g, estimateRecipeMacros } = await import(
+const { parseIngredient, staplePer100g, estimateRecipeMacros, CATALOG_RECIPES } = await import(
   pathToFileURL(BUNDLE).href
 )
 rmSync(BUNDLE, { force: true })
 
-const catalog = JSON.parse(readFileSync('src/shared/data/catalog-recipes.json', 'utf8'))
-const recipes = ONLY.length > 0 ? catalog.filter((r) => ONLY.includes(r.slug)) : catalog
+const recipes =
+  ONLY.length > 0 ? CATALOG_RECIPES.filter((r) => ONLY.includes(r.slug)) : CATALOG_RECIPES
 
 if (recipes.length === 0) {
   console.error('No recipes selected. Check --only=<slug>.')
