@@ -16,7 +16,86 @@ export interface RecipeStep {
   text: string
 }
 
-export interface Recipe {
+// ── catalog metadata ──────────────────────────────────────────────────────────
+
+/** Cuisine buckets the seeded catalog is authored against. */
+export type Cuisine =
+  | 'asian'
+  | 'american'
+  | 'italian'
+  | 'greek'
+  | 'mexican'
+  | 'spanish'
+  | 'indian'
+  | 'middle-eastern'
+  | 'other'
+
+export const CUISINES: Cuisine[] = [
+  'asian',
+  'american',
+  'italian',
+  'greek',
+  'mexican',
+  'spanish',
+  'indian',
+  'middle-eastern',
+  'other'
+]
+
+export const CUISINE_LABEL: Record<Cuisine, string> = {
+  asian: 'Asian',
+  american: 'American',
+  italian: 'Italian',
+  greek: 'Greek',
+  mexican: 'Mexican',
+  spanish: 'Spanish',
+  indian: 'Indian',
+  'middle-eastern': 'Middle Eastern',
+  other: 'Other'
+}
+
+/** Diet filters. Only these two are authored in the first iteration; the column is an
+ *  array so adding vegetarian/Mediterranean later is additive, not a migration. */
+export type DietTag = 'balanced' | 'high-protein'
+
+export const DIET_TAGS: DietTag[] = ['balanced', 'high-protein']
+
+export const DIET_LABEL: Record<DietTag, string> = {
+  balanced: 'Balanced',
+  'high-protein': 'High protein'
+}
+
+/** How much work a recipe is. `minimal` is the "Banana with Honey" class — assembly, not
+ *  cooking — and is what the generator reaches for to fill breakfasts and snack slots. */
+export type Effort = 'minimal' | 'easy' | 'medium'
+
+export const EFFORTS: Effort[] = ['minimal', 'easy', 'medium']
+
+export const EFFORT_LABEL: Record<Effort, string> = {
+  minimal: 'Minimal',
+  easy: 'Easy',
+  medium: 'Medium'
+}
+
+/** How leftovers of this recipe are eaten. `fresh-only` is never chained by the generator. */
+export type Reheat = 'microwave' | 'oven' | 'cold' | 'fresh-only'
+
+/** Planner-facing metadata. Personal imports carry the defaults (no cuisine, no tags,
+ *  keepsDays 0) and so are simply invisible to the generator until tagged. */
+export interface RecipeMeta {
+  isCatalog: boolean
+  catalogSlug: string | null
+  cuisine: Cuisine | null
+  dietTags: DietTag[]
+  mealSlots: MealType[]
+  effort: Effort | null
+  /** Fridge life in days. 0 = eat fresh; the leftover chain never reaches further. */
+  keepsDays: number
+  batchFriendly: boolean
+  reheat: Reheat | null
+}
+
+export interface Recipe extends RecipeMeta {
   id: number
   ownerId: string
   title: string
@@ -33,12 +112,13 @@ export interface Recipe {
   steps: RecipeStep[]
 }
 
-export interface RecipeSummary {
+export interface RecipeSummary extends RecipeMeta {
   id: number
   ownerId: string
   title: string
   imageUrl: string | null
   totalMin: number | null
+  servings: number | null
   est: RecipeEstimate | null
 }
 
@@ -63,8 +143,14 @@ export interface RecipeEstimate {
 
 export type ScrapeConfidence = 'structured' | 'heuristic' | 'manual'
 
-// Drafts have no estimate yet — it's computed right after save.
-export type DraftRecipe = Omit<Recipe, 'id' | 'ownerId' | 'createdAt' | 'est'> & {
+// Drafts have no estimate yet — it's computed right after save. Catalog metadata is
+// excluded too: a scraped/reviewed recipe is a personal import and takes the column
+// defaults (not catalog, no cuisine, keepsDays 0), so the review form never has to
+// invent planner tags. The seeder writes those columns directly instead.
+export type DraftRecipe = Omit<
+  Recipe,
+  'id' | 'ownerId' | 'createdAt' | 'est' | keyof RecipeMeta
+> & {
   confidence: ScrapeConfidence
 }
 
@@ -85,11 +171,30 @@ export type PlanMeal = 'breakfast' | 'lunch' | 'dinner'
 
 export const PLAN_MEALS: PlanMeal[] = ['breakfast', 'lunch', 'dinner']
 
+/**
+ * One planner slot. A LEFTOVER slot carries the same `recipeId` as its cook night —
+ * that's what lets groceries count the batch once and the tracker log identical macros.
+ * `cookDay` is the label source ("Leftovers from Tue"); `servingsPlanned` lives on the
+ * cook night and drives grocery scaling.
+ */
 export interface MealPlanEntry {
   day: Day
   meal: PlanMeal
   recipeId: number | null
   freeText: string | null
+  isLeftover: boolean
+  cookDay: Day | null
+  servingsPlanned: number | null
+}
+
+export const DAY_SHORT: Record<Day, string> = {
+  monday: 'Mon',
+  tuesday: 'Tue',
+  wednesday: 'Wed',
+  thursday: 'Thu',
+  friday: 'Fri',
+  saturday: 'Sat',
+  sunday: 'Sun'
 }
 
 export interface MergedGroceryItem {

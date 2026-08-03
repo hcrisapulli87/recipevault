@@ -51,6 +51,31 @@ alter table public.recipes add column if not exists est_matched       integer;
 alter table public.recipes add column if not exists est_total         integer;
 alter table public.recipes add column if not exists est_computed_at   timestamptz;
 
+-- Catalog metadata (2026-08, meal planner v2). The app ships a seeded pool of ~170
+-- recipes so a fresh week has something to plan WITH; they live in this same table
+-- behind `is_catalog` rather than a parallel one, so grocery merge, macro estimates,
+-- cooking mode and planner slots all keep working with no second code path.
+-- `catalog_slug` is the seeder's idempotency key. `keeps_days` (fridge life, 0 = eat
+-- fresh) and `reheat` are what the leftover engine chains on — a wrong value there
+-- produces a bad plan, not a cosmetic blemish. Guarded adds, all defaulted, so every
+-- existing row stays valid and re-runs are no-ops.
+alter table public.recipes add column if not exists is_catalog     boolean not null default false;
+alter table public.recipes add column if not exists catalog_slug   text;
+alter table public.recipes add column if not exists cuisine        text;
+alter table public.recipes add column if not exists diet_tags      text[] not null default '{}';
+alter table public.recipes add column if not exists meal_slots     text[] not null default '{}';
+alter table public.recipes add column if not exists effort         text;
+alter table public.recipes add column if not exists keeps_days     integer not null default 0;
+alter table public.recipes add column if not exists batch_friendly boolean not null default false;
+alter table public.recipes add column if not exists reheat         text;
+
+-- Unique only where present: personal imports leave catalog_slug null, and Postgres
+-- treats nulls as distinct in a unique index, so a partial index is not strictly
+-- required — but it keeps the index small (catalog rows only).
+create unique index if not exists recipes_catalog_slug_key
+  on public.recipes (catalog_slug) where catalog_slug is not null;
+create index if not exists recipes_catalog_idx on public.recipes (is_catalog, cuisine);
+
 -- Parsed ingredient lines. on delete cascade → deleting a recipe clears these in one go.
 create table if not exists public.ingredients (
   id           bigint generated always as identity primary key,
@@ -88,6 +113,14 @@ create table if not exists public.meal_plan (
   meal_text text,
   primary key (day, meal)
 );
+
+-- Leftovers (2026-08, meal planner v2). A leftover slot points at the SAME recipe_id as
+-- its cook night — that is what lets groceries count the batch once and the tracker log
+-- identical macros. `cook_day` is a label ("Leftovers from Tue"); `servings_planned` lives
+-- on the cook night and drives grocery scaling. Guarded adds, defaulted, re-run safe.
+alter table public.meal_plan add column if not exists is_leftover      boolean not null default false;
+alter table public.meal_plan add column if not exists cook_day         text;
+alter table public.meal_plan add column if not exists servings_planned integer;
 
 -- Migration (2026-07): planner upgraded from one meal/day to three slots/day.
 -- Legacy rows predate the meal column and can't be mapped to a slot, so they're
