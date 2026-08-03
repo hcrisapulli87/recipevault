@@ -12,6 +12,7 @@ import type {
 } from '../../shared/types'
 import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { macroCalorieShares } from '../../shared/tracker-logic'
+import { planSlotToFood } from '../../shared/plan-to-food'
 import { deleteLogEntry, getDailyLog, getDailyTotalsRange, updateLogEntry } from '../data/tracker'
 import { getMealPlan } from '../data/mealPlan'
 import { loggingStreak, shiftDate as shiftIso } from '../../shared/trends'
@@ -220,27 +221,15 @@ export function MacroTrackerPage(props: {
     return onTableChange(['meal_plan'], reloadPlan)
   }, [reloadPlan])
 
-  /** The recipe planned for this meal today, as a ready-to-log item. */
+  /** The recipe planned for this meal today, as a ready-to-log item. The mapping is
+   *  shared with the planner's own "Log to tracker" action so a leftover night logs
+   *  exactly what the cook night did. */
   const plannedFor = (meal: MealType): FoodItem | null => {
     if (meal === 'snack' || !plan) return null
     const jsDay = new Date(date + 'T00:00:00').getDay()
     const day = DAYS[(jsDay + 6) % 7] // getDay(): 0=Sunday; our week starts Monday
     const slot = plan.find((e) => e.day === day && e.meal === meal)
-    if (!slot || slot.recipeId === null) return null
-    const r = props.recipes.find((x) => x.id === slot.recipeId)
-    if (!r || !r.est) return null
-    return {
-      name: r.title,
-      brand: null,
-      barcode: null,
-      servingDesc: `planned ${MEAL_LABEL[meal].toLowerCase()} · best-guess macros`,
-      unit: 'serving',
-      calories: r.est.calories,
-      protein: r.est.protein,
-      carbs: r.est.carbs,
-      fat: r.est.fat,
-      source: 'plan'
-    }
+    return slot ? planSlotToFood(slot, props.recipes) : null
   }
 
   const changeAmount = async (id: number, amount: number): Promise<void> => {
