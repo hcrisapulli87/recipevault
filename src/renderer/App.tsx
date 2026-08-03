@@ -101,6 +101,10 @@ function AppInner(): JSX.Element {
                 closeRecipe()
                 recipes.reload()
               }}
+              onCopied={(newId) => {
+                recipes.reload()
+                openRecipe(newId)
+              }}
             />
           ) : page === 'library' ? (
             <LibraryPage

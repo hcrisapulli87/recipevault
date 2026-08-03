@@ -4,7 +4,8 @@ import { ChevronLeft } from 'lucide-react'
 import type { Recipe, RecipeEstimate } from '../../shared/types'
 import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
 import type { EstimateDetail } from '../../shared/macro-estimator'
-import { getRecipe, deleteRecipe } from '../data/recipes'
+import { getRecipe, deleteRecipe, copyToLibrary } from '../data/recipes'
+import { CUISINE_LABEL, DIET_LABEL } from '../../shared/types'
 import { computeRecipeEstimate, saveRecipeEstimate } from '../data/macroEstimate'
 import { convertRecipeToMetric } from '../data/metricConvert'
 import { hasImperialUnits } from '../../shared/unit-convert'
@@ -25,6 +26,8 @@ export function RecipeDetailPage(props: {
   recipeId: number
   onBack: () => void
   onDeleted: () => void
+  /** A catalog recipe was forked into the user's own library; opens the copy. */
+  onCopied: (newId: number) => void
 }): JSX.Element {
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState<number | null>(null)
@@ -36,6 +39,7 @@ export function RecipeDetailPage(props: {
   // All hooks stay ABOVE the loading early-return — a hook below it crashes the
   // page the moment the recipe arrives (hook count changes between renders).
   const [converting, setConverting] = useState(false)
+  const [copying, setCopying] = useState(false)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
   const ownerName =
@@ -57,6 +61,7 @@ export function RecipeDetailPage(props: {
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
   const isOwner = me != null && recipe.ownerId === me.id
+  const canEdit = isOwner && !recipe.isCatalog
 
   const convertMetric = async (): Promise<void> => {
     if (!recipe) return
@@ -91,6 +96,17 @@ export function RecipeDetailPage(props: {
     props.onDeleted()
   }
 
+  /** Fork a catalog recipe into your own library so it can be edited and deleted. */
+  const saveToLibrary = async (): Promise<void> => {
+    setCopying(true)
+    try {
+      const id = await copyToLibrary(recipe.id)
+      props.onCopied(id)
+    } finally {
+      setCopying(false)
+    }
+  }
+
   return (
     <div className="rdetail">
       {/* 200px tone/photo header with the glass back button */}
@@ -121,7 +137,29 @@ export function RecipeDetailPage(props: {
           {est && (
             <span className="glass-chip">~{Math.round(est.calories)} kcal / serve · est.</span>
           )}
-          {ownerName && <span className="glass-chip glass-chip--tint">Added by {ownerName}</span>}
+          {recipe.isCatalog && recipe.cuisine && (
+            <span className="glass-chip glass-chip--tint">{CUISINE_LABEL[recipe.cuisine]}</span>
+          )}
+          {recipe.isCatalog &&
+            recipe.dietTags.map((t) => (
+              <span key={t} className="glass-chip">
+                {DIET_LABEL[t]}
+              </span>
+            ))}
+          {/* Fridge life is what decides whether the planner can chain this into a
+              leftover night, so it belongs on the recipe, not only in the plan. */}
+          {recipe.isCatalog && recipe.reheat === 'fresh-only' && (
+            <span className="glass-chip">Eat fresh · does not keep</span>
+          )}
+          {recipe.isCatalog && recipe.reheat !== 'fresh-only' && recipe.keepsDays > 0 && (
+            <span className="glass-chip">
+              Keeps {recipe.keepsDays} day{recipe.keepsDays === 1 ? '' : 's'}
+              {recipe.reheat ? ` · reheat in the ${recipe.reheat}` : ''}
+            </span>
+          )}
+          {ownerName && !recipe.isCatalog && (
+            <span className="glass-chip glass-chip--tint">Added by {ownerName}</span>
+          )}
           {recipe.sourceUrl && (
             <button
               className="glass-chip glass-chip--link"
@@ -198,22 +236,30 @@ export function RecipeDetailPage(props: {
           Start cooking mode
         </button>
 
-        {/* Secondary actions (estimate/convert/delete are owner-only; RLS enforces it server-side too) */}
+        {/* Secondary actions. Estimate/convert/delete are owner-only (RLS enforces it
+            server-side too) AND withheld on catalog rows: those are seeded data owned by
+            whoever ran the seeder, so "is owner" would otherwise let one household member
+            delete a recipe the other has planned. Fork it first instead. */}
         <div className="rdetail__actions">
           <button className="btn-ghost" onClick={() => setGroceryOpen(true)}>
             Send ingredients to groceries
           </button>
-          {isOwner && (
+          {recipe.isCatalog && (
+            <button className="btn-ghost" onClick={saveToLibrary} disabled={copying}>
+              {copying ? 'Saving…' : 'Save to my recipes'}
+            </button>
+          )}
+          {canEdit && (
             <button className="btn-ghost" onClick={recalc} disabled={estimating}>
               {estimating ? 'Estimating…' : est ? 'Recalculate estimate' : 'Estimate macros'}
             </button>
           )}
-          {isOwner && hasImperialUnits(recipe) && (
+          {canEdit && hasImperialUnits(recipe) && (
             <button className="btn-ghost" onClick={convertMetric} disabled={converting}>
               {converting ? 'Converting…' : 'Convert to metric'}
             </button>
           )}
-          {isOwner && (
+          {canEdit && (
             <button className="btn-ghost btn-ghost--destructive" onClick={remove}>
               Delete recipe
             </button>

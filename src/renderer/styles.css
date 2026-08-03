@@ -583,6 +583,98 @@ body::before {
   padding: 2px 8px;
   flex-shrink: 0;
 }
+/* Fridge life on the card: it's what decides whether the planner can chain this
+   recipe into a leftover night, so it's worth the line. */
+.recipe-card__keeps {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-2);
+}
+
+/* ── Segmented control (Mine | Catalog) ─────────────────────────────────── */
+.segmented {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--pill-bg);
+  border: 1px solid var(--pill-border);
+  box-shadow: var(--pill-shadow);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+.segmented__btn {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.segmented__btn--on {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 2px 8px rgba(27, 36, 48, 0.08);
+}
+.segmented__count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted-3);
+}
+.segmented__btn--on .segmented__count {
+  color: var(--accent-dark);
+}
+
+/* ── Filter chip rows ───────────────────────────────────────────────────── */
+.filter-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.chip-row {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 1px;
+}
+.chip-row::-webkit-scrollbar {
+  display: none;
+}
+.filter-chip {
+  flex-shrink: 0;
+  border: 1px solid var(--pill-border);
+  background: var(--pill-bg);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.filter-chip--on {
+  background: var(--accent-grad);
+  border-color: transparent;
+  color: #fff;
+}
+.filter-chip--clear {
+  color: var(--muted-2);
+  text-decoration: underline;
+}
 
 /* ── Import ─────────────────────────────────────────────────────────────── */
 .import {
