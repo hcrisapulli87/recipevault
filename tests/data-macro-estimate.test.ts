@@ -70,6 +70,9 @@ describe('computeRecipeEstimate', () => {
     expect(estimate.calories).toBeGreaterThan(0)
     expect(fetches).toBe(0)
   })
+  // The fixture ingredient has to be a word the AFCD genuinely doesn't know. It used to be
+  // "xylophone berries", but staplePer100g now backs off through sub-phrases and "berries"
+  // legitimately matches "Mixed berry, frozen" — so the proxy was never reached.
   it('falls back to the proxy per-100g nutriments', async () => {
     vi.stubGlobal('fetch', async () => ({
       ok: true,
@@ -88,7 +91,7 @@ describe('computeRecipeEstimate', () => {
         ]
       })
     }))
-    const r = recipe([ing('xylophone berries', 200, 'g')], 2)
+    const r = recipe([ing('xylophone zarquon', 200, 'g')], 2)
     const { estimate } = await computeRecipeEstimate(r)
     expect(estimate.matched).toBe(1)
     expect(estimate.calories).toBe(90) // 90 × 2 / 2
@@ -98,7 +101,7 @@ describe('computeRecipeEstimate', () => {
       ok: true,
       json: async () => ({ ok: true, products: [] })
     }))
-    const { estimate } = await computeRecipeEstimate(recipe([ing('xylophone berries', 1, null)], 2))
+    const { estimate } = await computeRecipeEstimate(recipe([ing('xylophone zarquon', 1, null)], 2))
     expect(estimate.matched).toBe(0)
   })
 })

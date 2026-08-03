@@ -107,21 +107,250 @@ export function searchStaples(query: string): FoodItem[] {
   return scored.slice(0, 25).map((s) => auToFoodItem(s.f))
 }
 
-/** Per-100 g lookup for the recipe macro estimator: the shortest generic whose
- *  head name contains — or is contained by — the ingredient ("chicken thighs" →
- *  "Chicken, thigh, …"). */
-export function staplePer100g(name: string): { per100g: Per100g; servingGrams: number | null } | null {
-  const q = normFood(name.trim())
-  if (!q) return null
-  const hits = AU_FOODS.filter((f) => {
-    const n = normFood(headOf(f.name))
-    return n.includes(q) || q.includes(n)
-  }).sort((a, b) => a.name.length - b.name.length)
-  const f = hits[0]
-  if (!f) return null
+// ── recipe macro estimator: generic-food lookup ───────────────────────────────
+//
+// This used to take every AFCD food whose head name was a substring of the ingredient
+// (or vice versa) and keep the SHORTEST name. Substring matching crosses word
+// boundaries, so "rice" matched Liquorice and "coconut milk" matched almond meal
+// ("nut" ⊂ "coconut"); and "shortest name" preferred the processed form, so plain
+// "tomatoes" resolved to sundried tomato at 263 kcal/100 g. Every estimate built on
+// those matches was quietly wrong. Matching is now word-based and ranked.
+
+/** Singularise one word. Applied to BOTH sides, so it only has to be consistent —
+ *  "couscous" → "couscou" everywhere is harmless. */
+function singular(w: string): string {
+  if (w.length > 3 && w.endsWith('ies')) return `${w.slice(0, -3)}y`
+  if (w.length > 4 && /(oes|ches|shes|sses|xes)$/.test(w)) return w.slice(0, -2)
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1)
+  return w
+}
+
+function wordsOf(s: string): string[] {
+  return s
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean)
+    .map(singular)
+}
+
+/**
+ * Forms that move calories a long way from the plain ingredient. Each is penalised only
+ * when the ingredient didn't ask for it, so "tomatoes" gets the fresh one while
+ * "canned tomatoes" and "sundried tomatoes" still resolve to theirs.
+ *
+ * The cooked forms matter as much as the processed ones: an ingredient line is what goes
+ * INTO the pot, so "250 g spaghetti" and "1 cup rice" are dry weights. Matching them to
+ * boiled pasta (137 kcal/100 g) instead of dry (348) more than halves the estimate.
+ * `raw`, `fresh`, `dry` and `uncooked` are deliberately absent — those are what we want.
+ */
+const PROCESSED_MARKERS = [
+  // preserved / transformed
+  'dried',
+  'sundried',
+  'dehydrated',
+  'powder',
+  'powdered',
+  'chip',
+  'crisp',
+  'candied',
+  'glace',
+  'concentrate',
+  'extract',
+  'beverage',
+  'smoked',
+  'canned',
+  'pickled',
+  'syrup',
+  'flavoured',
+  'sweetened',
+  'infant',
+  'toddler',
+  // cooked: recipes measure ingredients before cooking
+  'boiled',
+  'cooked',
+  'baked',
+  'roasted',
+  'grilled',
+  'fried',
+  'steamed',
+  'poached',
+  'scrambled',
+  'microwaved',
+  'braised',
+  'stewed',
+  'casseroled',
+  'toasted',
+  'barbecued',
+  // parts, not the whole ingredient ("eggs" must not mean egg yolk)
+  'yolk',
+  'albumen',
+  'peel',
+  'rind',
+  'skin',
+  'bone',
+  'stalk',
+  // lean/light variants: for a best-guess estimate, over- beats under-counting
+  'skim',
+  'reduced',
+  'lower',
+  'lite',
+  'diet'
+].map(singular)
+
+/**
+ * The AFCD's vocabulary for "the ordinary one". Rewarded so that an unqualified
+ * ingredient lands on the neutral default: "eggs" → whole egg rather than yolk,
+ * "milk"/"beef mince" → regular fat rather than a lean variant, "tomatoes" → common.
+ */
+// 'fresh' is deliberately NOT here: it's the neutral word for produce but the opposite of
+// neutral for pantry staples, where it means fresh pasta (268 kcal/100 g) rather than the
+// dry packet (348) a recipe's "250 g spaghetti" actually refers to.
+const DEFAULT_MARKERS = ['regular', 'common', 'plain', 'whole', 'natural'].map(singular)
+
+/**
+ * Ingredients the AFCD simply doesn't name. Mapped to the words it does use rather than
+ * left unmatched — an unmatched ingredient is silently dropped from the estimate, which
+ * is worse than a close generic.
+ */
+const INGREDIENT_ALIASES: Record<string, string> = {
+  spaghetti: 'pasta white wheat flour',
+  penne: 'pasta white wheat flour',
+  rigatoni: 'pasta white wheat flour',
+  fusilli: 'pasta white wheat flour',
+  macaroni: 'pasta white wheat flour',
+  linguine: 'pasta white wheat flour',
+  fettuccine: 'pasta white wheat flour',
+  farfalle: 'pasta white wheat flour',
+  tagliatelle: 'pasta white wheat flour',
+  lasagne: 'pasta white wheat flour',
+  'lasagne sheet': 'pasta white wheat flour',
+  tortilla: 'bread tortilla',
+  'coconut milk': 'coconut cream',
+  'chicken stock': 'stock liquid',
+  'beef stock': 'stock liquid',
+  'vegetable stock': 'stock liquid',
+  'fish stock': 'stock liquid',
+  stock: 'stock liquid',
+  'chicken broth': 'stock liquid',
+  // The AFCD files nuts under "Nut, <name>" — a bare "almonds" otherwise lands on
+  // almond beverage (16 kcal) or almond oil (884).
+  almond: 'nut almond',
+  cashew: 'nut cashew',
+  walnut: 'nut walnut',
+  pecan: 'nut pecan',
+  'pine nut': 'nut pine',
+  'plain flour': 'flour wheat plain',
+  flour: 'flour wheat plain',
+  // "rolled oats" only ever matches the AFCD's porridge entries, which are already
+  // prepared with milk or water — the packet is filed as "Oats, hulled, uncooked".
+  'rolled oat': 'oat hulled',
+  'porridge oat': 'oat hulled',
+  'self-raising flour': 'flour wheat white self-raising',
+  'wholemeal flour': 'flour wheat wholemeal',
+  passata: 'tomato puree',
+  'tomato passata': 'tomato puree',
+  // No black bean in the AFCD; red kidney is the closest canned pulse.
+  'black bean': 'bean red kidney canned',
+  'canned black bean': 'bean red kidney canned',
+  // Only battered and crumbed "white flesh fish" are listed, both breadcrumbed and baked.
+  // Flathead is the AFCD's plain lean white fillet.
+  'white fish': 'flathead fillet',
+  'white fish fillet': 'flathead fillet',
+  'firm white fish': 'flathead fillet'
+}
+
+/** Lower is better. */
+function estimatorScore(food: AuFood, qWords: string[]): number {
+  const headWords = wordsOf(headOf(food.name))
+  const nameWords = wordsOf(food.name)
+  const headSet = new Set(headWords)
+
+  let score: number
+  if (headWords.length === qWords.length && qWords.every((w, i) => headWords[i] === w)) score = 0
+  else if (qWords.every((w, i) => headWords[i] === w)) score = 1 // head starts with the query
+  else if (qWords.every((w) => headSet.has(w))) score = 2 // head contains them, reordered
+  else {
+    // Matched partly in the descriptor tail. Penalise by HOW MUCH landed in the tail, so
+    // "Flour, wheat, white, plain" (1 of 4 query words in the head) beats "Biscuit,
+    // savoury, from white wheat flour, plain snack cracker style" (0 of 4).
+    score = 3 + qWords.filter((w) => !headSet.has(w)).length * 0.5
+  }
+
+  for (const marker of PROCESSED_MARKERS) {
+    if (nameWords.includes(marker) && !qWords.includes(marker)) score += 4
+  }
+  // Only when the head itself matched: otherwise a composite dish that happens to mention
+  // "regular fat milk" gets rewarded for words that describe a different ingredient.
+  if (score < 3) {
+    for (const marker of DEFAULT_MARKERS) {
+      if (nameWords.includes(marker) && !qWords.includes(marker)) score -= 1
+    }
+  }
+  return score
+}
+
+/**
+ * Best AFCD food containing every query word, or null.
+ *
+ * Relevance decides first, and only then the tiebreaks — curated everyday forms (the ones
+ * with real household measures), then the shorter, more generic name. Folding the
+ * measures preference into the score instead let a *cracker* ("Biscuit, savoury, from
+ * white wheat flour, plain snack cracker style", which has a serving size) outrank
+ * "Flour, wheat, white, plain", which doesn't.
+ */
+function bestStaple(qWords: string[]): AuFood | null {
+  let best: AuFood | null = null
+  let bestKey: [number, number, number] = [Infinity, Infinity, Infinity]
+  for (const f of AU_FOODS) {
+    const nameSet = new Set(wordsOf(f.name))
+    if (!qWords.every((w) => nameSet.has(w))) continue
+    const key: [number, number, number] = [
+      estimatorScore(f, qWords),
+      f.measures && f.measures.length > 0 ? 0 : 1,
+      f.name.length
+    ]
+    if (key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1]) ||
+        (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] < bestKey[2])) {
+      best = f
+      bestKey = key
+    }
+  }
+  return best
+}
+
+/**
+ * Per-100 g lookup for the recipe macro estimator. Every word of the ingredient must
+ * appear as a whole word in the food's name; if nothing matches, trailing qualifiers are
+ * dropped one at a time ("boneless chicken thigh fillets" → "boneless chicken thigh" →
+ * "boneless chicken") so a wordy ingredient still lands somewhere sensible.
+ */
+export function staplePer100g(
+  name: string
+): { per100g: Per100g; servingGrams: number | null } | null {
+  const cleaned = name.toLowerCase().trim()
+  const aliased = INGREDIENT_ALIASES[cleaned] ?? INGREDIENT_ALIASES[singular(cleaned)] ?? cleaned
+  const qWords = wordsOf(aliased)
+  if (qWords.length === 0) return null
+
+  // Try the whole phrase, then progressively shorter contiguous windows. Within a length,
+  // the RIGHTMOST window goes first: English compounds put the head noun last, so
+  // "chicken stock" should fall back to "stock", not to "chicken".
+  let food: AuFood | null = null
+  for (let n = qWords.length; n >= 1 && food === null; n--) {
+    for (let start = qWords.length - n; start >= 0 && food === null; start--) {
+      food = bestStaple(qWords.slice(start, start + n))
+    }
+  }
+  if (!food) return null
+
   return {
-    per100g: { calories: f.calories, protein: f.protein, carbs: f.carbs, fat: f.fat },
-    servingGrams: f.measures?.[0]?.grams ?? null
+    per100g: {
+      calories: food.calories,
+      protein: food.protein,
+      carbs: food.carbs,
+      fat: food.fat
+    },
+    servingGrams: food.measures?.[0]?.grams ?? null
   }
 }
 
