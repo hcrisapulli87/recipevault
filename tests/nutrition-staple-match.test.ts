@@ -113,4 +113,46 @@ describe('staplePer100g — backs off rather than giving up', () => {
     expect(kcal('')).toBeNull()
     expect(kcal('zzzznotafood')).toBeNull()
   })
+
+  it('never backs off onto a bare qualifier', () => {
+    // "frozen edamame" fell through to the single word "frozen" and matched *Banana,
+    // frozen* — 98 kcal of fruit standing in for a pulse. A window of pure modifiers is
+    // skipped now, so an unknown food stays honestly unmatched.
+    expect(kcal('frozen zzzznotafood')).toBeNull()
+    expect(kcal('finely chopped zzzznotafood')).toBeNull()
+    expect(kcal('large free range zzzznotafood')).toBeNull()
+  })
+})
+
+describe('staplePer100g — the everyday form, not the diet one', () => {
+  it('prefers full-fat over the low-fat variant when the recipe did not ask', () => {
+    // Both mayonnaise rows score equally on relevance, so the old length tiebreak handed
+    // it to "Mayonnaise, low fat, commercial" (123 kcal) over traditional (634).
+    expectBand('mayonnaise', 500, 750)
+    expectBand('low fat mayonnaise', 80, 200)
+  })
+
+  it('skips substitutes and preserved forms', () => {
+    expectBand('lemon', 10, 60) // not "Lemon, preserved"
+  })
+
+  it('takes the regular-fat row when the AFCD offers lower/regular/higher', () => {
+    // All three mince rows score the same on relevance, so this came down to the name
+    // length tiebreak — "higher fat" won by one character over "regular fat".
+    expectBand('beef mince', 160, 178)
+  })
+
+  it('honours an ingredient that says it is already cooked', () => {
+    // The default is a pre-cooking weight ("250 g spaghetti" is dry), but a leftovers
+    // recipe starting from "400 g cooked rice" means the boiled row, not the dry packet.
+    expectBand('rice', 300, 400)
+    expectBand('cooked rice', 120, 200)
+    expectBand('cooked chicken breast', 120, 200)
+  })
+
+  it('reads a packet ingredient as the packet, not its fresh namesake', () => {
+    // "popcorn kernels" matched frozen sweetcorn at 93 kcal/100 g.
+    expectBand('popcorn kernels', 350, 550)
+    expectBand('edamame', 40, 140)
+  })
 })

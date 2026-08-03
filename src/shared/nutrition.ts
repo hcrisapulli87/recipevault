@@ -160,6 +160,9 @@ const PROCESSED_MARKERS = [
   'smoked',
   'canned',
   'pickled',
+  'preserved',
+  'imitation',
+  'substitute',
   'syrup',
   'flavoured',
   'sweetened',
@@ -193,6 +196,8 @@ const PROCESSED_MARKERS = [
   'skim',
   'reduced',
   'lower',
+  'low',
+  'light',
   'lite',
   'diet'
 ].map(singular)
@@ -206,6 +211,73 @@ const PROCESSED_MARKERS = [
 // neutral for pantry staples, where it means fresh pasta (268 kcal/100 g) rather than the
 // dry packet (348) a recipe's "250 g spaghetti" actually refers to.
 const DEFAULT_MARKERS = ['regular', 'common', 'plain', 'whole', 'natural'].map(singular)
+
+/**
+ * Words that describe a food but never name one. The backoff below shortens an unmatched
+ * ingredient one word at a time, and without this guard it will happily match on whatever
+ * qualifier survives: "frozen edamame" (the AFCD has no edamame) fell through to the bare
+ * word "frozen" and came back with *Banana, frozen*. A window made only of these is
+ * skipped, so an ingredient the table genuinely doesn't cover stays unmatched — honestly
+ * absent from the estimate rather than wrong in it.
+ */
+const MODIFIER_ONLY_WORDS = new Set(
+  [
+    'fresh',
+    'frozen',
+    'raw',
+    'dried',
+    'dry',
+    'canned',
+    'tinned',
+    'cooked',
+    'uncooked',
+    'finely',
+    'roughly',
+    'thinly',
+    'coarsely',
+    'freshly',
+    'lightly',
+    'chopped',
+    'sliced',
+    'diced',
+    'minced',
+    'ground',
+    'crushed',
+    'grated',
+    'shredded',
+    'peeled',
+    'trimmed',
+    'boneless',
+    'skinless',
+    'large',
+    'small',
+    'medium',
+    'baby',
+    'mini',
+    'ripe',
+    'organic',
+    'free',
+    'range',
+    'mixed',
+    'assorted',
+    'plain',
+    'whole',
+    'thick',
+    'thin',
+    'hot',
+    'cold',
+    'warm',
+    'firm',
+    'soft',
+    'extra',
+    'virgin',
+    'light',
+    'low',
+    'reduced',
+    'good',
+    'quality'
+  ].map(singular)
+)
 
 /**
  * Ingredients the AFCD simply doesn't name. Mapped to the words it does use rather than
@@ -252,6 +324,23 @@ const INGREDIENT_ALIASES: Record<string, string> = {
   // No black bean in the AFCD; red kidney is the closest canned pulse.
   'black bean': 'bean red kidney canned',
   'canned black bean': 'bean red kidney canned',
+  // The estimator treats an ingredient line as a pre-cooking weight, which is right for
+  // "250 g spaghetti" but backwards for a leftovers recipe that starts from "400 g cooked
+  // rice". Without these the query backs off to the bare food and picks the dry row, so
+  // 400 g of cold rice reads 1,440 kcal instead of 630.
+  'cooked rice': 'rice white boiled',
+  'cold cooked rice': 'rice white boiled',
+  'cooked brown rice': 'rice brown boiled',
+  'cooked chicken': 'chicken breast lean flesh baked',
+  'cooked chicken breast': 'chicken breast lean flesh baked',
+  // No edamame in the AFCD and no plain soybean either — broad beans are the closest
+  // fresh green pulse. Undercounts protein a little; better than dropping the ingredient.
+  edamame: 'bean broad fresh',
+  'frozen edamame': 'bean broad fresh',
+  // "popcorn kernels" otherwise matches frozen sweetcorn (93 kcal/100 g) instead of the
+  // dry packet. The AFCD's only popcorn row is popped and buttered, so this overcounts
+  // slightly where a recipe adds its own oil — still far closer than sweetcorn.
+  'popcorn kernel': 'popcorn',
   // Only battered and crumbed "white flesh fish" are listed, both breadcrumbed and baked.
   // Flathead is the AFCD's plain lean white fillet.
   'white fish': 'flathead fillet',
@@ -279,9 +368,12 @@ function estimatorScore(food: AuFood, qWords: string[]): number {
   for (const marker of PROCESSED_MARKERS) {
     if (nameWords.includes(marker) && !qWords.includes(marker)) score += 4
   }
-  // Only when the head itself matched: otherwise a composite dish that happens to mention
-  // "regular fat milk" gets rewarded for words that describe a different ingredient.
-  if (score < 3) {
+  // Only when the match is essentially in the head: otherwise a composite dish that
+  // happens to mention "regular fat milk" gets rewarded for words describing a different
+  // ingredient. The cutoff allows one query word in the tail (score 3.5) — the AFCD files
+  // "Beef, mince, regular fat, raw" that way, and without this the neutral row lost the
+  // length tiebreak to "Beef, mince, higher fat, raw" by a single character.
+  if (score < 4) {
     for (const marker of DEFAULT_MARKERS) {
       if (nameWords.includes(marker) && !qWords.includes(marker)) score -= 1
     }
@@ -338,7 +430,9 @@ export function staplePer100g(
   let food: AuFood | null = null
   for (let n = qWords.length; n >= 1 && food === null; n--) {
     for (let start = qWords.length - n; start >= 0 && food === null; start--) {
-      food = bestStaple(qWords.slice(start, start + n))
+      const window = qWords.slice(start, start + n)
+      if (window.every((w) => MODIFIER_ONLY_WORDS.has(w))) continue
+      food = bestStaple(window)
     }
   }
   if (!food) return null

@@ -11,7 +11,7 @@ That's why there is no pantry/inventory item here, deliberately.
 
 ---
 
-## 1. Plan → Tracker macro bridge  (M–L) — the headliner
+## 1. Plan → Tracker macro bridge  (M–L) — the headliner — ✅ DELIVERED
 
 **What:** (a) Estimated macros per serving on every recipe ("~620 kcal ·
 P42/C58/F18 per serve"), computed by matching parsed ingredients against the
@@ -28,6 +28,12 @@ use benefits.
 **Watch out:** ingredient→nutrition matching is heuristic (unit conversion,
 "1 onion" → grams). Cache matches per ingredient; let the estimate be
 editable/overridable on the recipe. Phase (a) ships value alone; (b) follows.
+
+**Delivered:** (a) shipped with the AFCD estimator. (b) shipped in Meal Planner
+v2 (2026-08-04): the mapping lives in `src/shared/plan-to-food.ts`, used by both
+directions — the tracker's "planned for today" one-tap log and a `Log to
+tracker` action on every plan slot, leftovers included (same recipe, same
+macros). Estimates stay labelled best-guess.
 
 ## 2. Tracker trends view  (S–M)
 
@@ -53,7 +59,7 @@ so RLS still applies — no service-role key in the bot.
 made for weeks; makes the plan visible where the household already talks.
 Ranked below 1–2 only because the info is already accessible in the PWA.
 
-## 4. Meal-plan memory + quick-fill  (M)
+## 4. Meal-plan memory + quick-fill  (M) — partly delivered
 
 **What:** Stop losing history on "Clear week": archive filled weeks (small
 `meal_plan_history` table or soft snapshot on clear/rollover). Then: slot
@@ -62,6 +68,22 @@ suggestions while planning (recently cooked, most-cooked favourites) and a
 
 **Why fourth:** makes Sunday planning faster and answers "what did we eat
 last month?" — but it's an accelerator for a flow that already works.
+
+**Delivered in Meal Planner v2 (2026-08-04):** the quick-fill half, via a
+different route than "copy last week" — a 168-recipe catalog plus a
+deterministic week generator (`src/shared/plan-generator.ts`) that fills a whole
+week from diet/cuisine/cook-night settings, chains batches forward as leftovers,
+and previews before applying. Plus a suggestions strip targeting the emptiest
+slots. **Still parked:** archived history (`meal_plan_history`), "what did we
+eat last month", and copy-last-week — the week stays un-dated and shared.
+
+## 8. Meal planner v2 follow-ons  (S each)
+
+Deferred out of the 2026-08-04 build, worth picking up if the feature earns it:
+grow the catalog beyond 168 (vegetarian / Mediterranean / keto diet tags are
+already supported by the data model but unauthored), a "shopping-day" setting so
+cook nights cluster after the shop, and per-person serving counts (the generator
+assumes both household members eat the same batch).
 
 ## 5. Cooking-mode timers  (S)
 

@@ -171,22 +171,30 @@ export function generateWeek(
       opts.locked.filter((l) => l.meal === 'dinner').map((l) => l.day)
     )
     const used = new Set<number>()
+    const cookedCuisines: (Cuisine | null)[] = []
     let previous: RecipeSummary | null = null
 
     for (const day of chooseCookDays(opts.cookNights, lockedDinners)) {
       if (!isFree(day, 'dinner')) continue
-      // Prefer something unused and a change of cuisine; fall back through those
-      // preferences rather than leaving the night empty, but never cook the very same
-      // dish twice in a row — that's what leftovers are for.
+      // Fall through a ladder of preferences rather than leaving the night empty. Only
+      // avoiding the *immediately* previous cuisine still permits Italian-Greek-Italian-
+      // Greek, which reads as a rut, so ask first for a cuisine the week hasn't cooked at
+      // all. The last rung still refuses to cook the same dish twice running — repeating a
+      // dish is what leftovers are for.
+      const unused = (r: RecipeSummary): boolean => !used.has(r.id)
+      const recent = cookedCuisines.slice(-2)
       const pick =
-        pool.find((r) => !used.has(r.id) && r.cuisine !== previous?.cuisine) ??
-        pool.find((r) => !used.has(r.id)) ??
+        pool.find((r) => unused(r) && r.cuisine !== null && !cookedCuisines.includes(r.cuisine)) ??
+        pool.find((r) => unused(r) && !recent.includes(r.cuisine)) ??
+        pool.find((r) => unused(r) && r.cuisine !== previous?.cuisine) ??
+        pool.find(unused) ??
         pool.find((r) => r.id !== previous?.id)
       if (!pick) break
 
       const slot = bySlot.get(slotKey(day, 'dinner'))!
       slot.recipeId = pick.id
       used.add(pick.id)
+      cookedCuisines.push(pick.cuisine)
       previous = pick
       cookSlots.push(slot)
     }
