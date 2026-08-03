@@ -120,7 +120,11 @@ function AppInner(): JSX.Element {
               }}
             />
           ) : page === 'plan' ? (
-            <MealPlanPage recipes={recipes.recipes} onOpenRecipe={openRecipe} />
+            <MealPlanPage
+              recipes={recipes.recipes}
+              onOpenRecipe={openRecipe}
+              onLogToTracker={(meal, planned) => openAddFood(meal, planned)}
+            />
           ) : page === 'tracker' ? (
             <MacroTrackerPage
               recipes={recipes.recipes}
