@@ -275,6 +275,67 @@ function effortRank(r: RecipeSummary): number {
   return r.effort === 'minimal' ? 0 : r.effort === 'easy' ? 1 : 2
 }
 
+/** Can a batch cooked on `cookDay` still be eaten on `day`? The same two rules the
+ *  generator chains by: never a `fresh-only` dish, never past `keepsDays`. */
+export function reachesFrom(recipe: RecipeSummary, cookDay: Day, day: Day): boolean {
+  if (recipe.reheat === 'fresh-only') return false
+  const gap = DAYS.indexOf(day) - DAYS.indexOf(cookDay)
+  return gap > 0 && gap <= recipe.keepsDays
+}
+
+/**
+ * Cook something else on one night, and repair the leftover slots that were eating the
+ * old batch.
+ *
+ * Hand-picking a dinner in the review step is not just a field assignment: the leftover
+ * slots downstream carry the cook night's `recipeId`, so leaving them alone would have
+ * you eating leftovers of a meal that is no longer cooked. Each one either follows the
+ * new dish or — if that dish is `fresh-only`, or does not keep that long — is emptied.
+ * The cook night's `servingsPlanned` is then rebuilt from however many survived, which is
+ * what the grocery list scales by.
+ *
+ * Pure: returns a new week, leaves the input alone.
+ */
+export function setCookSlot(
+  week: MealPlanEntry[],
+  target: { day: Day; meal: PlanMeal },
+  recipe: RecipeSummary,
+  servingsPerMeal: number
+): MealPlanEntry[] {
+  const targetKey = slotKey(target.day, target.meal)
+  const previous = week.find((e) => slotKey(e.day, e.meal) === targetKey)
+  const previousId = previous?.recipeId ?? null
+
+  const next = week.map((e) => ({ ...e }))
+  const slot = next.find((e) => slotKey(e.day, e.meal) === targetKey)
+  if (!slot) return next
+
+  slot.recipeId = recipe.id
+  slot.freeText = null
+  slot.isLeftover = false
+  slot.cookDay = null
+
+  let survivors = 0
+  for (const e of next) {
+    const isChild =
+      e.isLeftover &&
+      e.cookDay === target.day &&
+      previousId !== null &&
+      e.recipeId === previousId &&
+      slotKey(e.day, e.meal) !== targetKey
+    if (!isChild) continue
+    if (reachesFrom(recipe, target.day, e.day)) {
+      e.recipeId = recipe.id
+      survivors++
+    } else {
+      Object.assign(e, blankSlot(e.day, e.meal))
+    }
+  }
+
+  slot.servingsPlanned = servingsPerMeal * (1 + survivors)
+  return next
+}
+
 /**
  * The label the Discord bot reads out of `meal_plan.meal_text`. Leftover slots must carry
  * one too — without it the bot's nightly post goes blank on every leftover night.
