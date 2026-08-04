@@ -6,10 +6,14 @@ import type { Day, FoodItem, MealPlanEntry, MealType, PlanMeal, RecipeSummary } 
 import { planLabel } from '../../shared/plan-generator'
 import { planSlotToFood } from '../../shared/plan-to-food'
 import { BottomSheet } from '../components/BottomSheet'
+import { ConfirmSheet } from '../components/ConfirmSheet'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { GenerateWeekSheet } from '../components/GenerateWeekSheet'
+import { PersonSwitcher } from '../components/PersonSwitcher'
+import { RecipePicker } from '../components/RecipePicker'
 import { getMealPlan, setMeal, clearWeek, applyGeneratedWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
+import type { HouseholdUser } from '../data/users'
 
 const SLOT_KEY: Record<PlanMeal, string> = { breakfast: 'B', lunch: 'L', dinner: 'D' }
 
@@ -29,21 +33,28 @@ const monthShort = (d: Date): string => d.toLocaleDateString(undefined, { month:
 
 export function MealPlanPage(props: {
   recipes: RecipeSummary[]
+  users: HouseholdUser[]
+  current: HouseholdUser | null
+  readOnly: boolean
+  onSelectViewer: (user: HouseholdUser) => void
   onOpenRecipe: (id: number) => void
   onLogToTracker: (meal: MealType, planned: FoodItem) => void
 }): JSX.Element {
+  const { users, current, readOnly } = props
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
+  const [confirmClear, setConfirmClear] = useState(false)
   const [editing, setEditing] = useState<{ day: Day; meal: PlanMeal } | null>(null)
   const [freeText, setFreeText] = useState('')
-  const [pickerSearch, setPickerSearch] = useState('')
 
-  // One shared household plan — both users edit the same week (Supabase realtime
-  // keeps the two phones in sync).
+  // Each person plans their own week; the switcher shows the other's read-only.
+  // Realtime keeps a phone and the desktop app in sync on the same week.
   const reload = useCallback(() => {
-    getMealPlan().then(setPlan)
-  }, [])
+    if (!current) return
+    getMealPlan(current.id).then(setPlan)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
 
   useEffect(() => {
     reload()
@@ -73,7 +84,6 @@ export function MealPlanPage(props: {
     })
     setEditing(null)
     setFreeText('')
-    setPickerSearch('')
     reload()
   }
 
@@ -96,7 +106,6 @@ export function MealPlanPage(props: {
     })
 
   const clearAll = async (): Promise<void> => {
-    if (!window.confirm('Clear the whole week?')) return
     await clearWeek()
     reload()
   }
@@ -188,16 +197,29 @@ export function MealPlanPage(props: {
     })
   }, [editing, cookSlots, recipeById])
 
-  const pickerRecipes = props.recipes.filter((r) =>
-    r.title.toLowerCase().includes(pickerSearch.toLowerCase())
-  )
-
   return (
     <div className="plan">
+      <div className="plan__top">
+        <span className="plan__week">{weekLabel}</span>
+        <PersonSwitcher
+          users={users}
+          selectedId={current?.id ?? ''}
+          onSelect={(u) => {
+            setEditing(null)
+            props.onSelectViewer(u)
+          }}
+        />
+      </div>
+
+      {readOnly && current && (
+        <div className="partner-banner">{current.name}&rsquo;s week — read-only</div>
+      )}
+
       <div className="plan-summary glass-island">
         <div className="plan-summary__top">
-          <span className="plan-summary__week">{weekLabel}</span>
-          <span className="plan-summary__shared">shared</span>
+          <span className="plan-summary__week">
+            {readOnly && current ? `${current.name}'s plan` : 'Your plan'}
+          </span>
         </div>
         <div className="plan-summary__stats">
           <span>
@@ -213,18 +235,34 @@ export function MealPlanPage(props: {
             <span className="plan-summary__kcal">~{avgKcal.toLocaleString()} kcal/day · est.</span>
           )}
         </div>
-        <div className="plan-summary__actions">
-          <button className="btn-primary plan-summary__gen" onClick={() => setGenerateOpen(true)}>
-            <Sparkles size={14} strokeWidth={2.4} /> Generate week
-          </button>
-          <button
-            className="btn-secondary"
-            onClick={() => setGroceryOpen(true)}
-            disabled={grocery.recipeIds.length === 0}
-          >
-            Send to groceries
-          </button>
-        </div>
+        {!readOnly && (
+          <>
+            <div className="plan-summary__actions">
+              <button
+                className="btn-primary plan-summary__gen"
+                onClick={() => setGenerateOpen(true)}
+              >
+                <Sparkles size={14} strokeWidth={2.4} /> Generate week
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => setGroceryOpen(true)}
+                disabled={grocery.recipeIds.length === 0}
+              >
+                Send to groceries
+              </button>
+            </div>
+            {/* Lives in the island rather than floating at the end of the page, where the
+                dock covered it. */}
+            <button
+              className="btn-ghost btn-ghost--destructive plan-summary__clear"
+              disabled={filledSlots.length === 0}
+              onClick={() => setConfirmClear(true)}
+            >
+              Clear week
+            </button>
+          </>
+        )}
       </div>
 
       {DAYS.map((day, i) => {
@@ -240,14 +278,14 @@ export function MealPlanPage(props: {
               const filled = recipe != null || Boolean(entry?.freeText)
               const isLeftover = entry?.isLeftover === true
               return (
-                <div
+                <button
                   key={meal}
+                  type="button"
                   className={`plan-slot ${isLeftover ? 'plan-slot--leftover' : ''}`}
-                  role="button"
+                  disabled={readOnly}
                   onClick={() => {
                     setEditing({ day, meal })
                     setFreeText(entry?.freeText ?? '')
-                    setPickerSearch('')
                   }}
                 >
                   <span className="plan-slot__key">{SLOT_KEY[meal]}</span>
@@ -268,14 +306,14 @@ export function MealPlanPage(props: {
                       cook{entry?.servingsPlanned ? ` · ${entry.servingsPlanned}` : ''}
                     </span>
                   )}
-                </div>
+                </button>
               )
             })}
           </div>
         )
       })}
 
-      {suggestion && (
+      {suggestion && !readOnly && (
         <div className="plan-suggest">
           <div className="eyebrow">
             Ideas for {MEAL_LABEL[suggestion.meal].toLowerCase()}
@@ -298,9 +336,15 @@ export function MealPlanPage(props: {
         </div>
       )}
 
-      <button className="btn-ghost btn-ghost--destructive plan__clear" onClick={clearAll}>
-        Clear week
-      </button>
+      {confirmClear && (
+        <ConfirmSheet
+          title="Clear the week?"
+          body="Every slot in your week is emptied. Your partner's plan and the grocery list are untouched."
+          confirmLabel="Clear week"
+          onConfirm={clearAll}
+          onClose={() => setConfirmClear(false)}
+        />
+      )}
 
       {editing && (
         <BottomSheet
@@ -375,29 +419,10 @@ export function MealPlanPage(props: {
             )}
 
             <div className="eyebrow plan-edit__head">Pick a recipe</div>
-            <input
-              className="input-pill"
-              placeholder="Search recipes and catalog"
-              value={pickerSearch}
-              onChange={(e) => setPickerSearch(e.target.value)}
+            <RecipePicker
+              recipes={props.recipes}
+              onPick={(r) => setSlot(editing.day, editing.meal, r.id, null)}
             />
-            <div className="plan-edit__recipes">
-              {pickerRecipes.slice(0, 40).map((r) => (
-                <button
-                  key={r.id}
-                  className="plan-edit__recipe"
-                  onClick={() => setSlot(editing.day, editing.meal, r.id, null)}
-                >
-                  <span>{r.title}</span>
-                  {r.est && (
-                    <span className="plan-edit__kcal">~{Math.round(r.est.calories)} kcal</span>
-                  )}
-                </button>
-              ))}
-              {pickerRecipes.length === 0 && (
-                <p className="addfood__note">No recipes match that search.</p>
-              )}
-            </div>
 
             <div className="eyebrow plan-edit__head">Or write it in</div>
             <input

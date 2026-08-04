@@ -8,26 +8,64 @@ import {
 import { DAYS, PLAN_MEALS } from '../src/shared/types'
 import type { MealPlanEntry } from '../src/shared/types'
 
+const ME = 'me-uuid'
+
 // In-memory stand-in for the meal_plan table. vi.hoisted so the vi.mock
 // factory (hoisted above imports) can close over it.
 const state = vi.hoisted(() => ({
   rows: [] as Record<string, unknown>[],
+  /** Every .eq() the last select applied, so tests can assert the owner scoping. */
+  selectFilters: {} as Record<string, unknown>,
   upserted: [] as { row: unknown; options: Record<string, unknown> }[],
   deletedDays: null as string[] | null,
-  // applyGeneratedWeek clears empty slots per day: .delete().eq('day', d).in('meal', […])
-  deletedSlots: [] as { day: string; meals: string[] }[]
+  // applyGeneratedWeek clears empty slots per day: .eq('day', d).in('meal', […])
+  deletedSlots: [] as { day: string; meals: string[] }[],
+  /** The owner_id every delete was scoped to. */
+  deleteOwners: [] as unknown[]
+}))
+
+vi.mock('../src/renderer/data/users', () => ({
+  myId: () => Promise.resolve('me-uuid')
 }))
 
 vi.mock('../src/renderer/data/supabase', () => {
-  // Thenable query builder: every chained call resolves to the same result.
+  // Thenable query builder: every chained call resolves to the same result, recording
+  // the .eq() filters on the way through.
   const chain = (data: unknown): Record<string, unknown> => {
     const result = { data, error: null }
     const node: Record<string, unknown> = {
       then: (ok: (r: unknown) => unknown) => Promise.resolve(result).then(ok)
     }
-    for (const m of ['select', 'eq']) node[m] = () => chain(data)
+    node.select = () => chain(data)
+    node.eq = (col: string, value: unknown) => {
+      state.selectFilters[col] = value
+      return chain(data)
+    }
     return node
   }
+
+  // Deletes are always owner-scoped first, then narrowed by day/meal.
+  const deleteChain = (): Record<string, unknown> => ({
+    eq: (col: string, value: string) => {
+      if (col === 'owner_id') {
+        state.deleteOwners.push(value)
+        return deleteChain()
+      }
+      // .eq('day', d).in('meal', meals)
+      return {
+        in: (_mealCol: string, meals: string[]) => {
+          state.deletedSlots.push({ day: value, meals })
+          return Promise.resolve({ error: null })
+        }
+      }
+    },
+    // clearWeek: .eq('owner_id', me).in('day', DAYS)
+    in: (_col: string, days: string[]) => {
+      state.deletedDays = days
+      return Promise.resolve({ error: null })
+    }
+  })
+
   return {
     supabase: {
       from: () => ({
@@ -36,20 +74,7 @@ vi.mock('../src/renderer/data/supabase', () => {
           state.upserted.push({ row, options })
           return Promise.resolve({ error: null })
         },
-        delete: () => ({
-          // clearWeek: .delete().in('day', DAYS)
-          in: (_col: string, days: string[]) => {
-            state.deletedDays = days
-            return Promise.resolve({ error: null })
-          },
-          // applyGeneratedWeek: .delete().eq('day', d).in('meal', meals)
-          eq: (_col: string, day: string) => ({
-            in: (_mealCol: string, meals: string[]) => {
-              state.deletedSlots.push({ day, meals })
-              return Promise.resolve({ error: null })
-            }
-          })
-        })
+        delete: () => deleteChain()
       })
     }
   }
@@ -57,9 +82,11 @@ vi.mock('../src/renderer/data/supabase', () => {
 
 beforeEach(() => {
   state.rows = []
+  state.selectFilters = {}
   state.upserted = []
   state.deletedDays = null
   state.deletedSlots = []
+  state.deleteOwners = []
 })
 
 /** A blank slot in the shape getMealPlan/generateWeek produce. */
@@ -76,8 +103,13 @@ const slot = (day: string, meal: string, patch: Partial<MealPlanEntry> = {}): Me
   }) as MealPlanEntry
 
 describe('getMealPlan', () => {
+  it('reads only the requested person’s week', async () => {
+    await getMealPlan('partner-uuid')
+    expect(state.selectFilters.owner_id).toBe('partner-uuid')
+  })
+
   it('returns 21 blank slots (7 days × 3 meals) for an empty week, day-major order', async () => {
-    const plan = await getMealPlan()
+    const plan = await getMealPlan(ME)
     expect(plan).toHaveLength(21)
     expect(plan.map((e) => e.day)).toEqual(DAYS.flatMap((d) => [d, d, d]))
     expect(plan.map((e) => e.meal)).toEqual(DAYS.flatMap(() => PLAN_MEALS))
@@ -90,7 +122,7 @@ describe('getMealPlan', () => {
       { day: 'monday', meal: 'dinner', recipe_id: 7, free_text: null },
       { day: 'tuesday', meal: 'breakfast', recipe_id: null, free_text: 'Overnight oats' }
     ]
-    const plan = await getMealPlan()
+    const plan = await getMealPlan(ME)
     const monDinner = plan.find((e) => e.day === 'monday' && e.meal === 'dinner')
     const tueBreakfast = plan.find((e) => e.day === 'tuesday' && e.meal === 'breakfast')
     const monLunch = plan.find((e) => e.day === 'monday' && e.meal === 'lunch')
@@ -113,7 +145,7 @@ describe('getMealPlan', () => {
       // A pre-migration row: the leftover columns simply aren't selected back as values.
       { day: 'tuesday', meal: 'lunch', recipe_id: 7, free_text: null, is_leftover: true, cook_day: 'monday' }
     ]
-    const plan = await getMealPlan()
+    const plan = await getMealPlan(ME)
     expect(plan.find((e) => e.day === 'monday' && e.meal === 'dinner')).toEqual(
       slot('monday', 'dinner', { recipeId: 7, servingsPlanned: 6 })
     )
@@ -124,7 +156,7 @@ describe('getMealPlan', () => {
 })
 
 describe('setMeal', () => {
-  it('upserts one shared slot keyed by day+meal, with the denormalised meal_text', async () => {
+  it('upserts one slot keyed by owner+day+meal, with the denormalised meal_text', async () => {
     await setMeal({
       day: 'wednesday',
       meal: 'lunch',
@@ -135,6 +167,7 @@ describe('setMeal', () => {
     expect(state.upserted).toEqual([
       {
         row: {
+          owner_id: ME,
           day: 'wednesday',
           meal: 'lunch',
           recipe_id: 3,
@@ -144,7 +177,7 @@ describe('setMeal', () => {
           cook_day: null,
           servings_planned: null
         },
-        options: { onConflict: 'day,meal' }
+        options: { onConflict: 'owner_id,day,meal' }
       }
     ])
   })
@@ -192,6 +225,9 @@ describe('applyGeneratedWeek', () => {
       { day: 'tuesday', meals: ['dinner'] },
       { day: 'wednesday', meals: ['breakfast'] }
     ])
+    // Every clearing delete stays inside my own week.
+    expect(state.deleteOwners).toEqual([ME, ME])
+    expect(rows.every((r) => r.owner_id === ME)).toBe(true)
   })
 
   it('skips the upsert entirely when the generated week is empty', async () => {
@@ -202,8 +238,9 @@ describe('applyGeneratedWeek', () => {
 })
 
 describe('clearWeek', () => {
-  it('deletes every day of the week', async () => {
+  it('deletes every day of my own week only', async () => {
     await clearWeek()
     expect(state.deletedDays).toEqual(DAYS)
+    expect(state.deleteOwners).toEqual([ME])
   })
 })

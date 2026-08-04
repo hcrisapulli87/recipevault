@@ -7,6 +7,19 @@ export interface HouseholdUser {
 }
 
 /**
+ * The signed-in user's id. Owner-scoped tables need it on every write (the column
+ * default only covers inserts, not the conflict target of an upsert), so it lives here
+ * once rather than as a repeated `supabase.auth.getUser()` in each data module.
+ */
+export async function myId(): Promise<string> {
+  const {
+    data: { user }
+  } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not signed in')
+  return user.id
+}
+
+/**
  * Both household profiles, me first. Powers the Me/partner switcher and the
  * "added by" chips. Until the partner has signed in once (their profiles row is
  * created on first sign-in), this returns just one entry and the switcher hides.

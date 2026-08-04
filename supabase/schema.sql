@@ -7,20 +7,26 @@
 --   Dashboard → Authentication → Users → "Add user" for each person (e.g. you + partner),
 --   tick "Auto Confirm User".
 --
--- Sharing model: recipes, food logs and profiles are READABLE by both household
--- users ("read all, write only your own" — writes always require
--- `owner_id = auth.uid()`). The MEAL PLAN and GROCERY LIST are fully SHARED
--- (2026-07 glass redesign): one household plan / one list, both users read AND
--- write. The barcode cache stays fully private per user.
+-- Sharing model (2026-08): ONE rule everywhere — "read all, write only your own".
+-- Recipes, food logs, profiles, the MEAL PLAN and the GROCERY LIST are all readable
+-- by both household users, and every write requires `owner_id = auth.uid()`. The app
+-- shows your own data with a Me/partner switcher for a read-only look at theirs, the
+-- same way the tracker always has. (The 2026-07 glass redesign briefly made the plan
+-- and list fully shared; that is reverted below.) The barcode cache stays fully
+-- private per user.
 -- Since sign-ups are disabled, "any authenticated user" means exactly the household.
 --
 -- The script is idempotent / safe to re-run: create-if-not-exists tables, guarded column
 -- adds, drop-and-recreate policies (Postgres has no "create policy if not exists"), and a
--- guarded realtime publication block. It never drops a table. Two exceptions on row
--- deletes, both one-time cutovers that are no-ops on every later run: the 2026-07
--- three-meal migration clears legacy one-meal-per-day planner rows, and the 2026-07
--- shared-plan migration dedupes per-person planner rows down to one household row
--- per (day, meal).
+-- guarded realtime publication block. It never drops a table. One exception on row
+-- deletes, a one-time cutover that is a no-op on every later run: the 2026-07 three-meal
+-- migration clears legacy one-meal-per-day planner rows. The 2026-08 un-sharing
+-- migration below only ADDS rows.
+--
+-- Heads up: Supabase's SQL Editor warns about "destructive operations" because the file
+-- contains the word DROP. Those are `drop policy if exists` lines that are recreated on
+-- the next line (Postgres has no "create policy if not exists"). There is no DROP TABLE,
+-- TRUNCATE, or unguarded DELETE — it is safe to run past the warning.
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Tables  (Postgres mirror of the old local SQLite schema, now owner-scoped)
@@ -99,11 +105,11 @@ create table if not exists public.steps (
   text      text not null
 );
 
--- One SHARED household row per weekday MEAL SLOT (breakfast/lunch/dinner) — the plan
--- is one plan for both users (2026-07 glass redesign). recipe_id `on delete set null`
--- so deleting a planned recipe just empties that slot. meal_text is a denormalised label
--- the Discord bot reads (no join). owner_id now means "last edited by" and keeps the
--- bot's REST reads working unchanged.
+-- One row per OWNER per weekday MEAL SLOT (breakfast/lunch/dinner) — each person plans
+-- their own week and can view the other's read-only (2026-08; see the un-sharing
+-- migration below). recipe_id `on delete set null` so deleting a planned recipe just
+-- empties that slot. meal_text is a denormalised label the Discord bot reads (no join) —
+-- it groups by owner_id and posts a section per person.
 create table if not exists public.meal_plan (
   owner_id  uuid not null default auth.uid() references auth.users (id) on delete cascade,
   day       text not null check (day in ('monday','tuesday','wednesday','thursday','friday','saturday','sunday')),
@@ -111,7 +117,7 @@ create table if not exists public.meal_plan (
   recipe_id bigint references public.recipes (id) on delete set null,
   free_text text,
   meal_text text,
-  primary key (day, meal)
+  primary key (owner_id, day, meal)
 );
 
 -- Leftovers (2026-08, meal planner v2). A leftover slot points at the SAME recipe_id as
@@ -139,52 +145,53 @@ begin
       add constraint meal_plan_meal_check check (meal in ('breakfast','lunch','dinner'));
   end if;
   -- If the table somehow has no PK at all (pre-2026-07 install), jump straight to the
-  -- shared-plan end state. The 3-column → 2-column conversion lives in the next block.
+  -- current end state. The 2-column → 3-column conversion lives in the next block.
   if not exists (
     select 1 from pg_constraint
     where conrelid = 'public.meal_plan'::regclass and conname = 'meal_plan_pkey'
   ) then
-    alter table public.meal_plan add constraint meal_plan_pkey primary key (day, meal);
+    alter table public.meal_plan add constraint meal_plan_pkey primary key (owner_id, day, meal);
   end if;
 end $$;
 
--- Migration (2026-07, glass redesign): the planner became SHARED — one household plan,
--- one row per (day, meal). Old per-person rows are deduped (the second row-delete
--- cutover in this script): filled slots beat empty ones, and on a filled-vs-filled tie
--- Harrison's row wins (the Discord bot reads the plan, so his rows must survive).
--- Then the PK moves from (owner_id, day, meal) to (day, meal). Guarded: a no-op once
--- the 2-column PK exists.
+-- Migration (2026-08): the planner goes back to ONE WEEK PER PERSON, matching the tracker
+-- (your own data, the partner's read-only behind the Me/partner switcher). The 2026-07
+-- redesign had collapsed it to a single shared row per (day, meal); this reverses that.
+--
+-- Nobody should open the planner to a surprise empty week, so the existing shared week is
+-- COPIED to every real household member (the bot is excluded — a service account has no
+-- meals). Only the PK changes and only rows are ADDED; nothing is deleted. Guarded on the
+-- 2-column PK, so this is a one-time cutover and a no-op on every later run.
 do $$
-declare
-  harrison uuid;
 begin
   if exists (
     select 1 from pg_constraint
     where conrelid = 'public.meal_plan'::regclass
-      and conname = 'meal_plan_pkey' and array_length(conkey, 1) = 3
+      and conname = 'meal_plan_pkey' and array_length(conkey, 1) = 2
   ) then
-    select id into harrison from auth.users where email = 'harrisonc2105@gmail.com';
-    delete from public.meal_plan
-    where ctid in (
-      select ctid from (
-        select ctid, row_number() over (
-          partition by day, meal
-          order by (recipe_id is not null or nullif(free_text, '') is not null) desc,
-                   coalesce(owner_id = harrison, false) desc,
-                   owner_id::text
-        ) as rn
-        from public.meal_plan
-      ) ranked
-      where rn > 1
-    );
     alter table public.meal_plan drop constraint meal_plan_pkey;
-    alter table public.meal_plan add constraint meal_plan_pkey primary key (day, meal);
+    alter table public.meal_plan add constraint meal_plan_pkey primary key (owner_id, day, meal);
+
+    insert into public.meal_plan (
+      owner_id, day, meal, recipe_id, free_text, meal_text,
+      is_leftover, cook_day, servings_planned
+    )
+    select p.id, m.day, m.meal, m.recipe_id, m.free_text, m.meal_text,
+           m.is_leftover, m.cook_day, m.servings_planned
+    from public.meal_plan m
+    cross join public.profiles p
+    where p.is_bot = false
+      and not exists (
+        select 1 from public.meal_plan x
+        where x.owner_id = p.id and x.day = m.day and x.meal = m.meal
+      );
   end if;
 end $$;
 
--- The built-in grocery list (replaces the old Google Tasks push). SHARED since the
--- 2026-07 glass redesign: one household list, both users add/check/remove any row.
--- owner_id just records who added the item.
+-- The built-in grocery list (replaces the old Google Tasks push). Owner-scoped again
+-- as of 2026-08: your list is yours to add/check/remove, the partner's is visible
+-- read-only. Existing rows keep the owner_id of whoever added them — a shopping list is
+-- transient, so unlike the meal plan there is nothing worth copying across.
 create table if not exists public.grocery_items (
   id         uuid primary key default gen_random_uuid(),
   owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
@@ -216,9 +223,9 @@ create index if not exists grocery_owner_state_idx  on public.grocery_items (own
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Row-Level Security.
--- Recipe tables (recipes/ingredients/steps): household-readable, owner-writable.
--- Fully shared tables (meal_plan/grocery_items): household read AND write — one
--- plan, one list for the whole household (2026-07 glass redesign).
+-- One rule for all of them (2026-08): household-readable, owner-writable. meal_plan and
+-- grocery_items were briefly household-writable too (2026-07 glass redesign) and are
+-- folded back into the same loop here, dropping those policies by name.
 -- The owner_id default (auth.uid()) stamps inserts; policies guard every operation.
 -- Each policy is dropped-then-created so the whole script stays re-runnable.
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -235,10 +242,11 @@ declare
   t text;
 begin
   -- (food_log gets the same treatment in the tracker section below, after its create table.)
-  foreach t in array array['recipes','ingredients','steps']
+  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items']
   loop
     execute format('drop policy if exists "%1$s: own rows" on public.%1$I', t);
     execute format('drop policy if exists "%1$s: household read" on public.%1$I', t);
+    execute format('drop policy if exists "%1$s: household write" on public.%1$I', t);
     execute format('drop policy if exists "%1$s: owner insert" on public.%1$I', t);
     execute format('drop policy if exists "%1$s: owner update" on public.%1$I', t);
     execute format('drop policy if exists "%1$s: owner delete" on public.%1$I', t);
@@ -246,26 +254,6 @@ begin
     execute format('create policy "%1$s: owner insert" on public.%1$I for insert to authenticated with check (owner_id = auth.uid())', t);
     execute format('create policy "%1$s: owner update" on public.%1$I for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid())', t);
     execute format('create policy "%1$s: owner delete" on public.%1$I for delete to authenticated using (owner_id = auth.uid())', t);
-  end loop;
-end $$;
-
--- meal_plan + grocery_items: fully shared — any household user can read and write
--- every row (same `using (true)` pattern as "import_queue: household update" below).
--- Old owner-scoped policies are dropped by name so re-runs upgrade cleanly.
-do $$
-declare
-  t text;
-begin
-  foreach t in array array['meal_plan','grocery_items']
-  loop
-    execute format('drop policy if exists "%1$s: own rows" on public.%1$I', t);
-    execute format('drop policy if exists "%1$s: household read" on public.%1$I', t);
-    execute format('drop policy if exists "%1$s: owner insert" on public.%1$I', t);
-    execute format('drop policy if exists "%1$s: owner update" on public.%1$I', t);
-    execute format('drop policy if exists "%1$s: owner delete" on public.%1$I', t);
-    execute format('drop policy if exists "%1$s: household write" on public.%1$I', t);
-    execute format('create policy "%1$s: household read" on public.%1$I for select to authenticated using (true)', t);
-    execute format('create policy "%1$s: household write" on public.%1$I for all to authenticated using (true) with check (true)', t);
   end loop;
 end $$;
 
@@ -336,6 +324,13 @@ create table if not exists public.food_cache (
 );
 
 alter table public.profiles add column if not exists is_bot boolean not null default false;
+
+-- The Generate-week wizard's answers (diet, cuisines, cook nights, serves, leftover
+-- appetite, which meals to fill). Remembered per person so the second week is one tap to
+-- the review step instead of six screens again. Shape is owned by the client
+-- (shared/plan-prefs.ts) and read defensively, so adding a question later needs no
+-- migration.
+alter table public.profiles add column if not exists plan_prefs jsonb;
 
 alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;

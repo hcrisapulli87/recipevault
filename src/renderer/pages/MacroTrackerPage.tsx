@@ -210,11 +210,14 @@ export function MacroTrackerPage(props: {
     return onTableChange(['food_log'], reloadRange)
   }, [reloadRange])
 
-  // The shared household meal plan, for the one-tap "log the planned meal" card.
+  // The selected person's meal plan, for the one-tap "log the planned meal" card — it
+  // follows the switcher so the partner's read-only day shows what THEY planned.
   const [plan, setPlan] = useState<MealPlanEntry[] | null>(null)
   const reloadPlan = useCallback((): void => {
-    getMealPlan().then(setPlan)
-  }, [])
+    if (!current) return
+    getMealPlan(current.id).then(setPlan)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
 
   useEffect(() => {
     reloadPlan()

@@ -22,8 +22,8 @@ const TABS = [
 ] as const
 
 const MORE_ROWS = [
-  { page: 'plan', label: 'Meal plan', sub: 'This week · shared', Icon: CalendarDays },
-  { page: 'groceries', label: 'Groceries', sub: 'Shared shopping list', Icon: ShoppingCart },
+  { page: 'plan', label: 'Meal plan', sub: 'Your week', Icon: CalendarDays },
+  { page: 'groceries', label: 'Groceries', sub: 'Your shopping list', Icon: ShoppingCart },
   { page: 'import', label: 'Import recipe', sub: 'From a link or reel', Icon: Link2 },
   { page: 'settings', label: 'Settings', sub: 'Goals & account', Icon: Settings }
 ] as const

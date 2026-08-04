@@ -1,13 +1,18 @@
 import { supabase } from './supabase'
+import { myId } from './users'
 import { DAYS, PLAN_MEALS } from '../../shared/types'
 import type { Day, MealPlanEntry, PlanMeal } from '../../shared/types'
 
 const PLAN_COLS = 'day, meal, recipe_id, free_text, is_leftover, cook_day, servings_planned'
 
-/** The shared household week: 21 slots (7 days × breakfast/lunch/dinner),
- *  blanks filled in. One plan for both users — no owner scoping. */
-export async function getMealPlan(): Promise<MealPlanEntry[]> {
-  const { data, error } = await supabase.from('meal_plan').select(PLAN_COLS)
+/** One person's week: 21 slots (7 days × breakfast/lunch/dinner), blanks filled in.
+ *  Each household member plans their own; RLS lets you read the other's, and the UI
+ *  shows it read-only behind the Me/partner switcher. */
+export async function getMealPlan(ownerId: string): Promise<MealPlanEntry[]> {
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select(PLAN_COLS)
+    .eq('owner_id', ownerId)
   if (error) throw new Error(error.message)
   const bySlot = new Map((data ?? []).map((r) => [`${r.day}|${r.meal}`, r]))
   return DAYS.flatMap((day) =>
@@ -30,6 +35,7 @@ export async function getMealPlan(): Promise<MealPlanEntry[]> {
  *  rows identically — the Discord bot reads `meal_text` and a missing label blanks its
  *  nightly post. */
 function toRow(args: {
+  ownerId: string
   day: Day
   meal: PlanMeal
   recipeId: number | null
@@ -40,6 +46,7 @@ function toRow(args: {
   servingsPlanned?: number | null
 }): Record<string, unknown> {
   return {
+    owner_id: args.ownerId,
     day: args.day,
     meal: args.meal,
     recipe_id: args.recipeId,
@@ -52,8 +59,9 @@ function toRow(args: {
 }
 
 /**
- * Upsert one slot. `mealText` is a denormalised label (recipe title or free text) the Discord
- * bot can read over REST without a join.
+ * Upsert one slot of my own week. `mealText` is a denormalised label (recipe title or
+ * free text) the Discord bot can read over REST without a join. `owner_id` is written
+ * explicitly, not left to the column default, because it is part of the conflict target.
  */
 export async function setMeal(args: {
   day: Day
@@ -65,9 +73,10 @@ export async function setMeal(args: {
   cookDay?: Day | null
   servingsPlanned?: number | null
 }): Promise<void> {
+  const ownerId = await myId()
   const { error } = await supabase
     .from('meal_plan')
-    .upsert(toRow(args), { onConflict: 'day,meal' })
+    .upsert(toRow({ ...args, ownerId }), { onConflict: 'owner_id,day,meal' })
   if (error) throw new Error(error.message)
 }
 
@@ -80,6 +89,7 @@ export async function applyGeneratedWeek(
   entries: MealPlanEntry[],
   labelFor: (entry: MealPlanEntry) => string | null
 ): Promise<void> {
+  const ownerId = await myId()
   const filled = entries.filter((e) => e.recipeId !== null || e.freeText !== null)
   const empty = entries.filter((e) => e.recipeId === null && e.freeText === null)
 
@@ -87,6 +97,7 @@ export async function applyGeneratedWeek(
     const { error } = await supabase.from('meal_plan').upsert(
       filled.map((e) =>
         toRow({
+          ownerId,
           day: e.day,
           meal: e.meal,
           recipeId: e.recipeId,
@@ -97,7 +108,7 @@ export async function applyGeneratedWeek(
           servingsPlanned: e.servingsPlanned
         })
       ),
-      { onConflict: 'day,meal' }
+      { onConflict: 'owner_id,day,meal' }
     )
     if (error) throw new Error(error.message)
   }
@@ -107,12 +118,24 @@ export async function applyGeneratedWeek(
   for (const day of DAYS) {
     const meals = empty.filter((e) => e.day === day).map((e) => e.meal)
     if (meals.length === 0) continue
-    const { error } = await supabase.from('meal_plan').delete().eq('day', day).in('meal', meals)
+    const { error } = await supabase
+      .from('meal_plan')
+      .delete()
+      .eq('owner_id', ownerId)
+      .eq('day', day)
+      .in('meal', meals)
     if (error) throw new Error(error.message)
   }
 }
 
+/** Clear my own week. RLS would block writing the partner's rows anyway; scoping the
+ *  delete makes that explicit rather than relying on the policy to catch it. */
 export async function clearWeek(): Promise<void> {
-  const { error } = await supabase.from('meal_plan').delete().in('day', DAYS)
+  const ownerId = await myId()
+  const { error } = await supabase
+    .from('meal_plan')
+    .delete()
+    .eq('owner_id', ownerId)
+    .in('day', DAYS)
   if (error) throw new Error(error.message)
 }

@@ -43,8 +43,9 @@ function AppInner(): JSX.Element {
   const [selectedRecipeId, setSelectedRecipeId] = useState<number | null>(null)
   const recipes = useRecipes()
 
-  // Household viewer (H/K) lives here so the Tracker and Trends share it and the
-  // FAB can hide itself in the partner's read-only view.
+  // Household viewer (H/K) lives here so every page shares one selection — switch to
+  // your partner on the tracker and their plan and grocery list follow. The FAB hides
+  // itself in the partner's read-only view.
   const users = useHousehold()
   const [viewer, setViewer] = useState<HouseholdUser | null>(null)
   const current = viewer ?? users[0] ?? null
@@ -122,6 +123,10 @@ function AppInner(): JSX.Element {
           ) : page === 'plan' ? (
             <MealPlanPage
               recipes={recipes.recipes}
+              users={users}
+              current={current}
+              readOnly={readOnly}
+              onSelectViewer={setViewer}
               onOpenRecipe={openRecipe}
               onLogToTracker={(meal, planned) => openAddFood(meal, planned)}
             />
@@ -137,7 +142,12 @@ function AppInner(): JSX.Element {
           ) : page === 'trends' ? (
             <TrendsPage current={current} />
           ) : page === 'groceries' ? (
-            <GroceriesPage />
+            <GroceriesPage
+              users={users}
+              current={current}
+              readOnly={readOnly}
+              onSelectViewer={setViewer}
+            />
           ) : (
             <SettingsPage />
           )}
