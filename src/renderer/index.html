@@ -5,6 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#eef3f0" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <!-- iOS home-screen install: Safari reads these rather than the web manifest for the
+         icon and the status-bar treatment. `default` keeps dark text over the pastel
+         wash; without the touch icon iOS screenshots the page and uses that instead. -->
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
+    <!-- Both spellings: iOS still reads the `apple-` one, other browsers want the
+         standard name and log a deprecation warning without it. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="RecipeVault" />
     <title>RecipeVault</title>
     <meta
       http-equiv="Content-Security-Policy"

@@ -50,7 +50,23 @@ export function GroceryPreviewModal(props: {
   }
 
   return (
-    <BottomSheet title="Send to groceries" onClose={props.onClose}>
+    <BottomSheet
+      title="Send to groceries"
+      onClose={props.onClose}
+      footer={
+        phase !== 'loading' && items.length > 0 ? (
+          <button
+            className="btn-primary grocery-preview__send"
+            onClick={add}
+            disabled={phase === 'saving' || selected.length === 0}
+          >
+            {phase === 'saving'
+              ? 'Sending…'
+              : `Send ${selected.length} item${selected.length === 1 ? '' : 's'}`}
+          </button>
+        ) : undefined
+      }
+    >
       {phase === 'loading' && <p className="addfood__note">Working out the list…</p>}
 
       {phase !== 'loading' && (
@@ -82,15 +98,6 @@ export function GroceryPreviewModal(props: {
             </>
           )}
           {error && <div className="info-banner info-banner--warm">{error}</div>}
-          <button
-            className="btn-primary grocery-preview__send"
-            onClick={add}
-            disabled={phase === 'saving' || selected.length === 0}
-          >
-            {phase === 'saving'
-              ? 'Sending…'
-              : `Send ${selected.length} item${selected.length === 1 ? '' : 's'}`}
-          </button>
         </div>
       )}
     </BottomSheet>

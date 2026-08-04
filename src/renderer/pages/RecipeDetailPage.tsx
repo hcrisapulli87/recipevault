@@ -9,6 +9,7 @@ import { CUISINE_LABEL, DIET_LABEL } from '../../shared/types'
 import { computeRecipeEstimate, saveRecipeEstimate } from '../data/macroEstimate'
 import { convertRecipeToMetric } from '../data/metricConvert'
 import { hasImperialUnits } from '../../shared/unit-convert'
+import { ConfirmSheet } from '../components/ConfirmSheet'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { useHousehold } from '../hooks/useHousehold'
@@ -36,6 +37,7 @@ export function RecipeDetailPage(props: {
   const [est, setEst] = useState<RecipeEstimate | null>(null)
   const [estDetail, setEstDetail] = useState<EstimateDetail[] | null>(null)
   const [estimating, setEstimating] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   // All hooks stay ABOVE the loading early-return — a hook below it crashes the
   // page the moment the recipe arrives (hook count changes between renders).
   const [converting, setConverting] = useState(false)
@@ -91,7 +93,6 @@ export function RecipeDetailPage(props: {
   }
 
   const remove = async (): Promise<void> => {
-    if (!window.confirm(`Delete “${recipe.title}”? This can't be undone.`)) return
     await deleteRecipe(recipe.id)
     props.onDeleted()
   }
@@ -260,7 +261,10 @@ export function RecipeDetailPage(props: {
             </button>
           )}
           {canEdit && (
-            <button className="btn-ghost btn-ghost--destructive" onClick={remove}>
+            <button
+              className="btn-ghost btn-ghost--destructive"
+              onClick={() => setConfirmDelete(true)}
+            >
               Delete recipe
             </button>
           )}
@@ -283,6 +287,16 @@ export function RecipeDetailPage(props: {
           </ul>
         )}
       </div>
+
+      {confirmDelete && (
+        <ConfirmSheet
+          title={`Delete “${recipe.title}”?`}
+          body="The recipe, its ingredients and steps are removed. This can't be undone."
+          confirmLabel="Delete recipe"
+          onConfirm={remove}
+          onClose={() => setConfirmDelete(false)}
+        />
+      )}
 
       {cooking && <CookingMode recipe={recipe} onClose={() => setCooking(false)} />}
       {groceryOpen && (

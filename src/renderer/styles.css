@@ -56,6 +56,29 @@
   --hairline: rgba(27, 36, 48, 0.12);
   --scrim: rgba(16, 20, 24, 0.35);
 
+  /* Floating-dock geometry. The dock is `position: fixed`, so nothing in normal flow
+     knows it is there — every page has to reserve the space itself. Deriving that
+     reservation from the dock's own numbers (gap below + height) is what stops page
+     footers like "Clear week" from disappearing underneath it. */
+  --dock-gap: 24px; /* dock's distance from the bottom edge */
+  --dock-height: 64px; /* .dock: 52px tab + 6px padding top and bottom */
+  --dock-space: calc(var(--dock-gap) + var(--dock-height) + 32px);
+}
+
+/* Grows a control's touch area past its painted size without moving anything around it.
+   Used on the pill controls (day stepper, H/K switcher), which read best small but are
+   well under the 44px a thumb needs. */
+.tap-44 {
+  position: relative;
+}
+.tap-44::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
 }
 
 html {
@@ -70,6 +93,20 @@ body {
     -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', system-ui, sans-serif;
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  /* iOS paints a grey box over anything tappable on touch-down. Fine on a web page,
+     wrong on something installed to the home screen. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* `manipulation` drops the double-tap-to-zoom gesture, and with it the ~300 ms wait
+   Safari spends deciding whether a tap was the first half of one. */
+button,
+[role='button'],
+label,
+input,
+select,
+textarea {
+  touch-action: manipulation;
 }
 /* Fixed pastel wash behind all content (spec: three soft radials). A dedicated
    fixed layer instead of body background-attachment — iOS Safari ignores `fixed`
@@ -94,7 +131,12 @@ body::before {
 .app {
   display: flex;
   flex-direction: column;
+  /* dvh, not vh: in a Safari tab 100vh includes the space behind the browser toolbars,
+     so the bottom of the scroll area sits underneath them and the last thing on a page
+     can't be reached. dvh tracks the actually-visible viewport. vh first as a fallback
+     for anything that doesn't know the unit. */
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
 }
 .app__body {
@@ -103,11 +145,17 @@ body::before {
   overflow: hidden;
 }
 /* One centered phone-width column everywhere — the Electron desktop window gets
-   the same glass UI, just floating on a wider wash. */
+   the same glass UI, just floating on a wider wash.
+   The viewport meta sets `viewport-fit=cover`, so the app draws under the notch, status
+   bar and home indicator and owes every inset back as padding — including the TOP one,
+   without which a standalone PWA renders its page headers behind the status bar. */
 .app__main {
   flex: 1;
   overflow-y: auto;
-  padding: 16px 16px calc(120px + env(safe-area-inset-bottom));
+  /* Keeps a rubber-band overscroll inside the list instead of dragging the whole shell. */
+  overscroll-behavior: contain;
+  padding: calc(16px + env(safe-area-inset-top)) 16px
+    calc(var(--dock-space) + env(safe-area-inset-bottom));
 }
 .app__main > * {
   max-width: 430px;
@@ -213,7 +261,7 @@ body::before {
 }
 .seg__btn {
   flex: 1;
-  min-height: 38px;
+  min-height: 44px;
   background: none;
   border: none;
   border-radius: 999px;
@@ -284,7 +332,10 @@ body::before {
 .sheet {
   width: 100%;
   max-width: 430px;
+  /* dvh so the sheet shrinks when iOS puts the keyboard up — with vh it keeps its full
+     height and its own inputs end up behind the keyboard. */
   max-height: 92vh;
+  max-height: 92dvh;
   background: rgba(255, 255, 255, 0.87);
   -webkit-backdrop-filter: blur(30px);
   backdrop-filter: blur(30px);
@@ -298,6 +349,14 @@ body::before {
 }
 .sheet--tall {
   height: 88vh;
+  height: 88dvh;
+}
+/* Action row pinned below the scrolling body — see BottomSheet's `footer`. */
+.sheet__footer {
+  flex: none;
+  padding-top: 12px;
+  margin-top: 4px;
+  border-top: 1px solid var(--divider);
 }
 @keyframes sheet-up {
   from {
@@ -327,7 +386,7 @@ body::before {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(104px + env(safe-area-inset-bottom));
+  bottom: calc(var(--dock-gap) + var(--dock-height) + 16px + env(safe-area-inset-bottom));
   z-index: 300;
   background: rgba(16, 20, 24, 0.85);
   -webkit-backdrop-filter: blur(16px);
@@ -385,7 +444,7 @@ body::before {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
-  bottom: calc(24px + env(safe-area-inset-bottom));
+  bottom: calc(var(--dock-gap) + env(safe-area-inset-bottom));
   width: calc(100% - 32px);
   max-width: 398px;
   display: flex;
@@ -608,6 +667,7 @@ body::before {
 }
 .segmented__btn {
   flex: 1;
+  min-height: 40px;
   border: 0;
   background: transparent;
   border-radius: 999px;
@@ -655,10 +715,15 @@ body::before {
 }
 .filter-chip {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  /* Chips are the main control of the Generate-week wizard, so they carry a real touch
+     target rather than the 30px the text alone gave them. */
+  min-height: 40px;
   border: 1px solid var(--pill-border);
   background: var(--pill-bg);
   border-radius: 999px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   font: inherit;
   font-size: 11px;
   font-weight: 700;
@@ -910,7 +975,8 @@ body::before {
 .addfood__link {
   background: none;
   border: none;
-  padding: 0;
+  /* Vertical padding so the inline link is a tappable strip, not a 16px hairline. */
+  padding: 12px 0;
   font: inherit;
   font-weight: 700;
   text-decoration: underline;
@@ -1646,10 +1712,19 @@ body::before {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 8px 0;
+  border: none;
   border-top: 1px solid var(--divider);
+  background: none;
+  font-family: inherit;
+  color: inherit;
+  text-align: left;
   cursor: pointer;
-  min-height: 40px;
+  min-height: 44px;
+}
+.plan-slot:disabled {
+  cursor: default;
 }
 .plan-slot__key {
   width: 26px;
@@ -1681,9 +1756,18 @@ body::before {
   padding: 2px 8px;
   flex-shrink: 0;
 }
-.plan__clear {
-  align-self: center;
-  margin-top: 4px;
+/* Page header: week label + the Me/partner switcher, matching the tracker's top row. */
+.plan__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0 2px 10px;
+}
+.plan__week {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
 }
 
 /* Slot editor sheet */
@@ -1760,10 +1844,9 @@ body::before {
   font-weight: 800;
   letter-spacing: -0.01em;
 }
-.plan-summary__shared {
-  font-size: 11px;
-  color: var(--muted-2);
-  font-weight: 700;
+.plan-summary__clear {
+  width: 100%;
+  margin-top: 2px;
 }
 .plan-summary__stats {
   display: flex;
@@ -1955,10 +2038,133 @@ body::before {
 .gen-actions {
   display: flex;
   gap: 8px;
-  padding-top: 12px;
 }
 .gen-actions > * {
   flex: 1;
+}
+
+/* ── Generate-week wizard ───────────────────────────────────────────────── */
+.gen-progress {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+.gen-progress__dot {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.1);
+}
+.gen-progress__dot--on {
+  background: var(--accent);
+}
+.gen-progress__count {
+  flex: none;
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted-2);
+  margin-left: 4px;
+}
+.gen-step {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+.gen-step__q {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+.gen-step__q--tight {
+  font-size: 17px;
+}
+.gen-step .gen-hint {
+  margin-top: 0;
+}
+
+/* Review step: one row per planned slot, with lock / reshuffle / pick. */
+.gen-review__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.gen-review__hint {
+  margin-bottom: 2px;
+}
+.gen-review__list {
+  list-style: none;
+}
+.gen-review__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  min-height: 48px;
+  border-bottom: 1px solid var(--divider);
+}
+.gen-review__title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gen-review__row--left .gen-review__title {
+  font-weight: 600;
+  color: var(--muted);
+}
+.gen-review__row--pinned {
+  background: var(--accent-tint);
+  border-radius: 12px;
+  padding-left: 8px;
+  padding-right: 4px;
+}
+.gen-review__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted-2);
+  cursor: pointer;
+}
+.gen-review__btn--on {
+  color: var(--accent);
+}
+.gen-review__btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.gen-pick__back {
+  width: 100%;
+}
+
+/* ── Destructive confirmation sheet ─────────────────────────────────────── */
+.confirm__body {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding: 2px 2px 8px;
+}
+.confirm__actions {
+  display: flex;
+  gap: 8px;
+}
+.confirm__actions > * {
+  flex: 1;
+}
+.btn-primary--destructive {
+  background: var(--destructive);
 }
 
 /* Grocery preview sheet (send-to-groceries review) */
@@ -2020,15 +2226,22 @@ body::before {
   text-decoration: line-through;
   color: var(--muted-3);
 }
+/* An icon with a full touch target, not 11px of "Remove" text — this button deletes
+   with no undo, so it should be hard to hit by accident and easy to hit on purpose. */
 .grocery-row__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   border: none;
   background: none;
   color: var(--muted-3);
-  font-size: 11px;
-  font-weight: 700;
   cursor: pointer;
-  font-family: inherit;
-  padding: 8px 0 8px 8px;
+}
+.grocery-row__remove:active {
+  color: var(--destructive);
 }
 
 
@@ -2068,7 +2281,9 @@ body::before {
   border: none;
   background: none;
   font: inherit;
-  font-size: 14px;
+  /* 16px is the threshold below which iOS zooms the page in on focus — and never zooms
+     back out. Every other input in the app already sits on it. */
+  font-size: 16px;
   font-weight: 700;
   color: var(--ink);
   padding: 0;
@@ -2169,6 +2384,7 @@ select.input-field {
   padding: 5px 6px;
 }
 .date-pill__btn {
+  position: relative;
   width: 30px;
   height: 30px;
   border-radius: 999px;
@@ -2179,6 +2395,17 @@ select.input-field {
   place-items: center;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(27, 36, 48, 0.12);
+}
+/* 30px looks right inside the pill but misses under a thumb — take the touch area out
+   to 44 without repainting anything. */
+.date-pill__btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
 }
 .date-pill__btn--next {
   background: rgba(255, 255, 255, 0.4);
@@ -2211,6 +2438,7 @@ select.input-field {
   padding: 3px;
 }
 .person-switch__btn {
+  position: relative;
   width: 28px;
   height: 28px;
   display: grid;
@@ -2223,6 +2451,16 @@ select.input-field {
   background: transparent;
   color: var(--dock-inactive);
   font-family: inherit;
+}
+/* Same trick as the date stepper: 28px circle, 44px touch area. */
+.person-switch__btn::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
 }
 .person-switch__btn--active {
   background: var(--ink);
@@ -2479,22 +2717,29 @@ select.input-field {
   display: flex;
   flex-direction: column;
 }
-.groceries__meta-row {
+.groceries__top {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  margin: 0 4px 12px;
-  min-height: 24px;
+  margin: 0 2px 12px;
+  min-height: 34px;
 }
 .groceries__meta {
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
 }
+.groceries__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: -4px 2px 8px;
+}
 .groceries__add-row {
   display: flex;
   gap: 8px;
+  margin-top: 12px;
   margin-bottom: 12px;
 }
 .groceries__add-row .input-pill {
