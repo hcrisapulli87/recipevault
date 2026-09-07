@@ -125,7 +125,7 @@ is the most significant one. Result:
 | Wine, white, riesling | White wine | riesling |
 
 **Category-head rule.** When the head is a bare category noun (`nut`, `fish`,
-`bread`, `cheese`, `sauce`, `biscuit`, `bar`, `noodle`, `oil`, `wine`) and
+`bread`, `cheese`, `sauce`, `biscuit`, `bar`, `noodle`, `seed`, `herb`, `spice`) and
 segment 1 is a single word, segment 1 *replaces* the head:
 `Nut, peanut, with skin, raw` → **Raw peanut** (not "Raw nut"),
 `Fish, eel, raw` → **Raw eel**, `Cheese, edam` → **Edam**. Without this the
