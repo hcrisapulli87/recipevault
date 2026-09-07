@@ -134,6 +134,9 @@ const CATEGORY_HEAD = new Set([
   'spice'
 ])
 
+/** Every lexicon word, for the category rule to skip over. */
+const LEXICON_WORDS = new Set([...PREP, ...PREFIX_MODIFIER, ...PART])
+
 /** Match `phrase` at the start of `segment`, returning what's left of the segment. */
 function matchLeading(segment: string, phrase: string): string | null {
   const s = segment.toLowerCase()
@@ -248,8 +251,13 @@ export function foodLabel(item: FoodItem): FoodLabel {
     const free = tail.map((seg, idx) => ({ seg, idx })).filter(({ idx }) => !taken.has(idx))
     // One word names a food ("peanut", "edam"); two can ("corn cake"); more is a
     // description of one ("white wheat flour & egg") and must not become the title.
+    // A qualifier is not a name. "Noodle, wheat with egg, plain, boiled" left "plain"
+    // as the only single-word candidate, and "Boiled plain noodle" names nothing;
+    // skipping lexicon words falls back to the category head, which at least is true.
+    const namesAFood = ({ seg }: { seg: string }): boolean => !LEXICON_WORDS.has(seg.toLowerCase())
+    const usable = free.filter(namesAFood)
     const chosen =
-      free.find(({ seg }) => words(seg) === 1) ?? free.find(({ seg }) => words(seg) === 2)
+      usable.find(({ seg }) => words(seg) === 1) ?? usable.find(({ seg }) => words(seg) === 2)
     if (chosen) {
       effectiveHead = chosen.seg
       taken.add(chosen.idx)

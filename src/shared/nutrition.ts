@@ -636,6 +636,10 @@ export function mapOffProduct(
   if (cal100 === null && pro100 === null && carb100 === null && fat100 === null && !hasServing) {
     return null
   }
+  // No energy figure in either unit — OFF has the macros but not the calories. A food
+  // logged at 0 kcal is worse than one that never appeared: the day's total silently
+  // under-counts and nothing on screen says so.
+  if (cal100 === null && servingCal === null) return null
 
   const brand = p.brands ? p.brands.split(',')[0].trim() : null
   const barcode = p.code !== undefined && p.code !== '' ? String(p.code) : null

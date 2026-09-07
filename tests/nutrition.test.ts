@@ -243,3 +243,17 @@ describe('mapOffProduct — kilojoule labels', () => {
     expect(mapOffProduct(product, 'search')).toBeNull()
   })
 })
+
+describe('mapOffProduct — missing energy', () => {
+  it('drops a product that has macros but no energy figure in either unit', () => {
+    // "Extra large cage eggs · Sunrise eggs" — OFF holds fat/carbs/sugars and no energy.
+    // Logging it would add its macros to the day against zero calories.
+    const product = {
+      product_name: 'Extra large cage eggs',
+      brands: 'Sunrise eggs',
+      code: '9351974041027',
+      nutriments: { fat_100g: 10.3, sugars_100g: 0.3, carbohydrates_100g: 1.4 }
+    }
+    expect(mapOffProduct(product, 'search')).toBeNull()
+  })
+})
