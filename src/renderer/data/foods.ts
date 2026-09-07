@@ -15,7 +15,8 @@ export const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
 // Barcode lookups still hit OFF directly — the v2 product endpoint sends ACAO: *
 // and isn't the rate-limited search endpoint.
 const OFF_BASE = 'https://world.openfoodfacts.org'
-const OFF_FIELDS = 'product_name,brands,code,serving_size,serving_quantity,nutriments'
+const OFF_FIELDS =
+  'product_name,brands,code,serving_size,serving_quantity,serving_quantity_unit,nutriments'
 
 export interface FoodSearchResult {
   items: FoodItem[]
@@ -68,6 +69,16 @@ export async function searchFoods(query: string): Promise<FoodSearchResult> {
   return { items: merged.slice(0, 40), online }
 }
 
+/** How long a cached barcode row is trusted without re-checking OpenFoodFacts. */
+const CACHE_TTL_DAYS = 90
+
+function isFresh(lastFetched: string | null | undefined): boolean {
+  if (!lastFetched) return true // pre-migration rows carry no timestamp; don't churn them
+  const t = Date.parse(lastFetched)
+  if (Number.isNaN(t)) return true
+  return Date.now() - t < CACHE_TTL_DAYS * 24 * 60 * 60 * 1000
+}
+
 export interface BarcodeLookupResult {
   item: FoodItem | null
   /** False when OpenFoodFacts couldn't be reached — "couldn't check" is not
@@ -84,11 +95,18 @@ export async function lookupBarcode(
   barcode: string,
   opts: { skipCache?: boolean } = {}
 ): Promise<BarcodeLookupResult> {
+  // A cached row older than this is served only as a fallback: products get reformulated
+  // and OFF entries get corrected, and `last_fetched` was previously written and never
+  // read, so a row cached once was authoritative forever. The refresh is silent and
+  // strictly safe — if OFF is unreachable or no longer knows the barcode, the stale row
+  // is still returned rather than failing the scan.
+  let stale: FoodItem | null = null
+
   if (!opts.skipCache) {
     const { data: cached } = await supabase
       .from('food_cache')
       .select(
-        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams'
+        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams, last_fetched'
       )
       .eq('barcode', barcode)
       .maybeSingle()
@@ -106,27 +124,25 @@ export async function lookupBarcode(
             }
           : undefined
       const grams = cached.serving_grams
-      return {
-        item: {
-          name: cached.name,
-          brand: cached.brand,
-          barcode: cached.barcode,
-          servingDesc: cached.serving_desc,
-          unit: cached.unit,
-          calories: cached.cal_per_unit,
-          protein: cached.protein_per_unit,
-          carbs: cached.carbs_per_unit,
-          fat: cached.fat_per_unit,
-          source: 'barcode',
-          per100g,
-          measures:
-            grams !== null && grams !== undefined && grams > 0
-              ? [{ desc: cached.serving_desc || `${Math.round(grams)} g`, grams }]
-              : []
-        },
-        online: true,
-        fromCache: true
+      const item: FoodItem = {
+        name: cached.name,
+        brand: cached.brand,
+        barcode: cached.barcode,
+        servingDesc: cached.serving_desc,
+        unit: cached.unit,
+        calories: cached.cal_per_unit,
+        protein: cached.protein_per_unit,
+        carbs: cached.carbs_per_unit,
+        fat: cached.fat_per_unit,
+        source: 'barcode',
+        per100g,
+        measures:
+          grams !== null && grams !== undefined && grams > 0
+            ? [{ desc: cached.serving_desc || `${Math.round(grams)} g`, grams }]
+            : []
       }
+      if (isFresh(cached.last_fetched)) return { item, online: true, fromCache: true }
+      stale = item // fall through to OFF, but keep this if the refresh can't be done
     }
   }
 
@@ -148,8 +164,15 @@ export async function lookupBarcode(
     // offline — online stays false
   }
 
-  if (item) await cacheFood(item)
-  return { item, online, fromCache: false }
+  if (item) {
+    await cacheFood(item)
+    return { item, online, fromCache: false }
+  }
+  // The refresh found nothing (OFF unreachable, or it has since dropped the product).
+  // The stale row is better than a failed scan, and `online: true` keeps the UI from
+  // claiming we couldn't check.
+  if (stale) return { item: stale, online: true, fromCache: true }
+  return { item: null, online, fromCache: false }
 }
 
 /**
@@ -232,7 +255,11 @@ export async function cacheFood(item: FoodItem): Promise<void> {
       protein_per_100g: item.per100g?.protein ?? null,
       carbs_per_100g: item.per100g?.carbs ?? null,
       fat_per_100g: item.per100g?.fat ?? null,
-      serving_grams: item.measures?.[0]?.grams ?? null
+      serving_grams: item.measures?.[0]?.grams ?? null,
+      // Set explicitly: the column default only fires on INSERT, so an upsert over an
+      // existing row would leave the original timestamp and the row could never come
+      // back from stale.
+      last_fetched: new Date().toISOString()
     },
     { onConflict: 'owner_id,barcode' }
   )

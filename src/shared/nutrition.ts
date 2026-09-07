@@ -575,6 +575,10 @@ interface OffProduct {
   code?: string | number
   serving_size?: string
   serving_quantity?: number | string
+  /** OFF ships the serving weight's unit separately — 'g' for solids, 'ml' for drinks.
+   *  The quantity itself is still used as the gram basis (density ≈ 1 for the drinks in
+   *  question); this only stops a 250 ml serve being LABELLED "250 g". */
+  serving_quantity_unit?: string
   nutriments?: OffNutriments
 }
 
@@ -636,8 +640,13 @@ export function mapOffProduct(
     }
   }
 
+  // Fall back to OFF's own unit rather than assuming grams: a 250 ml drink serve was
+  // being labelled "250 g".
+  const servingUnit = p.serving_quantity_unit?.trim() || 'g'
   const measures: FoodMeasure[] =
-    grams !== null && grams > 0 ? [{ desc: p.serving_size?.trim() || `${round0(grams)} g`, grams }] : []
+    grams !== null && grams > 0
+      ? [{ desc: p.serving_size?.trim() || `${round0(grams)} ${servingUnit}`, grams }]
+      : []
 
   if (hasServing) {
     return {

@@ -146,6 +146,45 @@ describe('lookupBarcode', () => {
     expect(item?.measures).toEqual([{ desc: '95g', grams: 95 }])
   })
 
+  it('re-checks OpenFoodFacts when the cached row has gone stale', async () => {
+    const old = new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString()
+    state.cachedRow = { ...CACHE_ROW, last_fetched: old }
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({ status: 1, product: offProduct({ product_name: 'Tuna in Oil (2026)' }) })
+    }))
+    const { item, fromCache } = await lookupBarcode('9350177000152')
+    expect(item?.name).toBe('Tuna in Oil (2026)')
+    expect(fromCache).toBe(false)
+    // Re-cached with a fresh timestamp, or the row could never leave the stale path.
+    expect(Date.parse(state.upserted[0].row.last_fetched as string)).toBeGreaterThan(
+      Date.parse(old)
+    )
+  })
+
+  it('keeps serving a stale row when the re-check cannot be done', async () => {
+    state.cachedRow = {
+      ...CACHE_ROW,
+      last_fetched: new Date(Date.now() - 200 * 24 * 60 * 60 * 1000).toISOString()
+    }
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('offline')
+    })
+    const { item, online, fromCache } = await lookupBarcode('9350177000152')
+    expect(item?.name).toBe('Tuna in Oil') // the stale row, not a failed scan
+    expect(fromCache).toBe(true)
+    expect(online).toBe(true)
+  })
+
+  it('serves a recent cache row without re-checking', async () => {
+    state.cachedRow = { ...CACHE_ROW, last_fetched: new Date().toISOString() }
+    const fetchSpy = vi.fn()
+    vi.stubGlobal('fetch', fetchSpy)
+    const { fromCache } = await lookupBarcode('9350177000152')
+    expect(fetchSpy).not.toHaveBeenCalled()
+    expect(fromCache).toBe(true)
+  })
+
   it('leaves pre-migration cache rows on the serve-only basis', async () => {
     state.cachedRow = CACHE_ROW // no per-100 g columns
     vi.stubGlobal('fetch', vi.fn())
@@ -239,27 +278,28 @@ describe('cacheFood', () => {
       source: 'manual'
     }
     await cacheFood(item)
-    expect(state.upserted).toEqual([
-      {
-        row: {
-          barcode: '9300633000001',
-          name: 'Woolies Choc Milk',
-          brand: 'Woolworths',
-          serving_desc: null,
-          unit: 'serving',
-          cal_per_unit: 180,
-          protein_per_unit: 8,
-          carbs_per_unit: 24,
-          fat_per_unit: 5,
-          cal_per_100g: null,
-          protein_per_100g: null,
-          carbs_per_100g: null,
-          fat_per_100g: null,
-          serving_grams: null
-        },
-        options: { onConflict: 'owner_id,barcode' }
-      }
-    ])
+    expect(state.upserted).toHaveLength(1)
+    const { last_fetched, ...row } = state.upserted[0].row
+    expect(row).toEqual({
+      barcode: '9300633000001',
+      name: 'Woolies Choc Milk',
+      brand: 'Woolworths',
+      serving_desc: null,
+      unit: 'serving',
+      cal_per_unit: 180,
+      protein_per_unit: 8,
+      carbs_per_unit: 24,
+      fat_per_unit: 5,
+      cal_per_100g: null,
+      protein_per_100g: null,
+      carbs_per_100g: null,
+      fat_per_100g: null,
+      serving_grams: null
+    })
+    expect(state.upserted[0].options).toEqual({ onConflict: 'owner_id,barcode' })
+    // Written explicitly — the column default only fires on INSERT, so an upsert over an
+    // existing row would otherwise keep its original timestamp forever.
+    expect(Date.parse(last_fetched as string)).toBeGreaterThan(Date.now() - 60_000)
   })
 
   it('caches the per-100 g basis and serving weight so a re-scan stays flexible', async () => {

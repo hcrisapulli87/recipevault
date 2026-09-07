@@ -22,6 +22,18 @@ function foodSub(item: FoodItem): string {
   return [item.brand, item.servingDesc].filter(Boolean).join(' · ')
 }
 
+/** What the row's kcal figure is actually per. Generics are per 100 g and branded
+ *  products are usually per serve, so the bare number in the column was comparing two
+ *  different things — 11 for a 5 g scrape of Vegemite sat next to 260 for 100 g of bread. */
+function kcalBasis(item: FoodItem): string {
+  return item.unit === '100g' ? '/100g' : '/serve'
+}
+
+/** A stable identity for a food row — index keys reorder wrongly as results change. */
+function foodKey(item: FoodItem): string {
+  return item.barcode ?? `${item.name}|${item.brand ?? ''}`
+}
+
 /** What actually gets logged: the day view multiplies base_* × amount. */
 export interface LogBasis {
   unit: string
@@ -49,7 +61,10 @@ function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): 
         <span className="food-row__name">{props.item.name}</span>
         <span className="food-row__sub">{props.note ?? foodSub(props.item)}</span>
       </span>
-      <span className="food-row__kcal">{Math.round(props.item.calories)}</span>
+      <span className="food-row__kcal">
+        {Math.round(props.item.calories)}
+        <span className="food-row__basis">{kcalBasis(props.item)}</span>
+      </span>
     </button>
   )
 }
@@ -468,8 +483,13 @@ export function AddFoodModal(props: {
     setRechecking(false)
   }
 
+  // A name alone used to be enough to Continue, which logged a silent 0 kcal entry that
+  // then sat in the day's total contributing nothing. The kcal field must be FILLED, not
+  // non-zero — black coffee and diet drinks are honestly 0.
+  const manualReady = mName.trim() !== '' && mCal.trim() !== ''
+
   const startManual = (): void => {
-    if (!mName.trim()) return
+    if (!manualReady) return
     setSelectedFromCache(false)
     const serveG = Number(mServeG)
     const cal = Number(mCal) || 0
@@ -593,15 +613,18 @@ export function AddFoodModal(props: {
                     <span className="food-row__name">Planned: {props.planned.name}</span>
                     <span className="food-row__sub">{props.planned.servingDesc}</span>
                   </span>
-                  <span className="food-row__kcal">{Math.round(props.planned.calories)}</span>
+                  <span className="food-row__kcal">
+                    {Math.round(props.planned.calories)}
+                    <span className="food-row__basis">{kcalBasis(props.planned)}</span>
+                  </span>
                 </button>
               )}
 
               {query.trim() === '' && recents.length > 0 && (
                 <>
                   <div className="addfood__head eyebrow">Recents</div>
-                  {recents.map((item, i) => (
-                    <FoodRow key={i} item={item} onPick={() => pick(item)} />
+                  {recents.map((item) => (
+                    <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
                   ))}
                 </>
               )}
@@ -609,8 +632,8 @@ export function AddFoodModal(props: {
               {query.trim() !== '' && (
                 <>
                   <div className="addfood__head eyebrow">Results</div>
-                  {results.map((item, i) => (
-                    <FoodRow key={i} item={item} onPick={() => pick(item)} />
+                  {results.map((item) => (
+                    <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
                   ))}
                   {!searched && !searching && (
                     <p className="addfood__note">
@@ -787,10 +810,13 @@ export function AddFoodModal(props: {
                   />
                 </label>
               </div>
+              {mName.trim() !== '' && mCal.trim() === '' && (
+                <p className="addfood__note">Add the kcal per serve to continue.</p>
+              )}
               <button
                 className="btn-primary addfood__continue"
                 onClick={startManual}
-                disabled={!mName.trim()}
+                disabled={!manualReady}
               >
                 Continue
               </button>

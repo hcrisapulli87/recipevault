@@ -83,6 +83,23 @@ describe('mapOffProduct', () => {
     })
   })
 
+  it('labels a serving measure with OpenFoodFacts own unit, not always grams', () => {
+    const drink = mapOffProduct({
+      product_name: 'Iced Coffee',
+      serving_quantity: 250,
+      serving_quantity_unit: 'ml',
+      nutriments: { 'energy-kcal_100g': 60 }
+    })
+    expect(drink?.measures?.[0].desc).toBe('250 ml')
+    // serving_size still wins when OFF supplies one, and solids stay on grams.
+    const solid = mapOffProduct({
+      product_name: 'Rice Cakes',
+      serving_quantity: 12,
+      nutriments: { 'energy-kcal_100g': 380 }
+    })
+    expect(solid?.measures?.[0].desc).toBe('12 g')
+  })
+
   it('returns null when the product has no name or no usable macros', () => {
     expect(mapOffProduct({ nutriments: { 'energy-kcal_100g': 100 } })).toBeNull()
     expect(mapOffProduct({ product_name: 'Mystery' })).toBeNull()

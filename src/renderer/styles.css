@@ -1042,10 +1042,22 @@ body::before {
   color: var(--muted-2);
 }
 .food-row__kcal {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
   font-size: 13px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
+}
+
+/* The kcal column mixes bases — generics are per 100 g, branded products are usually
+   per serve — so the number is meaningless without its unit next to it. */
+.food-row__basis {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  opacity: 0.65;
 }
 
 /* Tinted info banner (blue, gentle) + warm variant for soft errors */

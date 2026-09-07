@@ -8,7 +8,7 @@
 //      hence this proxy.
 //   2. Legacy search (world.openfoodfacts.org/cgi/search.pl) — used when
 //      Search-a-licious errors OR returns zero hits. It's flaky (intermittent
-//      503s) so failed calls are retried once.
+//      503s) so failed calls are retried, up to 6 attempts within the budget.
 // Only when every source fails does the response become ok:false, so the client
 // can tell "search is down" apart from "no such food". Successful non-empty
 // responses are CDN-cached, which also serves repeat queries during outages.
@@ -18,7 +18,8 @@ import { mergeSearchHits, legacySearchUrl, AU_FALLBACK_THRESHOLD } from '../src/
 import type { SalHit, NormalizedProduct } from '../src/shared/food-search'
 
 const SAL_BASE = 'https://search.openfoodfacts.org/search'
-const FIELDS = 'product_name,brands,code,serving_size,serving_quantity,nutriments'
+const FIELDS =
+  'product_name,brands,code,serving_size,serving_quantity,serving_quantity_unit,nutriments'
 const PAGE_SIZE = 20
 const UA = 'RecipeVault/1.0 (personal meal tracker)'
 const COUNTRY = 'en:australia'
@@ -86,7 +87,7 @@ async function salSearch(q: string, deadline: number): Promise<SalHit[]> {
 }
 
 /** Legacy cgi search. The endpoint 503s intermittently (~2 in 3 requests during
- *  OFF incidents) but failures come back fast, so retry up to 4 attempts while
+ *  OFF incidents) but failures come back fast, so retry up to 6 attempts while
  *  the time budget holds. */
 async function legacySearch(q: string, australia: boolean, deadline: number): Promise<SalHit[]> {
   const url = legacySearchUrl(q, { fields: FIELDS, pageSize: PAGE_SIZE, australia })
