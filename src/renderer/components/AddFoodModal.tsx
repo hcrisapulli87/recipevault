@@ -343,6 +343,9 @@ export function AddFoodModal(props: {
   // search tab
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<FoodItem[]>([])
+  // Generic AFCD hits are capped so the branded block stays reachable without scrolling
+  // past it — 'eggs' alone returns 17 generics. Reset whenever the query changes.
+  const [showAllBasic, setShowAllBasic] = useState(false)
   const [searching, setSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
@@ -552,6 +555,14 @@ export function AddFoodModal(props: {
     }
   }
 
+  // Generic AFCD foods and branded OpenFoodFacts products are two different kinds of
+  // answer measured on two different bases (per 100 g against per serve), so they get
+  // their own labelled blocks rather than one flat list that silently changes basis.
+  const BASIC_CAP = 6
+  const basic = results.filter((r) => r.source === 'staple')
+  const packaged = results.filter((r) => r.source !== 'staple')
+  const basicShown = showAllBasic ? basic : basic.slice(0, BASIC_CAP)
+
   const pick = (item: FoodItem, fromCache = false): void => {
     setSelectedFromCache(fromCache)
     setSelected(item)
@@ -631,10 +642,27 @@ export function AddFoodModal(props: {
 
               {query.trim() !== '' && (
                 <>
-                  <div className="addfood__head eyebrow">Results</div>
-                  {results.map((item) => (
-                    <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
-                  ))}
+                  {basic.length > 0 && (
+                    <>
+                      <div className="addfood__head eyebrow">Basic foods</div>
+                      {basicShown.map((item) => (
+                        <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
+                      ))}
+                      {basic.length > BASIC_CAP && !showAllBasic && (
+                        <button className="addfood__more" onClick={() => setShowAllBasic(true)}>
+                          Show {basic.length - BASIC_CAP} more
+                        </button>
+                      )}
+                    </>
+                  )}
+                  {packaged.length > 0 && (
+                    <>
+                      <div className="addfood__head eyebrow">Packaged products</div>
+                      {packaged.map((item) => (
+                        <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
+                      ))}
+                    </>
+                  )}
                   {!searched && !searching && (
                     <p className="addfood__note">
                       {results.length > 0 ? 'Offline staples shown — press' : 'Press'} Enter to
