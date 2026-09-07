@@ -404,8 +404,19 @@ export function AddFoodModal(props: {
 
   const lookUp = async (code: string): Promise<void> => {
     const trimmed = code.trim()
-    if (!isValidBarcode(trimmed)) return
+    // Stop the viewfinder FIRST. The scanner has already latched onto its read and
+    // killed the camera stream by the time it calls back, so bailing out before this
+    // left a frozen preview with no message and no way forward.
     setScanning(false)
+    if (!isValidBarcode(trimmed)) {
+      // Empty is just an accidental Enter in the typed field — say nothing.
+      if (trimmed !== '') {
+        setBarcodeError(
+          `Read "${trimmed}", which isn't a retail barcode (8–14 digits). Try again, or type it below.`
+        )
+      }
+      return
+    }
     setLookingUp(true)
     setBarcodeError(null)
     try {

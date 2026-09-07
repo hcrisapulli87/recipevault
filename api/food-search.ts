@@ -122,11 +122,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     res.status(200).json({ ok: true, products })
   }
 
-  // Primary: Search-a-licious. Grouping the free text keeps the country clause
-  // an AND-filter rather than an extra OR-term.
+  // Primary: Search-a-licious. The country clause is juxtaposed, NOT joined with an
+  // explicit AND and NOT wrapped in parentheses: Search-a-licious' parser returns zero
+  // hits for any parenthesised query, and zero for "<multi word> AND field:value" too.
+  // The old `(${q}) AND countries_tags:…` form therefore always came back empty, so the
+  // AU filter never applied and every search silently fell through to the world results
+  // (a search for "milk" led with Thai and Irish products). Plain juxtaposition still
+  // filters — "milk" alone returns ~19k hits, with the clause ~2.7k.
   let salProducts: NormalizedProduct[] | null = null
   try {
-    const au = await salSearch(`(${q}) AND countries_tags:"${COUNTRY}"`, deadline)
+    const au = await salSearch(`${q} countries_tags:"${COUNTRY}"`, deadline)
     const world = au.length < AU_FALLBACK_THRESHOLD ? await salSearch(q, deadline) : []
     salProducts = mergeSearchHits(au, world)
   } catch (e) {

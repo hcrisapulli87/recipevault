@@ -26,12 +26,6 @@ function num(v: unknown): number | null {
   return Number.isFinite(n) ? n : null
 }
 
-// Crude depluraliser applied to BOTH sides of a match, so consistency matters
-// more than English correctness ("thighs"→"thigh"; "couscous"→"couscou" on both sides).
-function normFood(s: string): string {
-  return s.toLowerCase().replace(/(\w{3,}?)s\b/g, '$1')
-}
-
 /** The comma-prefix "head" of an AFCD name — "Pasta, white wheat flour, boiled" → "pasta". */
 function headOf(name: string): string {
   return name.toLowerCase().split(',')[0].trim()
@@ -61,40 +55,120 @@ function auToFoodItem(f: AuFood): FoodItem {
 }
 
 /**
- * Relevance rank of an AFCD food for a query (lower = better). Generic whole
- * foods should beat verbose composite names: an exact/prefix hit on the head
- * name ("Pasta, …" for "pasta") ranks far above a deep substring match
- * ("…with pasta…"). Ties break on the shorter (usually more generic) name.
+ * Word lists for every AFCD food, split once at module load. The interactive search runs
+ * on every keystroke, and re-splitting 1,588 names per call (times the backoff windows
+ * below) is pure waste.
  */
-function rankScore(nameLower: string, head: string, headN: string, q: string, qn: string): number {
-  if (head === q) return 0
-  if (headN === qn) return 1
-  if (head.startsWith(q)) return 2
-  if (new RegExp(`\\b${q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(nameLower)) return 3
-  if (head.includes(q)) return 4
-  return 5 // substring somewhere in the tail
+const AU_INDEX: { f: AuFood; nameWords: string[]; headWords: string[] }[] = AU_FOODS.map((f) => ({
+  f,
+  nameWords: wordsOf(f.name),
+  headWords: wordsOf(headOf(f.name))
+}))
+
+/** Is `w` in `pool`? `allowPrefix` also accepts a word that STARTS with it — used for the
+ *  last query word, which is usually still half-typed. */
+function wordHit(pool: string[], w: string, allowPrefix: boolean): boolean {
+  return pool.some((n) => n === w || (allowPrefix && n.startsWith(w)))
 }
 
 /**
- * Relevance-ranked search over the bundled AU generic-food database. Returns
- * enriched FoodItems (per-100 g basis + real serving measures). This is the
- * generic layer that ranks ABOVE branded OpenFoodFacts hits in the Add flow.
+ * The AFCD is Australian-spelled and uses one canonical name per food, so common US
+ * spellings and alternate names find nothing at all. Applied per word, both ways round
+ * would be wrong — only the spellings the database does NOT contain are listed.
  */
-export function searchStaples(query: string): FoodItem[] {
-  const q = query.trim().toLowerCase()
-  if (!q) return []
-  const qn = normFood(q)
-  // Match on ALL query words, not the exact phrase: "chicken breast" must find
-  // "Chicken, breast, baked" (AFCD puts a comma between them). The phrase is still
-  // used for head-name ranking below, so an exact "Pasta, …" hit still wins.
-  const tokens = q.split(/\s+/).filter(Boolean)
+const SEARCH_WORD_ALIASES: Record<string, string> = {
+  yogurt: 'yoghurt',
+  cilantro: 'coriander',
+  arugula: 'rocket',
+  courgette: 'zucchini',
+  aubergine: 'eggplant',
+  garbanzo: 'chickpea',
+  oatmeal: 'oat'
+}
 
+/**
+ * Parts of a food, not the food. Searching "egg" must land on the whole egg, not the yolk
+ * (313 kcal/100 g) or the white (47). Penalised only when the query didn't ask for them,
+ * so "egg yolk" still finds the yolk.
+ *
+ * Deliberately NOT the estimator's cooked/processed list: a recipe ingredient is a
+ * pre-cooking weight, but a LOGGED food is whatever you actually ate, so boiled/baked
+ * forms have to stay first-class here.
+ */
+const PART_MARKERS = ['yolk', 'albumen', 'peel', 'rind', 'skin', 'bone', 'stalk'].map(singular)
+
+/**
+ * Relevance of an AFCD food for a query (lower = better).
+ *
+ * This used to compare the whole query PHRASE against the head name. AFCD names are
+ * comma-separated ("Chicken, breast, lean flesh, baked"), so no multi-word query could
+ * ever match a head, every candidate fell through to the same bottom score, and the
+ * SHORTEST name won by default — which put "Meatball or rissole, beef mince" above
+ * "Beef, mince, regular fat" and human breast milk above cow's milk (by two characters).
+ * Scoring is per-word now, and the AFCD's own "ordinary one" vocabulary breaks the ties.
+ */
+function searchScore(
+  headWords: string[],
+  nameWords: string[],
+  qWords: string[],
+  prefixLast: boolean
+): number {
+  const last = qWords.length - 1
+  /** Query word i sits at position i of the head. */
+  const at = (i: number): boolean => {
+    const n = headWords[i]
+    if (n === undefined) return false
+    return n === qWords[i] || (prefixLast && i === last && n.startsWith(qWords[i]))
+  }
+  /** Query word i appears anywhere in the head. */
+  const inHead = (i: number): boolean => wordHit(headWords, qWords[i], prefixLast && i === last)
+
+  let score: number
+  if (headWords.length === qWords.length && qWords.every((_, i) => at(i))) score = 0
+  else if (qWords.every((_, i) => at(i))) score = 1 // head starts with the query
+  else if (qWords.every((_, i) => inHead(i))) score = 2 // head has them all, reordered
+  else {
+    // Penalise by HOW MUCH of the query landed in the descriptor tail, so a food the
+    // query actually names outranks one that merely mentions it as an ingredient.
+    score = 3 + qWords.filter((_, i) => !inHead(i)).length * 0.5
+  }
+
+  for (const marker of PART_MARKERS) {
+    if (nameWords.includes(marker) && !qWords.includes(marker)) score += 4
+  }
+
+  // Reward the AFCD's "ordinary one" vocabulary, but only on a plain, unprepared row.
+  // Two guards, both earned:
+  //   · the score gate (as in the estimator) stops a composite dish taking credit for a
+  //     word that describes one of its ingredients;
+  //   · the prepared guard stops the reward attaching to a packaged product, where the
+  //     word qualifies the PRODUCT and not the food — "Potato, wedges, REGULAR, purchased
+  //     frozen, baked" (175 kcal) was outranking plain boiled potato (56).
+  // It is a bonus for the plain row, never a penalty for a cooked one: you log what you
+  // actually ate, so baked/boiled forms stay competitive on their own merits.
+  // Markers stack, so "Yoghurt, NATURAL, REGULAR fat" beats "Yoghurt, NATURAL, sheep's
+  // milk" — safely, because the prepared guard already excludes the cooked rows that
+  // stacking would otherwise have promoted.
+  const prepared = nameWords.some((w) => PROCESSED_MARKERS.includes(w))
+  if (score < 4 && !prepared) {
+    for (const marker of DEFAULT_MARKERS) {
+      if (nameWords.includes(marker) && !qWords.includes(marker)) score -= 1
+    }
+  }
+
+  return score
+}
+
+/** Ranked hits for one exact set of query words, or [] when nothing matches. */
+function rankWindow(qWords: string[], prefixLast: boolean): FoodItem[] {
+  const last = qWords.length - 1
   const scored: { f: AuFood; score: number }[] = []
-  for (const f of AU_FOODS) {
-    const nameLower = f.name.toLowerCase()
-    if (!tokens.every((t) => nameLower.includes(t))) continue
-    const head = headOf(f.name)
-    scored.push({ f, score: rankScore(nameLower, head, normFood(head), q, qn) })
+  for (const entry of AU_INDEX) {
+    if (!qWords.every((w, i) => wordHit(entry.nameWords, w, prefixLast && i === last))) continue
+    scored.push({
+      f: entry.f,
+      score: searchScore(entry.headWords, entry.nameWords, qWords, prefixLast)
+    })
   }
   // Same relevance → prefer foods with real serving sizes (these are the curated
   // everyday forms — cooked rice/pasta, raw banana, fluid milk — so they beat
@@ -105,6 +179,42 @@ export function searchStaples(query: string): FoodItem[] {
       a.score - b.score || hasMeasures(a.f) - hasMeasures(b.f) || a.f.name.length - b.f.name.length
   )
   return scored.slice(0, 25).map((s) => auToFoodItem(s.f))
+}
+
+/**
+ * Relevance-ranked search over the bundled AU generic-food database. Returns enriched
+ * FoodItems (per-100 g basis + real serving measures). This is the generic layer that
+ * ranks ABOVE branded OpenFoodFacts hits in the Add flow.
+ *
+ * Matching is per whole word, singularised on both sides. It used to be a raw substring
+ * test against the joined name, which meant "eggs", "tomatoes", "potatoes", "wraps" and
+ * "strawberries" returned NOTHING — the AFCD spells them "Egg,", "Tomato,", "Potato,",
+ * "wrap", "Strawberry," — while "rice" happily matched Liquorice.
+ *
+ * When the full query matches nothing, progressively shorter contiguous windows are
+ * tried, rightmost first: English puts the head noun last, so "greek yoghurt" (the AFCD
+ * has no "greek") falls back to "yoghurt" rather than to "greek". A window made only of
+ * qualifiers is skipped, so a food the table genuinely lacks stays honestly empty.
+ */
+export function searchStaples(query: string): FoodItem[] {
+  const q = query.trim().toLowerCase()
+  if (!q) return []
+  const qWords = wordsOf(q).map((w) => SEARCH_WORD_ALIASES[w] ?? w)
+  if (qWords.length === 0) return []
+
+  // Live filtering runs on every keystroke, so the last word is usually half-typed and
+  // matches as a prefix ("chick" → chicken). A trailing separator means it's finished.
+  const prefixLast = /[a-z0-9]$/.test(q)
+
+  for (let n = qWords.length; n >= 1; n--) {
+    for (let start = qWords.length - n; start >= 0; start--) {
+      const window = qWords.slice(start, start + n)
+      if (window.every((w) => MODIFIER_ONLY_WORDS.has(w))) continue
+      const hits = rankWindow(window, prefixLast && start + n === qWords.length)
+      if (hits.length > 0) return hits
+    }
+  }
+  return []
 }
 
 // ── recipe macro estimator: generic-food lookup ───────────────────────────────

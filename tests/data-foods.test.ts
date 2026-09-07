@@ -130,6 +130,30 @@ describe('lookupBarcode', () => {
     expect(item?.name).toBe('Tuna in Oil')
   })
 
+  it('restores the per-100 g basis and serving measure from the cache', async () => {
+    state.cachedRow = {
+      ...CACHE_ROW,
+      serving_desc: '95g',
+      cal_per_100g: 200,
+      protein_per_100g: 24,
+      carbs_per_100g: 0,
+      fat_per_100g: 11,
+      serving_grams: 95
+    }
+    vi.stubGlobal('fetch', vi.fn())
+    const { item } = await lookupBarcode('9350177000152')
+    expect(item?.per100g).toEqual({ calories: 200, protein: 24, carbs: 0, fat: 11 })
+    expect(item?.measures).toEqual([{ desc: '95g', grams: 95 }])
+  })
+
+  it('leaves pre-migration cache rows on the serve-only basis', async () => {
+    state.cachedRow = CACHE_ROW // no per-100 g columns
+    vi.stubGlobal('fetch', vi.fn())
+    const { item } = await lookupBarcode('9350177000152')
+    expect(item?.per100g).toBeUndefined()
+    expect(item?.measures).toEqual([])
+  })
+
   it('skipCache bypasses the cache, fetches OFF fresh and re-caches', async () => {
     state.cachedRow = CACHE_ROW
     vi.stubGlobal('fetch', async () => ({
@@ -226,11 +250,40 @@ describe('cacheFood', () => {
           cal_per_unit: 180,
           protein_per_unit: 8,
           carbs_per_unit: 24,
-          fat_per_unit: 5
+          fat_per_unit: 5,
+          cal_per_100g: null,
+          protein_per_100g: null,
+          carbs_per_100g: null,
+          fat_per_100g: null,
+          serving_grams: null
         },
         options: { onConflict: 'owner_id,barcode' }
       }
     ])
+  })
+
+  it('caches the per-100 g basis and serving weight so a re-scan stays flexible', async () => {
+    await cacheFood({
+      name: 'Vegemite',
+      brand: 'Vegemite',
+      barcode: '9352042000298',
+      servingDesc: '5g',
+      unit: 'serving',
+      calories: 11,
+      protein: 1.2,
+      carbs: 0.9,
+      fat: 0,
+      source: 'barcode',
+      per100g: { calories: 216, protein: 24.5, carbs: 18.2, fat: 0.4 },
+      measures: [{ desc: '5g', grams: 5 }]
+    })
+    expect(state.upserted[0].row).toMatchObject({
+      cal_per_100g: 216,
+      protein_per_100g: 24.5,
+      carbs_per_100g: 18.2,
+      fat_per_100g: 0.4,
+      serving_grams: 5
+    })
   })
 
   it('does nothing without a barcode', async () => {

@@ -88,11 +88,24 @@ export async function lookupBarcode(
     const { data: cached } = await supabase
       .from('food_cache')
       .select(
-        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit'
+        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams'
       )
       .eq('barcode', barcode)
       .maybeSingle()
     if (cached) {
+      // Restore the per-100 g basis and serving weight so a re-scan keeps the
+      // grams⇄serving picker. Rows cached before those columns existed have neither,
+      // and fall back to the serve-only flow exactly as before.
+      const per100g =
+        cached.cal_per_100g !== null && cached.cal_per_100g !== undefined
+          ? {
+              calories: cached.cal_per_100g,
+              protein: cached.protein_per_100g ?? 0,
+              carbs: cached.carbs_per_100g ?? 0,
+              fat: cached.fat_per_100g ?? 0
+            }
+          : undefined
+      const grams = cached.serving_grams
       return {
         item: {
           name: cached.name,
@@ -104,7 +117,12 @@ export async function lookupBarcode(
           protein: cached.protein_per_unit,
           carbs: cached.carbs_per_unit,
           fat: cached.fat_per_unit,
-          source: 'barcode'
+          source: 'barcode',
+          per100g,
+          measures:
+            grams !== null && grams !== undefined && grams > 0
+              ? [{ desc: cached.serving_desc || `${Math.round(grams)} g`, grams }]
+              : []
         },
         online: true,
         fromCache: true
@@ -196,6 +214,9 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
  */
 export async function cacheFood(item: FoodItem): Promise<void> {
   if (!item.barcode) return
+  // The per-100 g basis and the serving weight are cached alongside the per-unit macros;
+  // without them a re-scan came back as a serve-only item and lost the grams⇄serving
+  // picker the first scan offered.
   await supabase.from('food_cache').upsert(
     {
       barcode: item.barcode,
@@ -206,7 +227,12 @@ export async function cacheFood(item: FoodItem): Promise<void> {
       cal_per_unit: item.calories,
       protein_per_unit: item.protein,
       carbs_per_unit: item.carbs,
-      fat_per_unit: item.fat
+      fat_per_unit: item.fat,
+      cal_per_100g: item.per100g?.calories ?? null,
+      protein_per_100g: item.per100g?.protein ?? null,
+      carbs_per_100g: item.per100g?.carbs ?? null,
+      fat_per_100g: item.per100g?.fat ?? null,
+      serving_grams: item.measures?.[0]?.grams ?? null
     },
     { onConflict: 'owner_id,barcode' }
   )

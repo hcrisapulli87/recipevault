@@ -115,4 +115,66 @@ describe('searchStaples (AU generic foods)', () => {
     expect(searchStaples('')).toEqual([])
     expect(searchStaples('   ')).toEqual([])
   })
+
+  // The old substring matcher tested the raw query against the joined name, so every
+  // plural came back EMPTY — the AFCD spells these "Egg,", "Tomato,", "Potato,",
+  // "Strawberry," and "wrap".
+  it.each(['eggs', 'tomatoes', 'potatoes', 'strawberries', 'wraps', 'oats'])(
+    'finds generics for the plural "%s"',
+    (q) => {
+      expect(searchStaples(q).length).toBeGreaterThan(0)
+    }
+  )
+
+  it('matches whole words, so "rice" is not Liquorice', () => {
+    expect(searchStaples('rice').some((r) => /liquorice/i.test(r.name))).toBe(false)
+  })
+
+  it('prefix-matches the last word so live filtering works as you type', () => {
+    expect(searchStaples('chick').some((r) => /^chicken/i.test(r.name))).toBe(true)
+  })
+
+  it('accepts the US spelling the AFCD does not use', () => {
+    expect(searchStaples('yogurt').length).toBeGreaterThan(0)
+  })
+
+  it('backs off to the head noun when the full phrase matches nothing', () => {
+    // No AFCD food says "greek", so the query falls back to "yoghurt" rather than
+    // returning nothing at all.
+    const r = searchStaples('greek yoghurt')
+    expect(r.length).toBeGreaterThan(0)
+    expect(r.every((x) => /yoghurt/i.test(x.name))).toBe(true)
+  })
+
+  it('never backs off onto a bare qualifier', () => {
+    // "frozen" alone would happily match Banana, frozen — an ingredient the table
+    // genuinely lacks must stay honestly empty.
+    expect(searchStaples('frozen edamame')).toEqual([])
+  })
+
+  // Multi-word queries used to all score identically, leaving the SHORTEST name to win.
+  it('ranks the food the query names above one that merely mentions it', () => {
+    const top = searchStaples('beef mince')[0]
+    expect(top.name.toLowerCase().startsWith('beef, mince')).toBe(true)
+  })
+
+  it('prefers the everyday form over an odd one at the same relevance', () => {
+    // Both are "Milk, …" head hits; the neutral cow's milk must beat human breast milk,
+    // which used to win the name-length tiebreak by two characters.
+    expect(searchStaples('milk')[0].name).toMatch(/^Milk, cow/)
+    // Whole egg, not the yolk (313 kcal/100 g) or the white (47).
+    expect(searchStaples('egg')[0].name).toMatch(/whole/i)
+    // Neutral markers stack: regular-fat natural yoghurt over natural sheep's yoghurt.
+    expect(searchStaples('yoghurt')[0].name).toMatch(/regular fat/i)
+  })
+
+  it('does not treat a packaged product as the neutral form', () => {
+    // "Potato, wedges, REGULAR, purchased frozen, baked" (175 kcal) used to take the
+    // neutral-form bonus and outrank plain potato (56–67).
+    expect(searchStaples('potato')[0].name).not.toMatch(/wedge/i)
+  })
+
+  it('still honours a part when the query asks for it', () => {
+    expect(searchStaples('egg yolk')[0].name).toMatch(/yolk/i)
+  })
 })

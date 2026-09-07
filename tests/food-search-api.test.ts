@@ -80,6 +80,26 @@ describe('food-search handler', () => {
     expect(urls.some((u) => u.includes('cgi/search.pl'))).toBe(false)
   })
 
+  // Search-a-licious returns ZERO hits for a parenthesised query, and zero for
+  // "<multi word> AND field:value". The old `(${q}) AND countries_tags:…` form therefore
+  // never matched anything, the AU filter silently never applied, and every search fell
+  // through to unfiltered world results.
+  it('AU-filters the query without parentheses or an explicit AND', async () => {
+    const urls = stubFetch((url) => {
+      if (url.includes('search.openfoodfacts.org')) {
+        return { status: 200, body: { hits: Array.from({ length: 10 }, (_, i) => salHit(`Milk ${i}`, `9${i}`)) } }
+      }
+      return { status: 500 }
+    })
+    const { res } = makeRes()
+    await handler(makeReq('full cream milk'), res)
+    const sal = urls.find((u) => u.includes('search.openfoodfacts.org')) ?? ''
+    const q = decodeURIComponent(new URL(sal).searchParams.get('q') ?? '')
+    expect(q).toBe('full cream milk countries_tags:"en:australia"')
+    expect(q).not.toMatch(/[()]/)
+    expect(q).not.toMatch(/\bAND\b/)
+  })
+
   it('falls back to legacy search when Search-a-licious is down', async () => {
     const urls = stubFetch((url) => {
       if (url.includes('search.openfoodfacts.org')) return { status: 502 }

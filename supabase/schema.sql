@@ -323,6 +323,18 @@ create table if not exists public.food_cache (
   primary key (owner_id, barcode)
 );
 
+-- The cache originally stored only the per-UNIT macros, so a re-scan came back without a
+-- per-100 g basis or a serving weight: the first scan of a product offered the grams ⇄
+-- serving picker and every scan after it was locked to whole serves. These carry the
+-- basis through, so a cached product behaves exactly like a fresh OpenFoodFacts hit.
+-- Nullable: rows cached before this ran have no basis and keep the old serve-only flow.
+alter table public.food_cache
+  add column if not exists cal_per_100g     real,
+  add column if not exists protein_per_100g real,
+  add column if not exists carbs_per_100g   real,
+  add column if not exists fat_per_100g     real,
+  add column if not exists serving_grams    real;
+
 alter table public.profiles add column if not exists is_bot boolean not null default false;
 
 -- The Generate-week wizard's answers (diet, cuisines, cook nights, serves, leftover
