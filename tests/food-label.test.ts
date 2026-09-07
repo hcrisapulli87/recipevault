@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { foodLabel } from '../src/shared/food-label'
 import type { FoodItem } from '../src/shared/types'
+import auFoods from '../src/shared/data/au-foods.json'
 
 /** A FoodItem carrying only the fields foodLabel reads. */
 function item(partial: Partial<FoodItem>): FoodItem {
@@ -130,5 +131,45 @@ describe('foodLabel — category heads', () => {
     const label = foodLabel(item({ name: 'Oil, olive' }))
     expect(label.title).toBe('Oil')
     expect(label.detail).toBe('olive')
+  })
+})
+
+describe('foodLabel — title cap', () => {
+  it('drops the part, then the modifier, to stay within 40 characters', () => {
+    const label = foodLabel(
+      item({ name: 'Breakfast cereal biscuit, wholemeal wheat, regular fat, toasted' })
+    )
+    expect(label.title.length).toBeLessThanOrEqual(40)
+  })
+})
+
+describe('foodLabel — corpus invariant over the whole AFCD', () => {
+  const foods = auFoods as { name: string }[]
+
+  it('covers every bundled food', () => {
+    expect(foods.length).toBeGreaterThan(1500)
+  })
+
+  it('always produces a non-empty title of at most 40 characters', () => {
+    for (const f of foods) {
+      const { title } = foodLabel(item({ name: f.name }))
+      expect(title.length, f.name).toBeGreaterThan(0)
+      expect(title.length, f.name).toBeLessThanOrEqual(40)
+    }
+  })
+
+  it('never discards a segment — each appears in the title or the detail', () => {
+    for (const f of foods) {
+      const { title, detail } = foodLabel(item({ name: f.name }))
+      const shown = `${title} ${detail}`.toLowerCase()
+      for (const segment of f.name.split(',').map((s) => s.trim().toLowerCase())) {
+        if (!segment) continue
+        // A segment can be split across the two lines (a lexicon word in the title, its
+        // remainder in the detail), so the words are checked rather than the phrase.
+        for (const word of segment.split(/[^a-z0-9]+/).filter(Boolean)) {
+          expect(shown, `${f.name} — lost "${word}"`).toContain(word)
+        }
+      }
+    }
   })
 })

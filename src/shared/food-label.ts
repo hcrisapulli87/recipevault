@@ -8,6 +8,9 @@ export interface FoodLabel {
   detail: string
 }
 
+/** Longest title a 52 px row fits before it wraps and breaks the list's rhythm. */
+const MAX_TITLE = 40
+
 /** Sentence case: capitalise the first letter, leave the rest (AFCD has "pH", "UHT"). */
 function sentenceCase(s: string): string {
   return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
@@ -100,8 +103,15 @@ const PART = [
   'leg'
 ]
 
-/** AFCD writes the egg white as "white (albumen)"; the parenthetical is for scientists. */
-const PART_TITLE: Record<string, string> = { 'white (albumen)': 'white', albumen: 'white' }
+/**
+ * AFCD writes the egg white as "white (albumen)". The parenthetical is for scientists, so
+ * the title says "white" and `note` sends the technical term down to the detail line
+ * rather than deleting it.
+ */
+const PART_TITLE: Record<string, { title: string; note: string }> = {
+  'white (albumen)': { title: 'white', note: 'albumen' },
+  albumen: { title: 'white', note: 'albumen' }
+}
 
 /**
  * Heads that name a CATEGORY rather than a food. The AFCD files the specific food as the
@@ -171,6 +181,25 @@ function pickFrom(
 }
 
 /**
+ * Assemble the title, dropping the least important slot first when it doesn't fit. The
+ * part goes before the modifier — a "thigh" is easier to lose than a "wholemeal" — and
+ * whatever is dropped is picked back up by the detail line.
+ */
+function buildTitle(
+  prep: string | undefined,
+  modifier: string | undefined,
+  head: string,
+  part: string | undefined
+): string {
+  const candidates = [[prep, modifier, head, part], [prep, modifier, head], [prep, head], [head]]
+  for (const parts of candidates) {
+    const t = parts.filter(Boolean).join(' ')
+    if (t.length <= MAX_TITLE) return t
+  }
+  return head.slice(0, MAX_TITLE).trim()
+}
+
+/**
  * A readable label for one search result.
  *
  * Branded products already carry a marketing name written for humans, so it is used
@@ -212,23 +241,36 @@ export function foodLabel(item: FoodItem): FoodLabel {
   // beneath it takes over. Single-word only: "Pasta, white wheat flour & egg" describes
   // the pasta, it isn't a name for it.
   let effectiveHead = head
+  /** The demoted category word, kept for the detail line — "biscuit" still means something. */
+  let demotedHead: string | null = null
   if (CATEGORY_HEAD.has(head.toLowerCase())) {
-    const i = tail.findIndex((seg, idx) => !taken.has(idx) && !seg.includes(' '))
-    if (i !== -1) {
-      effectiveHead = tail[i]
-      taken.add(i)
-      leftovers.set(i, '')
+    const words = (s: string): number => s.split(' ').length
+    const free = tail.map((seg, idx) => ({ seg, idx })).filter(({ idx }) => !taken.has(idx))
+    // One word names a food ("peanut", "edam"); two can ("corn cake"); more is a
+    // description of one ("white wheat flour & egg") and must not become the title.
+    const chosen =
+      free.find(({ seg }) => words(seg) === 1) ?? free.find(({ seg }) => words(seg) === 2)
+    if (chosen) {
+      effectiveHead = chosen.seg
+      taken.add(chosen.idx)
+      leftovers.set(chosen.idx, '')
+      demotedHead = head
     }
   }
 
-  const title = [
-    prep?.word,
-    modifier?.word,
-    effectiveHead.toLowerCase(),
-    part ? (PART_TITLE[part.word] ?? part.word) : undefined
-  ]
-    .filter(Boolean)
-    .join(' ')
+  const renamed = part ? PART_TITLE[part.word] : undefined
+  const partWord = renamed?.title ?? part?.word
+  if (part && renamed) leftovers.set(part.index, renamed.note)
+
+  const title = buildTitle(prep?.word, modifier?.word, effectiveHead.toLowerCase(), partWord)
+
+  // A slot the cap dropped is not in the title, so its whole segment goes back to the
+  // detail line. Nothing the AFCD said may vanish between the two.
+  for (const p of [prep, part, modifier]) {
+    if (!p) continue
+    const inTitle = p === part ? (partWord ?? p.word) : p.word
+    if (!title.includes(inTitle)) leftovers.set(p.index, tail[p.index])
+  }
 
   // A claimed segment contributes only its unmatched remainder — "canned in pear juice"
   // gives "canned" to the title and "in pear juice" to the detail.
@@ -238,5 +280,5 @@ export function foodLabel(item: FoodItem): FoodLabel {
     return leftover ? [leftover] : []
   })
 
-  return { title: sentenceCase(title), detail: join([...rest, item.servingDesc]) }
+  return { title: sentenceCase(title), detail: join([demotedHead, ...rest, item.servingDesc]) }
 }
