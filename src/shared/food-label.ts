@@ -23,32 +23,85 @@ function join(parts: (string | null | undefined)[]): string {
  * several of these forms and the raw name buried the distinction at the end of a
  * five-part string.
  *
- * Ordered longest-phrase-first so "deep fried" is matched before "fried" and
- * "hard-boiled" before "boiled". Deliberately absent: "no added fat", "commercial",
- * "homemade", "as purchased" — those describe the sourcing, not the food.
+ * List order is priority order (see pickFrom), which buys two things at once:
+ *   · a longer phrase is matched before the shorter one it contains — "deep fried"
+ *     before "fried", "hard-boiled" before "boiled";
+ *   · a cooking method beats a preservation word beats a raw-state word, whatever
+ *     order the AFCD listed them in. "Capsicum, red, fresh, fried" is a FRIED capsicum;
+ *     scanning left to right would have titled it "Fresh red capsicum".
+ *
+ * Deliberately absent: "no added fat", "commercial", "homemade", "as purchased" —
+ * those describe the sourcing, not the food.
  */
 const PREP = [
+  // cooked
   'deep fried',
   'stir-fried',
   'hard-boiled',
   'microwaved',
   'casseroled',
   'scrambled',
-  'uncooked',
   'poached',
   'roasted',
   'steamed',
   'toasted',
   'grilled',
-  'smoked',
   'boiled',
+  'fried',
+  'baked',
+  // preserved
+  'smoked',
   'canned',
   'dried',
-  'fried',
+  // as-is
+  'uncooked',
   'fresh',
-  'baked',
   'raw'
 ]
+
+/**
+ * Qualifiers English puts BEFORE the noun. "Capsicum, red" is a red capsicum, never a
+ * "capsicum red" — placing these after the head produces titles that read as typos.
+ */
+const PREFIX_MODIFIER = [
+  'regular fat',
+  'reduced fat',
+  'wholemeal',
+  'savoury',
+  'brown',
+  'green',
+  'plain',
+  'sweet',
+  'white',
+  'red'
+]
+
+/**
+ * Which part of the animal or plant. These follow the head ("egg yolk", "chicken thigh")
+ * and matter enormously to the macros — the yolk is 313 kcal/100 g against the white's
+ * 47 — so they belong in the title, not the detail line.
+ *
+ * "white" appears here and in PREFIX_MODIFIER; parts are picked first, so the egg white
+ * is claimed as a part while "Wine, white" still reaches the modifier lexicon.
+ */
+const PART = [
+  'white (albumen)',
+  'albumen',
+  'fillet',
+  'breast',
+  'flesh',
+  'steak',
+  'thigh',
+  'mince',
+  'chips',
+  'yolk',
+  'seed',
+  'skin',
+  'leg'
+]
+
+/** AFCD writes the egg white as "white (albumen)"; the parenthetical is for scientists. */
+const PART_TITLE: Record<string, string> = { 'white (albumen)': 'white', albumen: 'white' }
 
 /** Match `phrase` at the start of `segment`, returning what's left of the segment. */
 function matchLeading(segment: string, phrase: string): string | null {
@@ -67,11 +120,16 @@ interface Pick {
   rest: string
 }
 
-/** First unclaimed segment whose leading words are in `lexicon`, or null. */
+/**
+ * Best match for `lexicon` among the unclaimed segments, or null.
+ *
+ * The lexicon is walked in its own order rather than the segments' — the list encodes
+ * which word makes the better title, and the AFCD's segment order does not.
+ */
 function pickFrom(tail: string[], lexicon: string[], taken: Set<number>): Pick | null {
-  for (let i = 0; i < tail.length; i++) {
-    if (taken.has(i)) continue
-    for (const word of lexicon) {
+  for (const word of lexicon) {
+    for (let i = 0; i < tail.length; i++) {
+      if (taken.has(i)) continue
       const rest = matchLeading(tail[i], word)
       if (rest !== null) return { word, index: i, rest }
     }
@@ -101,13 +159,25 @@ export function foodLabel(item: FoodItem): FoodLabel {
 
   const taken = new Set<number>()
   const leftovers = new Map<number, string>()
-  const prep = pickFrom(tail, PREP, taken)
-  if (prep) {
-    taken.add(prep.index)
-    leftovers.set(prep.index, prep.rest)
+  const picks: (Pick | null)[] = []
+  for (const lexicon of [PREP, PART, PREFIX_MODIFIER]) {
+    const pick = pickFrom(tail, lexicon, taken)
+    picks.push(pick)
+    if (pick) {
+      taken.add(pick.index)
+      leftovers.set(pick.index, pick.rest)
+    }
   }
+  const [prep, part, modifier] = picks
 
-  const title = [prep?.word, head.toLowerCase()].filter(Boolean).join(' ')
+  const title = [
+    prep?.word,
+    modifier?.word,
+    head.toLowerCase(),
+    part ? (PART_TITLE[part.word] ?? part.word) : undefined
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   // A claimed segment contributes only its unmatched remainder — "canned in pear juice"
   // gives "canned" to the title and "in pear juice" to the detail.

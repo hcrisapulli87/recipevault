@@ -78,3 +78,31 @@ describe('foodLabel — preparation', () => {
     expect(foodLabel(item({ name: 'Kohlrabi, peeled' })).title).toBe('Kohlrabi')
   })
 })
+
+describe('foodLabel — modifiers and parts', () => {
+  it('places a colour or grade modifier before the head', () => {
+    expect(foodLabel(item({ name: 'Wine, white, riesling' })).title).toBe('White wine')
+    expect(foodLabel(item({ name: 'Capsicum, red, fresh, fried, no added fat' })).title).toBe(
+      'Fried red capsicum'
+    )
+  })
+
+  it('places a body part after the head', () => {
+    expect(foodLabel(item({ name: 'Egg, chicken, yolk, raw' })).title).toBe('Raw egg yolk')
+    expect(
+      foodLabel(item({ name: 'Chicken, thigh, lean flesh, skin & fat, baked, no added fat' })).title
+    ).toBe('Baked chicken thigh')
+  })
+
+  it('keeps every unconsumed segment in the detail', () => {
+    const label = foodLabel(
+      item({ name: 'Chicken, thigh, lean flesh, skin & fat, baked, no added fat' })
+    )
+    expect(label.detail).toBe('lean flesh · skin & fat · no added fat')
+  })
+
+  it('takes at most one word per lexicon', () => {
+    const label = foodLabel(item({ name: 'Egg, chicken, white (albumen), raw' }))
+    expect(label.title).toBe('Raw egg white')
+  })
+})
