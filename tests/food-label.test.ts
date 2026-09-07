@@ -106,3 +106,29 @@ describe('foodLabel — modifiers and parts', () => {
     expect(label.title).toBe('Raw egg white')
   })
 })
+
+describe('foodLabel — category heads', () => {
+  it('replaces a bare category head with its specific segment', () => {
+    expect(foodLabel(item({ name: 'Nut, peanut, with skin, raw, unsalted' })).title).toBe(
+      'Raw peanut'
+    )
+    expect(foodLabel(item({ name: 'Fish, eel, raw' })).title).toBe('Raw eel')
+    expect(foodLabel(item({ name: 'Cheese, edam' })).title).toBe('Edam')
+  })
+
+  it('does not consume a multi-word segment as the head', () => {
+    const label = foodLabel(item({ name: 'Pasta, white wheat flour & egg, dry' }))
+    expect(label.title).toBe('Pasta')
+    expect(label.detail).toBe('white wheat flour & egg · dry')
+  })
+
+  it('does not treat a non-category head as replaceable', () => {
+    expect(foodLabel(item({ name: 'Egg, chicken, whole, raw' })).title).toBe('Raw egg')
+  })
+
+  it('leaves a head that is not in the category list alone', () => {
+    const label = foodLabel(item({ name: 'Oil, olive' }))
+    expect(label.title).toBe('Oil')
+    expect(label.detail).toBe('olive')
+  })
+})

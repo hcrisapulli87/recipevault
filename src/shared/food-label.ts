@@ -103,6 +103,27 @@ const PART = [
 /** AFCD writes the egg white as "white (albumen)"; the parenthetical is for scientists. */
 const PART_TITLE: Record<string, string> = { 'white (albumen)': 'white', albumen: 'white' }
 
+/**
+ * Heads that name a CATEGORY rather than a food. The AFCD files the specific food as the
+ * next segment ("Nut, peanut", "Fish, eel", "Cheese, edam").
+ *
+ * `oil` is deliberately absent: "Oil, olive" would need the segment placed BEFORE the
+ * head to read correctly, which is the modifier lexicon's job, not this rule's.
+ */
+const CATEGORY_HEAD = new Set([
+  'nut',
+  'fish',
+  'bread',
+  'cheese',
+  'sauce',
+  'biscuit',
+  'bar',
+  'noodle',
+  'seed',
+  'herb',
+  'spice'
+])
+
 /** Match `phrase` at the start of `segment`, returning what's left of the segment. */
 function matchLeading(segment: string, phrase: string): string | null {
   const s = segment.toLowerCase()
@@ -125,13 +146,25 @@ interface Pick {
  *
  * The lexicon is walked in its own order rather than the segments' — the list encodes
  * which word makes the better title, and the AFCD's segment order does not.
+ *
+ * `partial` says whether a word may be taken from the FRONT of a longer segment. A
+ * preparation may: "canned in pear juice" is a canned peach. A modifier may not:
+ * "Pasta, white wheat flour & egg" describes the flour, and titling it "White pasta"
+ * asserts something about the pasta that the AFCD never said.
  */
-function pickFrom(tail: string[], lexicon: string[], taken: Set<number>): Pick | null {
+function pickFrom(
+  tail: string[],
+  lexicon: string[],
+  taken: Set<number>,
+  partial: boolean
+): Pick | null {
   for (const word of lexicon) {
     for (let i = 0; i < tail.length; i++) {
       if (taken.has(i)) continue
       const rest = matchLeading(tail[i], word)
-      if (rest !== null) return { word, index: i, rest }
+      if (rest === null) continue
+      if (rest !== '' && !partial) continue
+      return { word, index: i, rest }
     }
   }
   return null
@@ -160,8 +193,12 @@ export function foodLabel(item: FoodItem): FoodLabel {
   const taken = new Set<number>()
   const leftovers = new Map<number, string>()
   const picks: (Pick | null)[] = []
-  for (const lexicon of [PREP, PART, PREFIX_MODIFIER]) {
-    const pick = pickFrom(tail, lexicon, taken)
+  for (const [lexicon, partial] of [
+    [PREP, true],
+    [PART, false],
+    [PREFIX_MODIFIER, false]
+  ] as [string[], boolean][]) {
+    const pick = pickFrom(tail, lexicon, taken, partial)
     picks.push(pick)
     if (pick) {
       taken.add(pick.index)
@@ -170,10 +207,24 @@ export function foodLabel(item: FoodItem): FoodLabel {
   }
   const [prep, part, modifier] = picks
 
+  // A head that names a CATEGORY rather than a food answers the wrong question — every
+  // nut in the database would be titled "nut" — so the specific segment the AFCD files
+  // beneath it takes over. Single-word only: "Pasta, white wheat flour & egg" describes
+  // the pasta, it isn't a name for it.
+  let effectiveHead = head
+  if (CATEGORY_HEAD.has(head.toLowerCase())) {
+    const i = tail.findIndex((seg, idx) => !taken.has(idx) && !seg.includes(' '))
+    if (i !== -1) {
+      effectiveHead = tail[i]
+      taken.add(i)
+      leftovers.set(i, '')
+    }
+  }
+
   const title = [
     prep?.word,
     modifier?.word,
-    head.toLowerCase(),
+    effectiveHead.toLowerCase(),
     part ? (PART_TITLE[part.word] ?? part.word) : undefined
   ]
     .filter(Boolean)
