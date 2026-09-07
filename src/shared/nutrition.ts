@@ -125,8 +125,10 @@ function searchScore(
 
   let score: number
   if (headWords.length === qWords.length && qWords.every((_, i) => at(i))) score = 0
-  else if (qWords.every((_, i) => at(i))) score = 1 // head starts with the query
-  else if (qWords.every((_, i) => inHead(i))) score = 2 // head has them all, reordered
+  else if (qWords.every((_, i) => at(i)))
+    score = 1 // head starts with the query
+  else if (qWords.every((_, i) => inHead(i)))
+    score = 2 // head has them all, reordered
   else {
     // Penalise by HOW MUCH of the query landed in the descriptor tail, so a food the
     // query actually names outranks one that merely mentions it as an ingredient.
@@ -466,8 +468,10 @@ function estimatorScore(food: AuFood, qWords: string[]): number {
 
   let score: number
   if (headWords.length === qWords.length && qWords.every((w, i) => headWords[i] === w)) score = 0
-  else if (qWords.every((w, i) => headWords[i] === w)) score = 1 // head starts with the query
-  else if (qWords.every((w) => headSet.has(w))) score = 2 // head contains them, reordered
+  else if (qWords.every((w, i) => headWords[i] === w))
+    score = 1 // head starts with the query
+  else if (qWords.every((w) => headSet.has(w)))
+    score = 2 // head contains them, reordered
   else {
     // Matched partly in the descriptor tail. Penalise by HOW MUCH landed in the tail, so
     // "Flour, wheat, white, plain" (1 of 4 query words in the head) beats "Biscuit,
@@ -511,8 +515,11 @@ function bestStaple(qWords: string[]): AuFood | null {
       f.measures && f.measures.length > 0 ? 0 : 1,
       f.name.length
     ]
-    if (key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1]) ||
-        (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] < bestKey[2])) {
+    if (
+      key[0] < bestKey[0] ||
+      (key[0] === bestKey[0] && key[1] < bestKey[1]) ||
+      (key[0] === bestKey[0] && key[1] === bestKey[1] && key[2] < bestKey[2])
+    ) {
       best = f
       bestKey = key
     }
@@ -564,6 +571,7 @@ interface OffNutriments {
   carbohydrates_100g?: number | string
   fat_100g?: number | string
   'energy-kcal_serving'?: number | string
+  'energy-kj_serving'?: number | string
   proteins_serving?: number | string
   carbohydrates_serving?: number | string
   fat_serving?: number | string
@@ -590,6 +598,24 @@ interface OffProduct {
  * display fields when OFF supplies them, otherwise falls back to per-100 g.
  * Returns null for products with no usable name or macros.
  */
+/** Thermochemical kilojoules per kilocalorie — the factor FSANZ and EU labelling use. */
+const KJ_PER_KCAL = 4.184
+
+/**
+ * kcal from whichever unit OpenFoodFacts holds.
+ *
+ * Australian labels are kilojoule-first and OFF stores what the label says without
+ * back-filling the other unit, so a kcal-only reader scored those products at zero —
+ * correct macros logged against no calories at all. The kcal field still wins when both
+ * are present: it is what the manufacturer printed.
+ */
+function kcalFrom(kcal: unknown, kj: unknown): number | null {
+  const direct = num(kcal)
+  if (direct !== null) return direct
+  const asKj = num(kj)
+  return asKj === null ? null : asKj / KJ_PER_KCAL
+}
+
 export function mapOffProduct(
   p: OffProduct,
   source: 'search' | 'barcode' = 'search'
@@ -598,12 +624,12 @@ export function mapOffProduct(
   const n = p.nutriments
   if (!name || !n) return null
 
-  const cal100 = num(n['energy-kcal_100g'])
+  const cal100 = kcalFrom(n['energy-kcal_100g'], n['energy-kj_100g'])
   const pro100 = num(n.proteins_100g)
   const carb100 = num(n.carbohydrates_100g)
   const fat100 = num(n.fat_100g)
 
-  const servingCal = num(n['energy-kcal_serving'])
+  const servingCal = kcalFrom(n['energy-kcal_serving'], n['energy-kj_serving'])
   const hasServing = servingCal !== null && !!p.serving_size
   const grams = num(p.serving_quantity)
 

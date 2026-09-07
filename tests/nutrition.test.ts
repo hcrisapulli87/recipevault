@@ -195,3 +195,51 @@ describe('searchStaples (AU generic foods)', () => {
     expect(searchStaples('egg yolk')[0].name).toMatch(/yolk/i)
   })
 })
+
+describe('mapOffProduct — kilojoule labels', () => {
+  it('derives kcal from kilojoules when OpenFoodFacts has no kcal field', () => {
+    // Australian labels are kJ-first and OFF stores what the label says. Six of the
+    // eighteen branded results for "eggs" carry only energy-kj_100g.
+    const product = {
+      product_name: 'Eggs',
+      brands: 'McLaren Vale Free Range Eggs',
+      code: '9315748109986',
+      nutriments: {
+        'energy-kj_100g': 559,
+        proteins_100g: 12.2,
+        carbohydrates_100g: 1.3,
+        fat_100g: 9.9
+      }
+    }
+    const item = mapOffProduct(product, 'search')
+    expect(item).not.toBeNull()
+    expect(item!.calories).toBe(134) // 559 / 4.184 = 133.6
+    expect(item!.per100g!.calories).toBe(134)
+  })
+
+  it('prefers the label kcal figure when both units are present', () => {
+    const product = {
+      product_name: 'Bread',
+      brands: 'Tip Top',
+      code: '9300601000012',
+      nutriments: {
+        'energy-kcal_100g': 260,
+        'energy-kj_100g': 1200,
+        proteins_100g: 9,
+        carbohydrates_100g: 45,
+        fat_100g: 3
+      }
+    }
+    expect(mapOffProduct(product, 'search')!.calories).toBe(260)
+  })
+
+  it('still drops a product with no nutriment data at all', () => {
+    const product = {
+      product_name: 'Farm Fresh Eggs',
+      brands: 'Farmhouse Fresh',
+      code: '9310229800185',
+      nutriments: {}
+    }
+    expect(mapOffProduct(product, 'search')).toBeNull()
+  })
+})
