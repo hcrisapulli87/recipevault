@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import type { FoodItem, MealType } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
+import { foodLabel } from '../../shared/food-label'
 import { lookupBarcode, searchFoods, cacheFood, getRecentFoods } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
@@ -16,10 +17,6 @@ const round1 = (n: number): number => Math.round(n * 10) / 10
 const fmtG = (n: number): string => {
   const v = round1(n)
   return v % 1 === 0 ? String(Math.round(v)) : v.toFixed(1)
-}
-
-function foodSub(item: FoodItem): string {
-  return [item.brand, item.servingDesc].filter(Boolean).join(' · ')
 }
 
 /** What the row's kcal figure is actually per. Generics are per 100 g and branded
@@ -53,13 +50,14 @@ function per100gOf(item: FoodItem): { calories: number; protein: number; carbs: 
   return null
 }
 
-/** One tappable food row: name + brand·serve meta, kcal right-aligned. */
+/** One tappable food row: readable title + demoted detail, kcal right-aligned. */
 function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): JSX.Element {
+  const label = foodLabel(props.item)
   return (
     <button className="food-row" onClick={props.onPick}>
       <span className="food-row__main">
-        <span className="food-row__name">{props.item.name}</span>
-        <span className="food-row__sub">{props.note ?? foodSub(props.item)}</span>
+        <span className="food-row__name">{label.title}</span>
+        <span className="food-row__sub">{props.note ?? label.detail}</span>
       </span>
       <span className="food-row__kcal">
         {Math.round(props.item.calories)}
@@ -161,8 +159,8 @@ function ConfirmStep(props: {
         ← Back to search
       </button>
       <div className="confirm__food">
-        <div className="confirm__name">{props.item.name}</div>
-        <div className="confirm__meta">{foodSub(props.item) || 'per 100 g'}</div>
+        <div className="confirm__name">{foodLabel(props.item).title}</div>
+        <div className="confirm__meta">{foodLabel(props.item).detail || 'per 100 g'}</div>
       </div>
 
       <div className="eyebrow confirm__eyebrow">Meal</div>
@@ -610,7 +608,9 @@ export function AddFoodModal(props: {
               {props.planned && query.trim() === '' && (
                 <button className="planned-row" onClick={() => pick(props.planned!)}>
                   <span className="food-row__main">
-                    <span className="food-row__name">Planned: {props.planned.name}</span>
+                    <span className="food-row__name">
+                      Planned: {foodLabel(props.planned).title}
+                    </span>
                     <span className="food-row__sub">{props.planned.servingDesc}</span>
                   </span>
                   <span className="food-row__kcal">

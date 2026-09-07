@@ -1040,6 +1040,11 @@ body::before {
 .food-row__sub {
   font-size: 11.5px;
   color: var(--muted-2);
+  /* Carries every AFCD segment the title didn't use, so it can run long. One line,
+     clipped — the food is already identified by the title above it. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .food-row__kcal {
   display: flex;
