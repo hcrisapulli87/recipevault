@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import type { FoodItem, MealType } from '../../shared/types'
+import type { FoodItem, FoodMeasure, MealType } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
 import { foodLabel } from '../../shared/food-label'
+import { isValidGtin } from '../../shared/barcode'
 import { lookupBarcode, searchFoods, cacheFood, getRecentFoods } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
@@ -12,6 +13,10 @@ import { BottomSheet } from './BottomSheet'
 import { useToast } from './Toast'
 
 type Tab = 'search' | 'scan' | 'manual'
+
+/** Typing pause before the online search runs by itself. */
+const AUTO_SEARCH_DELAY_MS = 700
+const AUTO_SEARCH_MIN_CHARS = 3
 
 const round1 = (n: number): number => Math.round(n * 10) / 10
 const fmtG = (n: number): string => {
@@ -106,17 +111,22 @@ function ConfirmStep(props: {
     setGrams(measures[i].grams)
   }
   const stepServing = (delta: number): void => {
+    const m = measures[measureIdx]
+    if (!m) return
     const c = Math.max(0.5, round1(count + delta))
     setCount(c)
-    setGrams(round1(measures[measureIdx].grams * c))
+    setGrams(round1(m.grams * c))
   }
 
   // Resolve the effective macros + the basis to log.
   let macros: { calories: number; protein: number; carbs: number; fat: number }
   let basis: LogBasis
   let amountValid: boolean
+  // The chosen measure can vanish if a re-check swaps in an item with fewer measures;
+  // indexing past the end used to crash the whole sheet.
+  const measure = measures[measureIdx] as FoodMeasure | undefined
   if (flexible && p100) {
-    const g = mode === 'g' ? grams : round1(measures[measureIdx].grams * count)
+    const g = mode === 'serving' && measure ? round1(measure.grams * count) : grams
     const f = g / 100
     macros = {
       calories: p100.calories * f,
@@ -197,7 +207,7 @@ function ConfirmStep(props: {
             </div>
           )}
 
-          {mode === 'serving' && measures.length > 0 ? (
+          {mode === 'serving' && measure ? (
             <>
               {measures.length > 1 && (
                 <div className="confirm__chips">
@@ -217,14 +227,14 @@ function ConfirmStep(props: {
                   −
                 </button>
                 <span className="confirm__amount-label">
-                  {count % 1 === 0 ? count : count.toFixed(1)} × {measures[measureIdx].desc}
+                  {count % 1 === 0 ? count : count.toFixed(1)} × {measure.desc}
                 </span>
                 <button className="round-btn confirm__step" aria-label="More" onClick={() => stepServing(0.5)}>
                   +
                 </button>
               </div>
               <div className="confirm__serve-note">
-                = {Math.round(measures[measureIdx].grams * count)} g
+                = {Math.round(measure.grams * count)} g
               </div>
             </>
           ) : (
@@ -384,10 +394,20 @@ export function AddFoodModal(props: {
   // results (a slow earlier response must not overwrite a newer one).
   const searchSeqRef = useRef(0)
 
-  /** Live-filter the bundled staples as the user types; the online search only
-   *  runs on Enter/Search. Also invalidates any in-flight online search. */
+  // Online search also starts on its own once typing pauses — pressing Enter was an
+  // easy step to miss, and a basic-foods-only list looked like the whole answer.
+  const autoSearchRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => () => clearTimeout(autoSearchRef.current), [])
+
+  /** Live-filter the bundled staples as the user types; the online search runs on
+   *  Enter, or by itself after a typing pause. Also invalidates any in-flight search. */
   const onQueryChange = (value: string): void => {
     setQuery(value)
+    setShowAllBasic(false)
+    clearTimeout(autoSearchRef.current)
+    if (value.trim().length >= AUTO_SEARCH_MIN_CHARS) {
+      autoSearchRef.current = setTimeout(() => void runSearch(value), AUTO_SEARCH_DELAY_MS)
+    }
     searchSeqRef.current++
     setSearching(false)
     setSearched(false)
@@ -396,13 +416,15 @@ export function AddFoodModal(props: {
     setResults(searchStaples(value))
   }
 
-  const runSearch = async (): Promise<void> => {
-    if (!query.trim()) return
+  const runSearch = async (text: string = query): Promise<void> => {
+    clearTimeout(autoSearchRef.current)
+    const q = text.trim()
+    if (!q) return
     const seq = ++searchSeqRef.current
     setSearching(true)
     setSearchError(null)
     try {
-      const { items, online } = await searchFoods(query.trim())
+      const { items, online } = await searchFoods(q)
       if (seq !== searchSeqRef.current) return // stale response — a newer search owns the UI
       setResults(items)
       setSearchOnline(online)
@@ -417,8 +439,19 @@ export function AddFoodModal(props: {
   // Retail barcodes (EAN-8 → GTIN-14) are 8–14 digits; anything else would be a
   // guaranteed-miss OFF call ending in a confusing "no product found".
   const isValidBarcode = (code: string): boolean => /^\d{8,14}$/.test(code)
+  // A typed code must also pass its check digit — one wrong or swapped digit otherwise
+  // looked up a different product or reported a real one as missing. (Camera reads are
+  // already check-digit validated by the decoder.)
+  const typedBarcodeProblem = (code: string): string | null =>
+    code === ''
+      ? null
+      : !isValidBarcode(code)
+        ? 'Barcodes are 8–14 digits.'
+        : !isValidGtin(code)
+          ? "That number's check digit doesn't add up — probably a typo. Check the digits under the barcode."
+          : null
 
-  const lookUp = async (code: string): Promise<void> => {
+  const lookUp = async (code: string, opts: { typed?: boolean } = {}): Promise<void> => {
     const trimmed = code.trim()
     // Stop the viewfinder FIRST. The scanner has already latched onto its read and
     // killed the camera stream by the time it calls back, so bailing out before this
@@ -433,15 +466,30 @@ export function AddFoodModal(props: {
       }
       return
     }
+    if (opts.typed) {
+      const problem = typedBarcodeProblem(trimmed)
+      if (problem) {
+        setBarcodeError(problem)
+        return
+      }
+    }
     setLookingUp(true)
     setBarcodeError(null)
     try {
-      const { item, online, fromCache } = await lookupBarcode(trimmed)
+      const { item, online, fromCache, known } = await lookupBarcode(trimmed)
       if (item) {
         setPendingBarcode(null)
         setSelectedFromCache(fromCache)
         setSelected(item)
         toast(`Barcode matched: ${item.name}`)
+      } else if (online && known) {
+        // OFF knows what it is, just not its nutrition — start the manual form from it.
+        setBarcodeError(
+          `Found “${known.name}”${known.brand ? ` (${known.brand})` : ''}, but OpenFoodFacts has no nutrition for it yet.`
+        )
+        setPendingBarcode(trimmed)
+        setMName(known.name)
+        setMBrand(known.brand ?? '')
       } else if (online) {
         setBarcodeError(`No product found for barcode ${trimmed}.`)
         setPendingBarcode(trimmed)
@@ -574,7 +622,7 @@ export function AddFoodModal(props: {
         <ConfirmStep
           // Remount if a re-check swaps the item (its unit may flip serving↔100g,
           // which changes what the amount field means).
-          key={`${selected.name}|${selected.unit}`}
+          key={`${selected.name}|${selected.unit}|${selected.per100g ? 'b' : ''}|${(selected.measures ?? []).map((m) => m.grams).join(',')}`}
           item={selected}
           meal={meal}
           onMeal={setMeal}
@@ -613,7 +661,7 @@ export function AddFoodModal(props: {
                 value={query}
                 autoFocus
                 onChange={(e) => onQueryChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && runSearch()}
+                onKeyDown={(e) => e.key === 'Enter' && void runSearch()}
               />
 
               {props.planned && query.trim() === '' && (
@@ -665,8 +713,9 @@ export function AddFoodModal(props: {
                   )}
                   {!searched && !searching && (
                     <p className="addfood__note">
-                      {results.length > 0 ? 'Offline staples shown — press' : 'Press'} Enter to
-                      search online products.
+                      {query.trim().length >= AUTO_SEARCH_MIN_CHARS
+                        ? 'Packaged products load in a moment — or press Enter.'
+                        : 'Press Enter to search packaged products.'}
                     </p>
                   )}
                   {searching && <p className="addfood__note">Searching…</p>}
@@ -739,18 +788,18 @@ export function AddFoodModal(props: {
                   value={barcodeInput}
                   inputMode="numeric"
                   onChange={(e) => setBarcodeInput(e.target.value.replace(/\D/g, ''))}
-                  onKeyDown={(e) => e.key === 'Enter' && lookUp(barcodeInput)}
+                  onKeyDown={(e) => e.key === 'Enter' && lookUp(barcodeInput, { typed: true })}
                 />
                 <button
                   className="btn-secondary"
-                  onClick={() => lookUp(barcodeInput)}
+                  onClick={() => lookUp(barcodeInput, { typed: true })}
                   disabled={lookingUp || !isValidBarcode(barcodeInput.trim())}
                 >
                   {lookingUp ? '…' : 'Look up'}
                 </button>
               </div>
-              {barcodeInput !== '' && !isValidBarcode(barcodeInput.trim()) && (
-                <p className="addfood__note">Barcodes are 8–14 digits.</p>
+              {typedBarcodeProblem(barcodeInput.trim()) && (
+                <p className="addfood__note">{typedBarcodeProblem(barcodeInput.trim())}</p>
               )}
             </div>
           )}

@@ -1,10 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { searchFoods, cacheFood, lookupBarcode, getRecentFoods } from '../src/renderer/data/foods'
+import {
+  searchFoods,
+  cacheFood,
+  lookupBarcode,
+  getRecentFoods,
+  clearFoodSearchCache
+} from '../src/renderer/data/foods'
 import type { FoodItem } from '../src/shared/types'
 
 const state = vi.hoisted(() => ({
   upserted: [] as { row: Record<string, unknown>; options: Record<string, unknown> }[],
   cachedRow: null as Record<string, unknown> | null,
+  cacheQueried: [] as string[][],
   logRows: [] as Record<string, unknown>[]
 }))
 
@@ -17,6 +24,10 @@ vi.mock('../src/renderer/data/supabase', () => ({
         return Promise.resolve({ error: null })
       },
       select: () => ({
+        in: (_col: string, values: string[]) => {
+          state.cacheQueried.push(values)
+          return Promise.resolve({ data: state.cachedRow ? [state.cachedRow] : [] })
+        },
         eq: () => ({
           maybeSingle: () => Promise.resolve({ data: state.cachedRow }),
           order: () => ({
@@ -46,7 +57,9 @@ function offProduct(over: Record<string, unknown> = {}): Record<string, unknown>
 beforeEach(() => {
   state.upserted = []
   state.cachedRow = null
+  state.cacheQueried = []
   state.logRows = []
+  clearFoodSearchCache()
 })
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -221,6 +234,100 @@ describe('lookupBarcode', () => {
     const offline = await lookupBarcode('4000000000000')
     expect(offline.item).toBeNull()
     expect(offline.online).toBe(false)
+  })
+})
+
+describe('lookupBarcode — equivalent codes and partial products', () => {
+  it('finds a UPC-A product OFF files under its EAN-13 spelling', async () => {
+    const requested: string[] = []
+    vi.stubGlobal('fetch', async (url: string) => {
+      requested.push(String(url))
+      const found = String(url).includes('/0036000291452.json')
+      return {
+        ok: found,
+        status: found ? 200 : 404,
+        json: async () => (found ? { status: 1, product: offProduct({ code: '0036000291452' }) } : { status: 0 })
+      }
+    })
+    const { item, online } = await lookupBarcode('036000291452')
+    expect(online).toBe(true)
+    expect(item?.name).toBe('Tuna in Oil')
+    expect(requested).toHaveLength(2)
+    // The cache is searched under every spelling too.
+    expect(state.cacheQueried[0]).toEqual(['036000291452', '0036000291452'])
+  })
+
+  it('treats OFF’s HTTP 404 as a genuine not-found, not as offline', async () => {
+    vi.stubGlobal('fetch', async () => ({ ok: false, status: 404, json: async () => ({ status: 0 }) }))
+    const { item, online } = await lookupBarcode('5449000000996')
+    expect(item).toBeNull()
+    expect(online).toBe(true)
+  })
+
+  it('stops after the first unreachable call instead of retrying every spelling', async () => {
+    const fetchSpy = vi.fn(async () => {
+      throw new Error('offline')
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    const { online } = await lookupBarcode('036000291452')
+    expect(online).toBe(false)
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('reports the name of a known product that has no nutrition', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        status: 1,
+        product: { product_name: 'Tim Tam Original', brands: "Arnott's, Campbell", nutriments: {} }
+      })
+    }))
+    const { item, online, known } = await lookupBarcode('9310072000268')
+    expect(item).toBeNull()
+    expect(online).toBe(true)
+    expect(known).toEqual({ name: 'Tim Tam Original', brand: "Arnott's" })
+  })
+})
+
+describe('searchFoods — ranking and session cache', () => {
+  it('puts products that name the query above ones that merely mention it', async () => {
+    vi.stubGlobal('fetch', async () => ({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        products: [
+          offProduct({ product_name: 'Cat Food Ocean Mix', brands: 'Whiskas', code: '1' }),
+          offProduct({ product_name: 'Tuna Chunks in Springwater', brands: 'John West', code: '2' })
+        ]
+      })
+    }))
+    const { items } = await searchFoods('tuna')
+    const packaged = items.filter((r) => r.source === 'search')
+    expect(packaged.map((r) => r.barcode)).toEqual(['2', '1'])
+  })
+
+  it('serves a repeated search from the session cache', async () => {
+    const fetchSpy = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ ok: true, products: [offProduct()] })
+    }))
+    vi.stubGlobal('fetch', fetchSpy)
+    await searchFoods('tuna')
+    const again = await searchFoods('  Tuna ')
+    expect(fetchSpy).toHaveBeenCalledTimes(1)
+    expect(again.online).toBe(true)
+    expect(again.items.some((r) => r.source === 'search')).toBe(true)
+  })
+
+  it('never caches a failed search', async () => {
+    const fetchSpy = vi.fn(async () => {
+      throw new Error('offline')
+    })
+    vi.stubGlobal('fetch', fetchSpy)
+    await searchFoods('tuna')
+    await searchFoods('tuna')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 })
 

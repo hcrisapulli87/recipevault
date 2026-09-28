@@ -14,12 +14,17 @@
 // responses are CDN-cached, which also serves repeat queries during outages.
 // Results are normalised to the legacy OffProduct shape the client's
 // mapOffProduct already understands.
-import { mergeSearchHits, legacySearchUrl, AU_FALLBACK_THRESHOLD } from '../src/shared/food-search'
+import {
+  mergeSearchHits,
+  legacySearchUrl,
+  sanitizeSearchQuery,
+  AU_FALLBACK_THRESHOLD,
+  OFF_PRODUCT_FIELDS
+} from '../src/shared/food-search'
 import type { SalHit, NormalizedProduct } from '../src/shared/food-search'
 
 const SAL_BASE = 'https://search.openfoodfacts.org/search'
-const FIELDS =
-  'product_name,brands,code,serving_size,serving_quantity,serving_quantity_unit,nutriments'
+const FIELDS = OFF_PRODUCT_FIELDS
 const PAGE_SIZE = 20
 const UA = 'RecipeVault/1.0 (personal meal tracker)'
 const COUNTRY = 'en:australia'
@@ -130,13 +135,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   // AU filter never applied and every search silently fell through to the world results
   // (a search for "milk" led with Thai and Irish products). Plain juxtaposition still
   // filters — "milk" alone returns ~19k hits, with the clause ~2.7k.
+  // User text is sanitised first: brackets, quotes and colons are query syntax to
+  // Search-a-licious and made it return nothing. A query that is ALL syntax skips
+  // straight to the legacy search, which takes plain terms.
+  const salQ = sanitizeSearchQuery(q)
   let salProducts: NormalizedProduct[] | null = null
-  try {
-    const au = await salSearch(`${q} countries_tags:"${COUNTRY}"`, deadline)
-    const world = au.length < AU_FALLBACK_THRESHOLD ? await salSearch(q, deadline) : []
-    salProducts = mergeSearchHits(au, world)
-  } catch (e) {
-    console.warn('food-search: Search-a-licious failed:', e)
+  if (salQ) {
+    try {
+      const au = await salSearch(`${salQ} countries_tags:"${COUNTRY}"`, deadline)
+      const world = au.length < AU_FALLBACK_THRESHOLD ? await salSearch(salQ, deadline) : []
+      salProducts = mergeSearchHits(au, world)
+    } catch (e) {
+      console.warn('food-search: Search-a-licious failed:', e)
+    }
   }
   if (salProducts && salProducts.length > 0) {
     respond(salProducts)

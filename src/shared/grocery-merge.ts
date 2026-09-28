@@ -10,8 +10,20 @@ export function normaliseName(name: string): string {
     .replace(/\s*\(.*\)\s*$/, '') // strip a "(3)" / "(200 g)" suffix from grocery titles
     .replace(/\s+/g, ' ')
     .trim()
-  if (n.length > 3 && n.endsWith('s')) n = n.slice(0, -1)
+  // Plural → singular for the common English patterns. A bare trailing-s strip turned
+  // "tomatoes" into "tomatoe" and "berries" into "berrie", so they never merged with
+  // "tomato"/"berry" from another recipe.
+  if (n.length > 4 && n.endsWith('ies')) n = `${n.slice(0, -3)}y`
+  else if (n.length > 4 && /(oes|ches|shes|sses|xes)$/.test(n)) n = n.slice(0, -2)
+  else if (n.length > 3 && n.endsWith('s') && !n.endsWith('ss')) n = n.slice(0, -1)
   return n
+}
+
+/** Metric units that sum into a base unit, so "500 g" + "1 kg" reads "1 ½ kg" rather
+ *  than two parts side by side. */
+const METRIC_BASE: Record<string, { unit: string; factor: number }> = {
+  kg: { unit: 'g', factor: 1000 },
+  l: { unit: 'ml', factor: 1000 }
 }
 
 export function mergeIngredients(ingredients: ParsedIngredient[]): MergedGroceryItem[] {
@@ -25,11 +37,14 @@ export function mergeIngredients(ingredients: ParsedIngredient[]): MergedGrocery
     }
     if (ing.quantity === null) continue
     // ranges count as their lower bound for shopping purposes
-    const part = item.parts.find((p) => p.unit === ing.unit)
+    const base = ing.unit ? METRIC_BASE[ing.unit] : undefined
+    const unit = base ? base.unit : ing.unit
+    const quantity = base ? ing.quantity * base.factor : ing.quantity
+    const part = item.parts.find((p) => p.unit === unit)
     if (part) {
-      part.quantity += ing.quantity
+      part.quantity += quantity
     } else {
-      item.parts.push({ quantity: ing.quantity, unit: ing.unit })
+      item.parts.push({ quantity, unit })
     }
   }
   return [...byName.values()]
@@ -39,7 +54,12 @@ export function groceryTitle(item: MergedGroceryItem): string {
   const name = item.name.charAt(0).toUpperCase() + item.name.slice(1)
   if (item.parts.length === 0) return name
   const qty = item.parts
-    .map((p) => (p.unit ? `${formatQuantity(p.quantity)} ${p.unit}` : formatQuantity(p.quantity)))
+    .map((p) => {
+      // Summed grams/millilitres read back in kg/L once they reach a whole one.
+      if (p.unit === 'g' && p.quantity >= 1000) return `${formatQuantity(p.quantity / 1000)} kg`
+      if (p.unit === 'ml' && p.quantity >= 1000) return `${formatQuantity(p.quantity / 1000)} l`
+      return p.unit ? `${formatQuantity(p.quantity)} ${p.unit}` : formatQuantity(p.quantity)
+    })
     .join(' + ')
   return `${name} (${qty})`
 }

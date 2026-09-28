@@ -83,7 +83,48 @@ const SEARCH_WORD_ALIASES: Record<string, string> = {
   courgette: 'zucchini',
   aubergine: 'eggplant',
   garbanzo: 'chickpea',
-  oatmeal: 'oat'
+  oatmeal: 'oat',
+  cantaloupe: 'rockmelon',
+  shrimp: 'prawn',
+  cookie: 'biscuit',
+  cooky: 'biscuit', // "cookies" singularises this way
+  candy: 'lolly',
+  rutabaga: 'swede',
+  beet: 'beetroot',
+  kumara: 'sweet potato',
+  soda: 'soft drink',
+  popsicle: 'ice confection',
+  granola: 'muesli granola'
+}
+
+/** Multi-word names the AFCD files under different words. Matched on whole words in the
+ *  (singularised) query before the per-word aliases run; keys are written singular. */
+const SEARCH_PHRASE_ALIASES_RAW: [string, string][] = [
+  ['ground beef', 'beef mince'],
+  ['ground pork', 'pork mince'],
+  ['ground chicken', 'chicken mince'],
+  ['ground lamb', 'lamb mince'],
+  ['bell pepper', 'capsicum'],
+  ['french fry', 'potato fries'],
+  ['hot chip', 'potato fries'],
+  ['snap pea', 'snow pea'],
+  ['sweet corn', 'sweetcorn']
+]
+// Targets are singularised like every indexed AFCD word ("fries" is indexed as "fry").
+const SEARCH_PHRASE_ALIASES = SEARCH_PHRASE_ALIASES_RAW.map(
+  ([from, to]) => [from, wordsOf(to).join(' ')] as const
+)
+
+function applySearchAliases(words: string[]): string[] {
+  let joined = ` ${words.join(' ')} `
+  for (const [from, to] of SEARCH_PHRASE_ALIASES) {
+    joined = joined.split(` ${from} `).join(` ${to} `)
+  }
+  return joined
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+    .flatMap((w) => (SEARCH_WORD_ALIASES[w] ? wordsOf(SEARCH_WORD_ALIASES[w]) : [w]))
 }
 
 /**
@@ -201,7 +242,7 @@ function rankWindow(qWords: string[], prefixLast: boolean): FoodItem[] {
 export function searchStaples(query: string): FoodItem[] {
   const q = query.trim().toLowerCase()
   if (!q) return []
-  const qWords = wordsOf(q).map((w) => SEARCH_WORD_ALIASES[w] ?? w)
+  const qWords = applySearchAliases(wordsOf(q))
   if (qWords.length === 0) return []
 
   // Live filtering runs on every keystroke, so the last word is usually half-typed and
@@ -567,6 +608,7 @@ export function staplePer100g(
 
 interface OffNutriments {
   'energy-kcal_100g'?: number | string
+  'energy-kj_100g'?: number | string
   proteins_100g?: number | string
   carbohydrates_100g?: number | string
   fat_100g?: number | string
@@ -579,6 +621,11 @@ interface OffNutriments {
 
 interface OffProduct {
   product_name?: string
+  /** Language-specific names. Many AU/NZ products only have one of these filled — the
+   *  bare product_name stays empty — so reading product_name alone hid real products. */
+  product_name_en?: string
+  generic_name_en?: string
+  generic_name?: string
   brands?: string
   code?: string | number
   serving_size?: string
@@ -588,6 +635,26 @@ interface OffProduct {
    *  question); this only stops a 250 ml serve being LABELLED "250 g". */
   serving_quantity_unit?: string
   nutriments?: OffNutriments
+}
+
+/** Best available display name: the main name, else the English or generic name. */
+function productName(p: OffProduct): string {
+  for (const n of [p.product_name, p.product_name_en, p.generic_name_en, p.generic_name]) {
+    const t = (n ?? '').trim()
+    if (t) return t
+  }
+  return ''
+}
+
+/**
+ * Name + brand of an OFF product even when it has no usable nutrition. A barcode that
+ * resolves to "Arnott's Tim Tam" with no nutrition panel used to report "No product
+ * found"; knowing the name lets the Manual tab start pre-filled instead of blank.
+ */
+export function offProductIdentity(p: OffProduct): { name: string; brand: string | null } | null {
+  const name = productName(p)
+  if (!name) return null
+  return { name, brand: p.brands ? p.brands.split(',')[0].trim() || null : null }
 }
 
 /**
@@ -611,35 +678,60 @@ const KJ_PER_KCAL = 4.184
  */
 function kcalFrom(kcal: unknown, kj: unknown): number | null {
   const direct = num(kcal)
-  if (direct !== null) return direct
   const asKj = num(kj)
+  // A common OFF data-entry slip is typing the label's kJ figure into the kcal field too,
+  // which reads as ~4× the real energy (a 1,500 kJ muesli logged at 1,500 kcal). Real
+  // values differ by a factor of 4.184, so the two fields agreeing means the kJ one is
+  // the true figure.
+  if (direct !== null && asKj !== null && asKj > 50 && Math.abs(direct - asKj) / asKj < 0.02) {
+    return asKj / KJ_PER_KCAL
+  }
+  if (direct !== null) return direct
   return asKj === null ? null : asKj / KJ_PER_KCAL
+}
+
+/**
+ * Physically possible per-100 g values: nothing beats pure fat's ~900 kcal/100 g, no
+ * macro can exceed 100 g in 100 g, and the three together can't meaningfully exceed it.
+ * OFF is crowd-sourced and its bad rows are loud — a per-100 g value entered as per-kg,
+ * a serve entered as 100 g — so an impossible basis is dropped rather than logged.
+ */
+function plausiblePer100g(p: Per100g): boolean {
+  const vals = [p.calories, p.protein, p.carbs, p.fat]
+  if (vals.some((v) => v < 0)) return false
+  if (p.calories > 950) return false
+  if (p.protein > 100 || p.carbs > 100 || p.fat > 100) return false
+  return p.protein + p.carbs + p.fat <= 105
 }
 
 export function mapOffProduct(
   p: OffProduct,
   source: 'search' | 'barcode' = 'search'
 ): FoodItem | null {
-  const name = (p.product_name ?? '').trim()
+  const name = productName(p)
   const n = p.nutriments
   if (!name || !n) return null
 
-  const cal100 = kcalFrom(n['energy-kcal_100g'], n['energy-kj_100g'])
-  const pro100 = num(n.proteins_100g)
-  const carb100 = num(n.carbohydrates_100g)
-  const fat100 = num(n.fat_100g)
+  const cal100d = kcalFrom(n['energy-kcal_100g'], n['energy-kj_100g'])
+  const pro100d = num(n.proteins_100g)
+  const carb100d = num(n.carbohydrates_100g)
+  const fat100d = num(n.fat_100g)
 
   const servingCal = kcalFrom(n['energy-kcal_serving'], n['energy-kj_serving'])
+  const proS = num(n.proteins_serving)
+  const carbS = num(n.carbohydrates_serving)
+  const fatS = num(n.fat_serving)
   const hasServing = servingCal !== null && !!p.serving_size
   const grams = num(p.serving_quantity)
+  const hasGrams = grams !== null && grams > 0
 
-  if (cal100 === null && pro100 === null && carb100 === null && fat100 === null && !hasServing) {
+  if (cal100d === null && pro100d === null && carb100d === null && fat100d === null && !hasServing) {
     return null
   }
   // No energy figure in either unit — OFF has the macros but not the calories. A food
   // logged at 0 kcal is worse than one that never appeared: the day's total silently
   // under-counts and nothing on screen says so.
-  if (cal100 === null && servingCal === null) return null
+  if (cal100d === null && servingCal === null) return null
 
   const brand = p.brands ? p.brands.split(',')[0].trim() : null
   const barcode = p.code !== undefined && p.code !== '' ? String(p.code) : null
@@ -650,32 +742,39 @@ export function mapOffProduct(
   const perServing = (serving: number | null, per100: number | null): number =>
     serving ?? (per100 !== null && grams !== null ? (per100 * grams) / 100 : 0)
 
-  // Canonical per-100 g basis — from the per-100 g fields when present, else
-  // back-derived from the serving values and weight.
-  let per100g: Per100g | undefined
-  if (cal100 !== null || pro100 !== null || carb100 !== null || fat100 !== null) {
-    per100g = {
-      calories: round0(cal100 ?? 0),
-      protein: round1(pro100 ?? 0),
-      carbs: round1(carb100 ?? 0),
-      fat: round1(fat100 ?? 0)
-    }
-  } else if (hasServing && grams !== null && grams > 0) {
-    const to100 = (v: number): number => (v * 100) / grams
-    per100g = {
-      calories: round0(to100(servingCal ?? 0)),
-      protein: round1(to100(perServing(num(n.proteins_serving), null))),
-      carbs: round1(to100(perServing(num(n.carbohydrates_serving), null))),
-      fat: round1(to100(perServing(num(n.fat_serving), null)))
-    }
+  // Canonical per-100 g basis, field by field: the per-100 g value when OFF has it, else
+  // back-derived from the per-serve value and the serving weight. Energy decides whether
+  // there is a basis at all — this used to be built whenever ANY macro had a per-100 g
+  // value, so a product with per-serve kcal but per-100 g protein got a basis of 0 kcal,
+  // and logging it by grams recorded no energy at all.
+  const to100 = (serving: number | null): number | null =>
+    serving !== null && hasGrams ? (serving * 100) / grams! : null
+  const cal100 = cal100d ?? to100(servingCal)
+  const pro100 = pro100d ?? to100(proS)
+  const carb100 = carb100d ?? to100(carbS)
+  const fat100 = fat100d ?? to100(fatS)
+
+  let per100g: Per100g | undefined =
+    cal100 !== null
+      ? {
+          calories: round0(cal100),
+          protein: round1(pro100 ?? 0),
+          carbs: round1(carb100 ?? 0),
+          fat: round1(fat100 ?? 0)
+        }
+      : undefined
+  if (per100g && !plausiblePer100g(per100g)) {
+    // Without a trustworthy basis only a direct per-serve figure can still be shown.
+    if (!hasServing) return null
+    per100g = undefined
   }
 
   // Fall back to OFF's own unit rather than assuming grams: a 250 ml drink serve was
   // being labelled "250 g".
   const servingUnit = p.serving_quantity_unit?.trim() || 'g'
   const measures: FoodMeasure[] =
-    grams !== null && grams > 0
-      ? [{ desc: p.serving_size?.trim() || `${round0(grams)} ${servingUnit}`, grams }]
+    per100g && hasGrams
+      ? [{ desc: p.serving_size?.trim() || `${round0(grams!)} ${servingUnit}`, grams: grams! }]
       : []
 
   if (hasServing) {
@@ -686,25 +785,26 @@ export function mapOffProduct(
       servingDesc: p.serving_size ?? null,
       unit: 'serving',
       calories: round0(servingCal ?? 0),
-      protein: round1(perServing(num(n.proteins_serving), pro100)),
-      carbs: round1(perServing(num(n.carbohydrates_serving), carb100)),
-      fat: round1(perServing(num(n.fat_serving), fat100)),
+      protein: round1(perServing(proS, pro100d)),
+      carbs: round1(perServing(carbS, carb100d)),
+      fat: round1(perServing(fatS, fat100d)),
       source,
       per100g,
       measures
     }
   }
 
+  if (!per100g) return null
   return {
     name,
     brand,
     barcode,
     servingDesc: 'per 100 g',
     unit: '100g',
-    calories: round0(cal100 ?? 0),
-    protein: round1(pro100 ?? 0),
-    carbs: round1(carb100 ?? 0),
-    fat: round1(fat100 ?? 0),
+    calories: per100g.calories,
+    protein: per100g.protein,
+    carbs: per100g.carbs,
+    fat: per100g.fat,
     source,
     per100g,
     measures

@@ -25,6 +25,26 @@ describe('mergeIngredients', () => {
     expect(merged[0]).toEqual({ name: 'salt and pepper to taste', parts: [] })
   })
 
+  it('merges -oes and -ies plurals with their singulars', () => {
+    const merged = mergeIngredients([
+      parseIngredient('3 tomatoes'),
+      parseIngredient('1 tomato'),
+      parseIngredient('1 cup blueberries'),
+      parseIngredient('1 cup blueberry')
+    ])
+    expect(merged).toHaveLength(2)
+    expect(merged[0].parts).toEqual([{ quantity: 4, unit: null }])
+  })
+
+  it('sums kg with g and l with ml', () => {
+    const merged = mergeIngredients([
+      parseIngredient('500g chicken thigh'),
+      parseIngredient('1 kg chicken thigh')
+    ])
+    expect(merged[0].parts).toEqual([{ quantity: 1500, unit: 'g' }])
+    expect(groceryTitle(merged[0])).toBe('Chicken thigh (1 ½ kg)')
+  })
+
   it('keeps the first-seen display name', () => {
     const merged = mergeIngredients([parseIngredient('2 Onions'), parseIngredient('1 onion')])
     expect(merged[0].name).toBe('Onions')

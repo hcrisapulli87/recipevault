@@ -1,5 +1,7 @@
 import { supabase } from './supabase'
-import { searchStaples, mapOffProduct } from '../../shared/nutrition'
+import { searchStaples, mapOffProduct, offProductIdentity } from '../../shared/nutrition'
+import { barcodeCandidates } from '../../shared/barcode'
+import { OFF_PRODUCT_FIELDS, rankPackagedResults } from '../../shared/food-search'
 import type { FoodItem } from '../../shared/types'
 
 // Text search goes through our Vercel proxy (api/food-search.ts): OFF's ranked
@@ -15,8 +17,8 @@ export const FOOD_SEARCH_ENDPOINT = import.meta.env.DEV
 // Barcode lookups still hit OFF directly — the v2 product endpoint sends ACAO: *
 // and isn't the rate-limited search endpoint.
 const OFF_BASE = 'https://world.openfoodfacts.org'
-const OFF_FIELDS =
-  'product_name,brands,code,serving_size,serving_quantity,serving_quantity_unit,nutriments'
+/** A hung OpenFoodFacts request used to leave "Looking it up…" on screen forever. */
+const OFF_TIMEOUT_MS = 8_000
 
 export interface FoodSearchResult {
   items: FoodItem[]
@@ -26,27 +28,51 @@ export interface FoodSearchResult {
   online: boolean
 }
 
-/** Generic AU foods (relevance-ranked, offline) first, then AU-first branded
- *  OpenFoodFacts hits beneath them. Degrades to generics-only when OFF is down. */
-export async function searchFoods(query: string): Promise<FoodSearchResult> {
-  const staples = searchStaples(query)
+/** Successful online results, per normalised query, for this session. Going Back from
+ *  the confirm step and re-running the same search (or retyping it) was a fresh
+ *  network round trip every time. Failures are never cached, so a retry still retries. */
+const SEARCH_CACHE_TTL_MS = 10 * 60 * 1000
+const SEARCH_CACHE_MAX = 30
+const searchCache = new Map<string, { at: number; items: FoodItem[] }>()
 
-  let off: FoodItem[] = []
-  let online = false
+/** Test hook — module state otherwise leaks between test cases. */
+export function clearFoodSearchCache(): void {
+  searchCache.clear()
+}
+
+async function searchOnline(query: string): Promise<FoodItem[] | null> {
+  const key = query.toLowerCase().replace(/\s+/g, ' ')
+  const hit = searchCache.get(key)
+  if (hit && Date.now() - hit.at < SEARCH_CACHE_TTL_MS) return hit.items
   try {
     const res = await fetch(`${FOOD_SEARCH_ENDPOINT}?q=${encodeURIComponent(query)}`)
-    if (res.ok) {
-      const data = (await res.json()) as { ok?: boolean; products?: unknown[] }
-      if (data.ok) {
-        online = true
-        off = (data.products ?? [])
-          .map((p) => mapOffProduct(p as never, 'search'))
-          .filter((x): x is FoodItem => x !== null)
-      }
-    }
+    if (!res.ok) return null
+    const data = (await res.json()) as { ok?: boolean; products?: unknown[] }
+    if (!data.ok) return null
+    const items = rankPackagedResults(
+      query,
+      (data.products ?? [])
+        .map((p) => mapOffProduct(p as never, 'search'))
+        .filter((x): x is FoodItem => x !== null)
+    )
+    searchCache.delete(key)
+    searchCache.set(key, { at: Date.now(), items })
+    // Map iteration is insertion-ordered, so the first key is the oldest.
+    if (searchCache.size > SEARCH_CACHE_MAX) searchCache.delete(searchCache.keys().next().value!)
+    return items
   } catch {
-    // offline — staples still returned
+    return null // offline — staples still returned
   }
+}
+
+/** Generic AU foods (relevance-ranked, offline) first, then AU-first branded
+ *  OpenFoodFacts hits beneath them — re-ranked so products the query actually names
+ *  lead. Degrades to generics-only when OFF is down. */
+export async function searchFoods(query: string): Promise<FoodSearchResult> {
+  const staples = searchStaples(query)
+  const fetched = await searchOnline(query.trim())
+  const online = fetched !== null
+  const off = fetched ?? []
 
   // Dedupe by barcode when present (globally unique), else name+brand: a branded
   // OFF product that happens to share a generic's name ("Banana · Some Brand") is
@@ -87,14 +113,102 @@ export interface BarcodeLookupResult {
   online: boolean
   /** True when the item came from the per-user food_cache rather than OFF. */
   fromCache: boolean
+  /** OFF knows the product's name but has no usable nutrition for it — lets the UI
+   *  pre-fill the manual entry instead of starting from a blank form. */
+  known?: { name: string; brand: string | null } | null
+}
+
+const CACHE_COLS =
+  'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams, last_fetched'
+
+interface CacheRow {
+  barcode: string
+  name: string
+  brand: string | null
+  serving_desc: string | null
+  unit: string
+  cal_per_unit: number
+  protein_per_unit: number
+  carbs_per_unit: number
+  fat_per_unit: number
+  cal_per_100g?: number | null
+  protein_per_100g?: number | null
+  carbs_per_100g?: number | null
+  fat_per_100g?: number | null
+  serving_grams?: number | null
+  last_fetched?: string | null
+}
+
+function cacheRowToItem(cached: CacheRow): FoodItem {
+  // Restore the per-100 g basis and serving weight so a re-scan keeps the
+  // grams⇄serving picker. Rows cached before those columns existed have neither,
+  // and fall back to the serve-only flow exactly as before.
+  const per100g =
+    cached.cal_per_100g !== null && cached.cal_per_100g !== undefined
+      ? {
+          calories: cached.cal_per_100g,
+          protein: cached.protein_per_100g ?? 0,
+          carbs: cached.carbs_per_100g ?? 0,
+          fat: cached.fat_per_100g ?? 0
+        }
+      : undefined
+  const grams = cached.serving_grams
+  return {
+    name: cached.name,
+    brand: cached.brand,
+    barcode: cached.barcode,
+    servingDesc: cached.serving_desc,
+    unit: cached.unit,
+    calories: cached.cal_per_unit,
+    protein: cached.protein_per_unit,
+    carbs: cached.carbs_per_unit,
+    fat: cached.fat_per_unit,
+    source: 'barcode',
+    per100g,
+    measures:
+      grams !== null && grams !== undefined && grams > 0
+        ? [{ desc: cached.serving_desc || `${Math.round(grams)} g`, grams }]
+        : []
+  }
+}
+
+/** One OFF product fetch. 'down' = unreachable / errored / timed out. */
+async function fetchOffProduct(
+  code: string
+): Promise<{ status: 'found'; product: unknown } | { status: 'missing' } | { status: 'down' }> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), OFF_TIMEOUT_MS)
+  try {
+    const res = await fetch(
+      `${OFF_BASE}/api/v2/product/${encodeURIComponent(code)}.json?fields=${OFF_PRODUCT_FIELDS}`,
+      { signal: controller.signal }
+    )
+    // OFF answers an unknown barcode with HTTP 404 + status 0 — that's a real answer.
+    if (!res.ok && res.status !== 404) return { status: 'down' }
+    const data = (await res.json()) as { status?: number; product?: unknown }
+    return data.status === 1 && data.product
+      ? { status: 'found', product: data.product }
+      : { status: 'missing' }
+  } catch {
+    return { status: 'down' }
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /** Look up a barcode: per-user cache first, then OpenFoodFacts (and cache the result).
- *  `skipCache` forces a fresh OFF fetch — the escape hatch for stale/typo'd cache rows. */
+ *  `skipCache` forces a fresh OFF fetch — the escape hatch for stale/typo'd cache rows.
+ *
+ *  Every equivalent spelling of the code is tried (UPC-A ⇄ EAN-13, UPC-E → UPC-A, see
+ *  shared/barcode.ts): OFF files each product under one form, and the scanner may hand
+ *  back another. */
 export async function lookupBarcode(
   barcode: string,
   opts: { skipCache?: boolean } = {}
 ): Promise<BarcodeLookupResult> {
+  const candidates = barcodeCandidates(barcode)
+  if (candidates.length === 0) return { item: null, online: true, fromCache: false }
+
   // A cached row older than this is served only as a fallback: products get reformulated
   // and OFF entries get corrected, and `last_fetched` was previously written and never
   // read, so a row cached once was authoritative forever. The refresh is silent and
@@ -103,44 +217,12 @@ export async function lookupBarcode(
   let stale: FoodItem | null = null
 
   if (!opts.skipCache) {
-    const { data: cached } = await supabase
-      .from('food_cache')
-      .select(
-        'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams, last_fetched'
-      )
-      .eq('barcode', barcode)
-      .maybeSingle()
+    const { data } = await supabase.from('food_cache').select(CACHE_COLS).in('barcode', candidates)
+    const rows = (data ?? []) as CacheRow[]
+    // Prefer the row for the most literal spelling.
+    const cached = candidates.map((c) => rows.find((r) => r.barcode === c)).find(Boolean)
     if (cached) {
-      // Restore the per-100 g basis and serving weight so a re-scan keeps the
-      // grams⇄serving picker. Rows cached before those columns existed have neither,
-      // and fall back to the serve-only flow exactly as before.
-      const per100g =
-        cached.cal_per_100g !== null && cached.cal_per_100g !== undefined
-          ? {
-              calories: cached.cal_per_100g,
-              protein: cached.protein_per_100g ?? 0,
-              carbs: cached.carbs_per_100g ?? 0,
-              fat: cached.fat_per_100g ?? 0
-            }
-          : undefined
-      const grams = cached.serving_grams
-      const item: FoodItem = {
-        name: cached.name,
-        brand: cached.brand,
-        barcode: cached.barcode,
-        servingDesc: cached.serving_desc,
-        unit: cached.unit,
-        calories: cached.cal_per_unit,
-        protein: cached.protein_per_unit,
-        carbs: cached.carbs_per_unit,
-        fat: cached.fat_per_unit,
-        source: 'barcode',
-        per100g,
-        measures:
-          grams !== null && grams !== undefined && grams > 0
-            ? [{ desc: cached.serving_desc || `${Math.round(grams)} g`, grams }]
-            : []
-      }
+      const item = cacheRowToItem(cached)
       if (isFresh(cached.last_fetched)) return { item, online: true, fromCache: true }
       stale = item // fall through to OFF, but keep this if the refresh can't be done
     }
@@ -148,20 +230,21 @@ export async function lookupBarcode(
 
   let item: FoodItem | null = null
   let online = false
-  try {
-    const res = await fetch(
-      `${OFF_BASE}/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${OFF_FIELDS}`
-    )
-    if (res.ok) {
-      online = true
-      const data = (await res.json()) as { status?: number; product?: unknown }
-      if (data.status === 1 && data.product) {
-        item = mapOffProduct(data.product as never, 'barcode')
-        if (item && !item.barcode) item.barcode = barcode
-      }
+  let known: { name: string; brand: string | null } | null = null
+  for (const code of candidates) {
+    const r = await fetchOffProduct(code)
+    // Unreachable — stop rather than retrying every variant against a dead server.
+    if (r.status === 'down') break
+    online = true
+    if (r.status === 'missing') continue
+    const product = r.product as never
+    item = mapOffProduct(product, 'barcode')
+    if (item) {
+      if (!item.barcode) item.barcode = code
+      break
     }
-  } catch {
-    // offline — online stays false
+    // Known product, no usable nutrition — remember its name, keep trying variants.
+    known ??= offProductIdentity(product)
   }
 
   if (item) {
@@ -172,7 +255,7 @@ export async function lookupBarcode(
   // The stale row is better than a failed scan, and `online: true` keeps the UI from
   // claiming we couldn't check.
   if (stale) return { item: stale, online: true, fromCache: true }
-  return { item: null, online, fromCache: false }
+  return { item: null, online, fromCache: false, known }
 }
 
 /**

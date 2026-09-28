@@ -42,6 +42,9 @@ export function RecipeDetailPage(props: {
   // page the moment the recipe arrives (hook count changes between renders).
   const [converting, setConverting] = useState(false)
   const [copying, setCopying] = useState(false)
+  // A deleted recipe (e.g. removed on the partner's device) or a failed fetch used to
+  // leave the page on "Loading…" forever with no way to tell it apart from slowness.
+  const [loadProblem, setLoadProblem] = useState<string | null>(null)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
   const ownerName =
@@ -50,14 +53,28 @@ export function RecipeDetailPage(props: {
       : null
 
   useEffect(() => {
-    getRecipe(props.recipeId).then((r) => {
-      setRecipe(r)
-      setServings(r?.servings ?? 1)
-      setEst(r?.est ?? null)
-      setEstDetail(null)
-    })
+    getRecipe(props.recipeId).then(
+      (r) => {
+        setLoadProblem(r ? null : 'This recipe no longer exists — it may have been deleted.')
+        setRecipe(r)
+        setServings(r?.servings ?? 1)
+        setEst(r?.est ?? null)
+        setEstDetail(null)
+      },
+      () => setLoadProblem("Couldn't load this recipe. Check your connection and try again.")
+    )
   }, [props.recipeId])
 
+  if (loadProblem) {
+    return (
+      <div className="library__empty">
+        <p>{loadProblem}</p>
+        <button className="btn-secondary" onClick={props.onBack}>
+          ← Back
+        </button>
+      </div>
+    )
+  }
   if (!recipe || servings === null) return <p className="library__empty">Loading…</p>
 
   const baseServings = recipe.servings ?? 1

@@ -53,8 +53,16 @@ const TYPICAL_WEIGHTS: [string, number][] = [
   ['lime', 45],
   ['lemon', 60],
   ['cucumber', 250],
-  ['celery', 40]
+  ['celery', 40],
+  ['eggplant', 300]
 ]
+
+// Whole-word matches (with plural endings) — a substring test gave "2 eggplants" the
+// weight of two eggs and "1 pineapple" that of an apple.
+const TYPICAL_WEIGHT_RES: [RegExp, number][] = TYPICAL_WEIGHTS.map(([k, g]) => [
+  new RegExp(`\\b${k}(?:e?s)?\\b`),
+  g
+])
 
 export interface EstimateDetail {
   name: string
@@ -77,7 +85,7 @@ export function ingredientGrams(
   if (qty === null) return null
   if (ing.unit) return UNIT_GRAMS[ing.unit] !== undefined ? qty * UNIT_GRAMS[ing.unit] : null
   const lower = ing.name.toLowerCase()
-  const hit = TYPICAL_WEIGHTS.find(([k]) => lower.includes(k))
+  const hit = TYPICAL_WEIGHT_RES.find(([re]) => re.test(lower))
   if (hit) return qty * hit[1]
   if (stapleServingGrams !== null) return qty * stapleServingGrams
   return null

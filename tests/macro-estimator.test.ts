@@ -19,6 +19,10 @@ describe('ingredientGrams', () => {
   })
   it('uses typical weights for unit-less counts', () => {
     expect(ingredientGrams(ing({ quantity: 2, name: 'large eggs' }), null)).toBe(100)
+    // Whole words only: eggplant is not an egg, pineapple is not an apple.
+    expect(ingredientGrams(ing({ quantity: 2, name: 'eggplants' }), null)).toBe(600)
+    expect(ingredientGrams(ing({ quantity: 1, name: 'pineapple' }), null)).toBeNull()
+    expect(ingredientGrams(ing({ quantity: 3, name: 'tomatoes' }), null)).toBe(360)
     expect(ingredientGrams(ing({ quantity: 1, name: 'brown onion, diced' }), null)).toBe(150)
   })
   it('falls back to the matched staple serving grams, else null', () => {
