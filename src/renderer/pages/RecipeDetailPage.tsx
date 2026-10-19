@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
 import { ChevronLeft, Heart } from 'lucide-react'
 import type { DraftRecipe, Recipe, RecipeEstimate, RecipePref } from '../../shared/types'
-import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
+import { formatScaledIngredient } from '../../shared/ingredient-parser'
 import type { EstimateDetail } from '../../shared/macro-estimator'
 import { getRecipe, deleteRecipe, copyToLibrary } from '../data/recipes'
 import { CUISINE_LABEL, DIET_LABEL } from '../../shared/types'
@@ -18,14 +18,6 @@ import { RecipeReviewForm } from '../components/RecipeReviewForm'
 import { useToast } from '../components/Toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { recipeInitial, recipeTone } from '../lib/recipeTone'
-
-function formatIngredient(ing: Recipe['ingredients'][number], factor: number): string {
-  const scaled = scaleIngredient(ing, factor)
-  if (scaled.quantity === null) return scaled.raw
-  let qty = formatQuantity(scaled.quantity)
-  if (scaled.quantityMax !== null) qty += `–${formatQuantity(scaled.quantityMax)}`
-  return [qty, scaled.unit, scaled.name].filter(Boolean).join(' ')
-}
 
 /** A saved recipe as the edit form's starting draft. `manual` confidence keeps the
  *  "check everything" scrape banner off — the owner already reviewed this once. */
@@ -329,7 +321,7 @@ export function RecipeDetailPage(props: {
           </div>
           {recipe.ingredients.map((ing) => (
             <div key={ing.position} className="rdetail__ingredient">
-              {formatIngredient(ing, factor)}
+              {formatScaledIngredient(ing, factor)}
             </div>
           ))}
         </section>
@@ -446,7 +438,7 @@ export function RecipeDetailPage(props: {
         />
       )}
 
-      {cooking && <CookingMode recipe={recipe} onClose={() => setCooking(false)} />}
+      {cooking && <CookingMode recipe={recipe} factor={factor} onClose={() => setCooking(false)} />}
       {groceryOpen && (
         <GroceryPreviewModal
           recipeIds={[recipe.id]}

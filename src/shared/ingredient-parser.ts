@@ -153,3 +153,13 @@ export function formatQuantity(n: number): string {
   if (Math.abs(nearest[0] - frac) > 0.02) return String(Math.round(n * 100) / 100)
   return whole === 0 ? nearest[1] : `${whole} ${nearest[1]}`
 }
+
+/** An ingredient line at a serving scale: "1 ½ cup flour", "2–3 cloves garlic". Lines
+ *  with no parsed quantity print as written. */
+export function formatScaledIngredient(ing: ParsedIngredient, factor: number): string {
+  const scaled = scaleIngredient(ing, factor)
+  if (scaled.quantity === null) return scaled.raw
+  let qty = formatQuantity(scaled.quantity)
+  if (scaled.quantityMax !== null) qty += `–${formatQuantity(scaled.quantityMax)}`
+  return [qty, scaled.unit, scaled.name].filter(Boolean).join(' ')
+}

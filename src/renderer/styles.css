@@ -1750,6 +1750,175 @@ body::before {
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
 }
 
+/* Cooking mode v2: timer tray, inline timer pills, "In this step", ingredient checklist */
+.cooking__timers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  max-width: 430px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+.cooking__timer {
+  display: flex;
+  align-items: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+.cooking__timer--paused {
+  opacity: 0.7;
+}
+.cooking__timer--done {
+  background: #fff;
+  color: #2b64e0;
+  animation: timer-done 1s ease-in-out infinite;
+}
+@keyframes timer-done {
+  50% {
+    transform: scale(1.04);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cooking__timer--done {
+    animation: none;
+  }
+}
+.cooking__timer-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 6px 0 12px;
+  background: none;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.cooking__timer--done .cooking__timer-main {
+  padding-right: 14px;
+}
+.cooking__timer-label {
+  opacity: 0.85;
+}
+.cooking__timer-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-size: 14px;
+}
+.cooking__timer-x {
+  width: 32px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  background: none;
+  border: none;
+  color: inherit;
+  opacity: 0.75;
+  cursor: pointer;
+}
+.cooking__timer-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  vertical-align: baseline;
+  padding: 0 12px;
+  margin: 2px 0;
+  border-radius: 999px;
+  border: none;
+  background: #fff;
+  color: #2b64e0;
+  font: inherit;
+  font-size: 0.85em;
+  line-height: 1.5;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+.cooking__timer-btn--live {
+  font-variant-numeric: tabular-nums;
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  box-shadow: none;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+.cooking__uses {
+  margin-top: 22px;
+}
+.cooking__uses-label {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.cooking__uses-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.cooking__use {
+  font-size: 13px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.cooking__ingredients-btn {
+  padding: 0;
+  width: 48px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+/* Sheets open inside the blue cooking layer, which sets white text — put the ink back. */
+.cooking .sheet {
+  color: var(--ink);
+}
+.cooking-list {
+  display: flex;
+  flex-direction: column;
+}
+.cooking-list__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  border-bottom: 1px solid rgba(27, 36, 48, 0.08);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.cooking-list__row--on {
+  color: var(--muted-3);
+  text-decoration: line-through;
+}
+.cooking-list__tick {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 2px solid var(--muted-3);
+  display: grid;
+  place-items: center;
+}
+.cooking-list__row--on .cooking-list__tick {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 /* ── Meal plan (shared week) ────────────────────────────────────────────── */
 .plan {
   display: flex;
