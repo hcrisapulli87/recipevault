@@ -4,7 +4,8 @@ import {
   cacheFood,
   lookupBarcode,
   getRecentFoods,
-  clearFoodSearchCache
+  clearFoodSearchCache,
+  pickCachedRow
 } from '../src/renderer/data/foods'
 import type { FoodItem } from '../src/shared/types'
 
@@ -449,5 +450,36 @@ describe('cacheFood', () => {
       source: 'manual'
     })
     expect(state.upserted).toHaveLength(0)
+  })
+})
+
+describe('pickCachedRow (household cache)', () => {
+  const row = (
+    owner: string,
+    barcode: string,
+    last: string
+  ): { owner_id: string; barcode: string; last_fetched: string } => ({
+    owner_id: owner,
+    barcode,
+    last_fetched: last
+  })
+
+  it('prefers my own row for a barcode', () => {
+    const rows = [row('partner', '123', '2026-10-18'), row('me', '123', '2026-01-01')]
+    expect(pickCachedRow(rows, ['123'], 'me')?.owner_id).toBe('me')
+  })
+
+  it('falls back to the freshest of the partner’s rows', () => {
+    const rows = [row('partner', '123', '2026-05-01'), row('bot', '123', '2026-10-01')]
+    expect(pickCachedRow(rows, ['123'], 'me')?.owner_id).toBe('bot')
+  })
+
+  it('lets the most literal spelling win, whoever cached it', () => {
+    const rows = [row('me', '0123', '2026-10-01'), row('partner', '123', '2026-01-01')]
+    expect(pickCachedRow(rows, ['123', '0123'], 'me')?.barcode).toBe('123')
+  })
+
+  it('is null when nothing is cached', () => {
+    expect(pickCachedRow([], ['123'], 'me')).toBeNull()
   })
 })

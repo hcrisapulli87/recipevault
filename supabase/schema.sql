@@ -274,9 +274,9 @@ create policy "import_queue: owner delete"     on public.import_queue for delete
 -- Macro tracker
 -- profiles: one row per auth user (display name + daily goals). The app upserts the row
 -- on first sign-in. food_log: owner-scoped daily entries; macros are stored per ONE unit,
--- so a day's total is base_* × amount. food_cache: a per-user barcode→macros cache so
--- re-scans are instant/offline (owner-scoped — no shared-mutable row another user could
--- poison; numeric bounds guard against garbage values).
+-- so a day's total is base_* × amount. food_cache: a barcode→macros cache so re-scans
+-- are instant/offline (household-readable since 2026-10, still owner-writable; numeric
+-- bounds guard against garbage values).
 -- ─────────────────────────────────────────────────────────────────────────────
 create table if not exists public.profiles (
   id           uuid primary key references auth.users (id) on delete cascade,
@@ -397,15 +397,27 @@ create policy "food_log: owner update" on public.food_log
 create policy "food_log: owner delete" on public.food_log
   for delete to authenticated using (owner_id = auth.uid());
 
--- food_cache is per-user: each person reads/writes only their own cached barcodes, so no
--- one can poison a row another user reads. (Drop any earlier shared policies if present.)
+-- food_cache (2026-10): household-readable, owner-writable — the same loop as every other
+-- table. One person's scan saves the other the lookup; nobody can edit the other's rows,
+-- so a bad entry can only ever come from your own household. The client prefers its own
+-- row for a barcode, then the freshest of the partner's (data/foods.ts pickCachedRow).
+-- Earlier policy names are dropped so re-runs upgrade cleanly.
 drop policy if exists "food_cache: shared read" on public.food_cache;
 drop policy if exists "food_cache: shared insert" on public.food_cache;
 drop policy if exists "food_cache: shared update" on public.food_cache;
 drop policy if exists "food_cache: own rows" on public.food_cache;
-create policy "food_cache: own rows" on public.food_cache
-  for all to authenticated
-  using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+drop policy if exists "food_cache: household read" on public.food_cache;
+drop policy if exists "food_cache: owner insert" on public.food_cache;
+drop policy if exists "food_cache: owner update" on public.food_cache;
+drop policy if exists "food_cache: owner delete" on public.food_cache;
+create policy "food_cache: household read" on public.food_cache
+  for select to authenticated using (true);
+create policy "food_cache: owner insert" on public.food_cache
+  for insert to authenticated with check (owner_id = auth.uid());
+create policy "food_cache: owner update" on public.food_cache
+  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "food_cache: owner delete" on public.food_cache
+  for delete to authenticated using (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Per-person recipe favourites and notes (2026-10). A side table rather than columns on

@@ -119,9 +119,10 @@ export interface BarcodeLookupResult {
 }
 
 const CACHE_COLS =
-  'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, fibre_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fibre_per_100g, serving_grams, last_fetched'
+  'owner_id, barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, fibre_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fibre_per_100g, serving_grams, last_fetched'
 
 interface CacheRow {
+  owner_id?: string
   barcode: string
   name: string
   brand: string | null
@@ -200,7 +201,28 @@ async function fetchOffProduct(
   }
 }
 
-/** Look up a barcode: per-user cache first, then OpenFoodFacts (and cache the result).
+/**
+ * Which cached row answers a scan. The cache is shared across the household (your
+ * partner's scan saves you the lookup), so a barcode can have a row from each of you:
+ * your own wins, then the freshest of anyone else's. The most literal barcode spelling
+ * still beats an equivalent one, whoever cached it.
+ */
+export function pickCachedRow<
+  T extends { owner_id?: string; barcode: string; last_fetched?: string | null }
+>(rows: T[], candidates: string[], meId: string | null): T | null {
+  for (const code of candidates) {
+    const forCode = rows.filter((r) => r.barcode === code)
+    if (forCode.length === 0) continue
+    const mine = forCode.find((r) => meId !== null && r.owner_id === meId)
+    if (mine) return mine
+    return [...forCode].sort((a, b) =>
+      (b.last_fetched ?? '').localeCompare(a.last_fetched ?? '')
+    )[0]
+  }
+  return null
+}
+
+/** Look up a barcode: household cache first (mine, then my partner's), then OpenFoodFacts (and cache the result).
  *  `skipCache` forces a fresh OFF fetch — the escape hatch for stale/typo'd cache rows.
  *
  *  Every equivalent spelling of the code is tried (UPC-A ⇄ EAN-13, UPC-E → UPC-A, see
@@ -221,10 +243,11 @@ export async function lookupBarcode(
   let stale: FoodItem | null = null
 
   if (!opts.skipCache) {
-    const { data } = await supabase.from('food_cache').select(CACHE_COLS).in('barcode', candidates)
-    const rows = (data ?? []) as CacheRow[]
-    // Prefer the row for the most literal spelling.
-    const cached = candidates.map((c) => rows.find((r) => r.barcode === c)).find(Boolean)
+    const [{ data }, { data: auth }] = await Promise.all([
+      supabase.from('food_cache').select(CACHE_COLS).in('barcode', candidates),
+      supabase.auth.getUser()
+    ])
+    const cached = pickCachedRow((data ?? []) as CacheRow[], candidates, auth.user?.id ?? null)
     if (cached) {
       const item = cacheRowToItem(cached)
       if (isFresh(cached.last_fetched)) return { item, online: true, fromCache: true }
