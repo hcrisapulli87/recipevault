@@ -1,4 +1,5 @@
-import type { DailyTotals, LogEntry } from './types'
+import { MEAL_TYPES } from './types'
+import type { DailyTotals, LogEntry, MealType } from './types'
 
 /**
  * Each macro's share of the day's energy (protein/carbs 4 kcal/g, fat 9), as 0–100
@@ -29,4 +30,60 @@ export function computeTotals(entries: LogEntry[]): DailyTotals {
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   )
+}
+
+/** A log entry with the day it was logged on — the shape the repeat-a-meal lookups read. */
+export type DatedLogEntry = LogEntry & { date: string }
+
+/** One earlier meal (or day) worth offering again: when, what, and its energy. */
+export interface PastMeal {
+  date: string
+  entries: LogEntry[]
+  calories: number
+}
+
+const kcalOf = (entries: LogEntry[]): number =>
+  entries.reduce((a, e) => a + e.baseCalories * e.amount, 0)
+
+/**
+ * For each meal type, the most recent day BEFORE `date` that had it — so an empty
+ * breakfast can offer "same as yesterday's", or Monday's if yesterday was skipped. Entries
+ * keep their logged order. Days on or after `date` are ignored.
+ */
+export function latestMealsBefore(
+  rows: DatedLogEntry[],
+  date: string
+): Partial<Record<MealType, PastMeal>> {
+  const out: Partial<Record<MealType, PastMeal>> = {}
+  for (const meal of MEAL_TYPES) {
+    const earlier = rows.filter((r) => r.mealType === meal && r.date < date)
+    if (earlier.length === 0) continue
+    const day = earlier.reduce((a, r) => (r.date > a ? r.date : a), earlier[0].date)
+    const entries = earlier.filter((r) => r.date === day).map(stripDate)
+    out[meal] = { date: day, entries, calories: kcalOf(entries) }
+  }
+  return out
+}
+
+/** The most recent day before `date` with anything logged, every meal included. */
+export function latestDayBefore(rows: DatedLogEntry[], date: string): PastMeal | null {
+  const earlier = rows.filter((r) => r.date < date)
+  if (earlier.length === 0) return null
+  const day = earlier.reduce((a, r) => (r.date > a ? r.date : a), earlier[0].date)
+  const entries = earlier.filter((r) => r.date === day).map(stripDate)
+  return { date: day, entries, calories: kcalOf(entries) }
+}
+
+function stripDate(r: DatedLogEntry): LogEntry {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { date, ...entry } = r
+  return entry
+}
+
+/** "yesterday's" / "Monday's" — how a past day reads in a repeat button. */
+export function pastDayLabel(pastDate: string, today: string): string {
+  const ms = (d: string): number => new Date(`${d}T00:00:00`).getTime()
+  const days = Math.round((ms(today) - ms(pastDate)) / 86_400_000)
+  if (days === 1) return 'yesterday’s'
+  return `${new Date(`${pastDate}T00:00:00`).toLocaleDateString('en-AU', { weekday: 'long' })}’s`
 }

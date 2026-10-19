@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { addLogEntry, getDailyLog, getProfile, updateProfile } from '../src/renderer/data/tracker'
+import {
+  addLogEntry,
+  copyEntriesTo,
+  getDailyLog,
+  getProfile,
+  updateProfile
+} from '../src/renderer/data/tracker'
 
 // In-memory stand-in for the two tracker tables. vi.hoisted so the vi.mock
 // factory (hoisted above imports) can close over it.
@@ -206,5 +212,51 @@ describe('addLogEntry', () => {
         source: 'staple'
       }
     ])
+  })
+})
+
+describe('copyEntriesTo', () => {
+  const entry = (over: Record<string, unknown>): Parameters<typeof copyEntriesTo>[0][number] => ({
+    id: 9,
+    mealType: 'breakfast',
+    name: 'Toast',
+    brand: null,
+    amount: 2,
+    unit: 'serving',
+    baseCalories: 100,
+    baseProtein: 4,
+    baseCarbs: 15,
+    baseFat: 2,
+    barcode: null,
+    source: 'staple',
+    ...over
+  })
+
+  it('logs every entry again on the new day in one insert, same amounts, no ids', async () => {
+    state.inserted = []
+    await copyEntriesTo(
+      [entry({}), entry({ id: 10, name: 'Coffee', mealType: 'snack' })],
+      '2026-10-19'
+    )
+    expect(state.inserted).toHaveLength(1)
+    const rows = state.inserted[0] as unknown as Record<string, unknown>[]
+    expect(rows.map((r) => [r.log_date, r.meal_type, r.name, r.amount])).toEqual([
+      ['2026-10-19', 'breakfast', 'Toast', 2],
+      ['2026-10-19', 'snack', 'Coffee', 2]
+    ])
+    expect(rows[0]).not.toHaveProperty('id')
+  })
+
+  it('moves them all into one meal when asked', async () => {
+    state.inserted = []
+    await copyEntriesTo([entry({ mealType: 'snack' })], '2026-10-19', 'lunch')
+    const rows = state.inserted[0] as unknown as Record<string, unknown>[]
+    expect(rows[0].meal_type).toBe('lunch')
+  })
+
+  it('does nothing for an empty list', async () => {
+    state.inserted = []
+    await copyEntriesTo([], '2026-10-19')
+    expect(state.inserted).toHaveLength(0)
   })
 })

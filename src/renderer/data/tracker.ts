@@ -1,5 +1,6 @@
 import { supabase } from './supabase'
 import { computeTotals } from '../../shared/tracker-logic'
+import type { DatedLogEntry } from '../../shared/tracker-logic'
 import { MEAL_TYPES } from '../../shared/types'
 import type { DailyLog, DailyTotals, LogEntry, MealType, ProfileGoals } from '../../shared/types'
 
@@ -196,8 +197,43 @@ export async function getDailyTotalsRange(
   return map
 }
 
-export async function addLogEntry(entry: NewLogEntry): Promise<void> {
-  const { error } = await supabase.from('food_log').insert({
+/** Every entry in a date range (inclusive), oldest day first — what the repeat-a-meal
+ *  buttons pick from. */
+export async function getLogEntriesRange(
+  ownerId: string,
+  from: string,
+  to: string
+): Promise<DatedLogEntry[]> {
+  const { data, error } = await supabase
+    .from('food_log')
+    .select(
+      'id, log_date, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source'
+    )
+    .eq('owner_id', ownerId)
+    .gte('log_date', from)
+    .lte('log_date', to)
+    .order('log_date')
+    .order('id')
+  if (error) throw new Error(error.message)
+  return (data ?? []).map((r) => ({ ...rowToLogEntry(r), date: r.log_date }))
+}
+
+/** Log earlier entries again on `date`, same foods and amounts, in one insert. `mealType`
+ *  moves them all into one meal; omitted, each keeps its own (copying a whole day). */
+export async function copyEntriesTo(
+  entries: LogEntry[],
+  date: string,
+  mealType?: MealType
+): Promise<void> {
+  if (entries.length === 0) return
+  const { error } = await supabase
+    .from('food_log')
+    .insert(entries.map((e) => toRow({ ...e, date, mealType: mealType ?? e.mealType })))
+  if (error) throw new Error(error.message)
+}
+
+function toRow(entry: NewLogEntry): Record<string, unknown> {
+  return {
     log_date: entry.date,
     meal_type: entry.mealType,
     name: entry.name,
@@ -210,7 +246,11 @@ export async function addLogEntry(entry: NewLogEntry): Promise<void> {
     base_fat: entry.baseFat,
     barcode: entry.barcode,
     source: entry.source
-  })
+  }
+}
+
+export async function addLogEntry(entry: NewLogEntry): Promise<void> {
+  const { error } = await supabase.from('food_log').insert(toRow(entry))
   if (error) throw new Error(error.message)
 }
 

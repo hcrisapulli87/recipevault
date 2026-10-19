@@ -536,6 +536,37 @@ export function AddFoodModal(props: {
   // then sat in the day's total contributing nothing. The kcal field must be FILLED, not
   // non-zero — black coffee and diet drinks are honestly 0.
   const manualReady = mName.trim() !== '' && mCal.trim() !== ''
+  // Quick add: just the numbers, no name — "a 450 kcal lunch I can't itemise". Logs in one
+  // tap as one serving; not offered while a scanned barcode is waiting to be named.
+  const quickReady = mName.trim() === '' && mCal.trim() !== '' && pendingBarcode === null
+
+  const quickAdd = async (): Promise<void> => {
+    if (!quickReady || logging) return
+    setLogging(true)
+    setLogError(null)
+    try {
+      await addLogEntry({
+        date: props.date,
+        mealType: meal,
+        name: 'Quick add',
+        brand: null,
+        amount: 1,
+        unit: 'serving',
+        baseCalories: Number(mCal) || 0,
+        baseProtein: Number(mProtein) || 0,
+        baseCarbs: Number(mCarbs) || 0,
+        baseFat: Number(mFat) || 0,
+        barcode: null,
+        source: 'manual'
+      })
+      toast(`Added to ${MEAL_LABEL[meal]}`)
+      props.onLogged()
+      props.onClose()
+    } catch (err) {
+      setLogError(err instanceof Error ? err.message : 'Could not save — try again.')
+      setLogging(false)
+    }
+  }
 
   const startManual = (): void => {
     if (!manualReady) return
@@ -822,7 +853,7 @@ export function AddFoodModal(props: {
                 <input
                   className="input-field"
                   value={mName}
-                  placeholder="e.g. Protein bar"
+                  placeholder="e.g. Protein bar — or leave blank to quick add"
                   autoFocus
                   onChange={(e) => setMName(e.target.value)}
                 />
@@ -890,13 +921,28 @@ export function AddFoodModal(props: {
               {mName.trim() !== '' && mCal.trim() === '' && (
                 <p className="addfood__note">Add the kcal per serve to continue.</p>
               )}
-              <button
-                className="btn-primary addfood__continue"
-                onClick={startManual}
-                disabled={!manualReady}
-              >
-                Continue
-              </button>
+              {quickReady ? (
+                <>
+                  {logError && <p className="addfood__note">{logError}</p>}
+                  <button
+                    className="btn-primary addfood__continue"
+                    onClick={quickAdd}
+                    disabled={logging}
+                  >
+                    {logging
+                      ? 'Adding…'
+                      : `Quick add ${Math.round(Number(mCal) || 0)} kcal to ${MEAL_LABEL[meal]}`}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn-primary addfood__continue"
+                  onClick={startManual}
+                  disabled={!manualReady}
+                >
+                  Continue
+                </button>
+              )}
             </div>
           )}
         </div>

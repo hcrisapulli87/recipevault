@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import { ChevronLeft, ChevronRight, Flame, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Flame, Plus, Repeat } from 'lucide-react'
 import type {
   DailyLog,
   DailyTotals,
@@ -11,9 +11,23 @@ import type {
   RecipeSummary
 } from '../../shared/types'
 import { DAYS, MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
-import { macroCalorieShares } from '../../shared/tracker-logic'
+import {
+  latestDayBefore,
+  latestMealsBefore,
+  macroCalorieShares,
+  pastDayLabel
+} from '../../shared/tracker-logic'
+import type { DatedLogEntry, PastMeal } from '../../shared/tracker-logic'
 import { planSlotToFood } from '../../shared/plan-to-food'
-import { deleteLogEntry, getDailyLog, getDailyTotalsRange, updateLogEntry } from '../data/tracker'
+import {
+  copyEntriesTo,
+  deleteLogEntry,
+  getDailyLog,
+  getDailyTotalsRange,
+  getLogEntriesRange,
+  updateLogEntry
+} from '../data/tracker'
+import { useToast } from '../components/Toast'
 import { getMealPlan } from '../data/mealPlan'
 import { loggingStreak, shiftDate as shiftIso } from '../../shared/trends'
 import { onTableChange } from '../data/realtime'
@@ -168,6 +182,10 @@ export function MacroTrackerPage(props: {
   const [log, setLog] = useState<DailyLog | null>(null)
   const [rangeTotals, setRangeTotals] = useState<Map<string, DailyTotals> | null>(null)
   const [editingId, setEditingId] = useState<number | null>(null)
+  // The last week of MY entries, for the "same as yesterday's" buttons on an empty meal.
+  const [pastRows, setPastRows] = useState<DatedLogEntry[]>([])
+  const [copying, setCopying] = useState(false)
+  const toast = useToast()
   const { users, current, readOnly } = props
 
   const isToday = date === todayStr()
@@ -209,6 +227,37 @@ export function MacroTrackerPage(props: {
     reloadRange()
     return onTableChange(['food_log'], reloadRange)
   }, [reloadRange])
+
+  // Repeat-a-meal sources: only ever my own log, only offered on today.
+  const myId = current?.isMe ? current.id : null
+  const reloadPast = useCallback((): void => {
+    if (!myId) return
+    const today = todayStr()
+    getLogEntriesRange(myId, shiftIso(today, -7), shiftIso(today, -1)).then(
+      setPastRows,
+      () => undefined // offline — the buttons just don't appear
+    )
+  }, [myId])
+
+  useEffect(() => {
+    reloadPast()
+    return onTableChange(['food_log'], reloadPast)
+  }, [reloadPast])
+
+  /** Log an earlier meal (or whole day) again today, same foods and amounts. */
+  const repeat = async (past: PastMeal, label: string, meal?: MealType): Promise<void> => {
+    if (copying) return
+    setCopying(true)
+    try {
+      await copyEntriesTo(past.entries, todayStr(), meal)
+      toast(`Copied ${label}`)
+      reloadLog()
+    } catch {
+      toast("Couldn't copy — check your connection.")
+    } finally {
+      setCopying(false)
+    }
+  }
 
   // The selected person's meal plan, for the one-tap "log the planned meal" card — it
   // follows the switcher so the partner's read-only day shows what THEY planned.
@@ -252,6 +301,10 @@ export function MacroTrackerPage(props: {
   const streak = rangeTotals ? loggingStreak(rangeTotals, todayStr()) : 0
   const dayEmpty =
     log != null && MEAL_TYPES.every((m) => (log.meals[m] ?? []).length === 0) && !readOnly
+  const pastMeals = canEdit ? latestMealsBefore(pastRows, date) : {}
+  const pastDay = canEdit && dayEmpty ? latestDayBefore(pastRows, date) : null
+  const summary = (p: PastMeal): string =>
+    `${p.entries.length} item${p.entries.length === 1 ? '' : 's'} · ${Math.round(p.calories).toLocaleString()} kcal`
 
   const heroSub = dayEmpty
     ? 'Nothing logged yet'
@@ -367,6 +420,16 @@ export function MacroTrackerPage(props: {
           <button className="btn-primary" onClick={() => props.onAddFood('breakfast', null)}>
             + Log a food
           </button>
+          {pastDay && (
+            <button
+              className="btn-secondary tracker-empty__repeat"
+              disabled={copying}
+              onClick={() => repeat(pastDay, `${pastDayLabel(pastDay.date, date)} food`)}
+            >
+              <Repeat size={15} strokeWidth={2.4} />
+              Copy all of {pastDayLabel(pastDay.date, date)} food · {summary(pastDay)}
+            </button>
+          )}
         </div>
       )}
 
@@ -391,7 +454,26 @@ export function MacroTrackerPage(props: {
                   </button>
                 )}
               </div>
-              {entries.length === 0 ? (
+              {entries.length === 0 && pastMeals[meal] ? (
+                <button
+                  className="meal-card__repeat"
+                  disabled={copying}
+                  onClick={() =>
+                    repeat(
+                      pastMeals[meal]!,
+                      `${pastDayLabel(pastMeals[meal]!.date, date)} ${MEAL_LABEL[meal].toLowerCase()}`,
+                      meal
+                    )
+                  }
+                >
+                  <Repeat size={14} strokeWidth={2.4} />
+                  <span>
+                    Same as {pastDayLabel(pastMeals[meal]!.date, date)}{' '}
+                    {MEAL_LABEL[meal].toLowerCase()}
+                    <span className="meal-card__repeat-meta"> · {summary(pastMeals[meal]!)}</span>
+                  </span>
+                </button>
+              ) : entries.length === 0 ? (
                 <div className="meal-card__empty">Nothing yet</div>
               ) : (
                 entries.map((e) => (
