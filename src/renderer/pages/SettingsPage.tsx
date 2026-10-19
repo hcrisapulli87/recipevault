@@ -12,6 +12,9 @@ import {
 import type { BodySex, CalculatedGoals, GoalDirection } from '../../shared/goal-calculator'
 import { getBodyStats, saveBodyStats } from '../data/bodyStats'
 import { useToast } from '../components/Toast'
+import { useEnergy } from '../components/EnergyUnit'
+import { energyValue, toKcal } from '../../shared/energy'
+import type { EnergyUnit } from '../../shared/energy'
 
 const toNum = (s: string): number | null => {
   const n = Number(s)
@@ -21,12 +24,24 @@ const toStr = (n: number | null): string => (n == null ? '' : String(Math.round(
 
 export function SettingsPage(): JSX.Element {
   const toast = useToast()
+  const energy = useEnergy()
   const [email, setEmail] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [loaded, setLoaded] = useState(false)
 
   // Daily goals as input strings (blank = no goal → null in the profile).
-  const [gCal, setGCal] = useState('')
+  // The energy goal as typed, remembering WHICH unit it was typed in: the kJ/kcal
+  // preference loads asynchronously and can be flipped on this page, so the field is
+  // converted when shown and when saved rather than trusting it matches the current unit.
+  const [gCal, setGCalState] = useState<{ text: string; unit: EnergyUnit }>({
+    text: '',
+    unit: 'kcal'
+  })
+  const setGCal = (text: string): void => setGCalState({ text, unit: energy.unit })
+  const calText =
+    gCal.unit === energy.unit || toNum(gCal.text) == null
+      ? gCal.text
+      : String(energyValue(toKcal(Number(gCal.text), gCal.unit), energy.unit))
   const [gProtein, setGProtein] = useState('')
   const [gCarbs, setGCarbs] = useState('')
   const [gFat, setGFat] = useState('')
@@ -46,7 +61,7 @@ export function SettingsPage(): JSX.Element {
     getSession().then((s) => setEmail(s?.user.email ?? null))
     getProfile().then((p) => {
       setName(p.name)
-      setGCal(toStr(p.calGoal))
+      setGCalState({ text: toStr(p.calGoal), unit: 'kcal' }) // stored in kcal
       setGProtein(toStr(p.proteinGoal))
       setGCarbs(toStr(p.carbsGoal))
       setGFat(toStr(p.fatGoal))
@@ -66,13 +81,20 @@ export function SettingsPage(): JSX.Element {
     )
   }, [])
 
+  /** Flip kJ⇄kcal everywhere; the goal field on screen re-renders in the new unit. */
+  const switchUnit = (next: EnergyUnit): void => {
+    if (next === energy.unit) return
+    energy.setUnit(next)
+  }
+
   const saveName = async (): Promise<void> => {
     if (!loaded || !name.trim()) return
     await updateProfile({ name: name.trim() })
   }
 
   const goalsFromInputs = (): ProfileGoals => ({
-    calGoal: toNum(gCal),
+    // Typed in the display unit, stored in kcal.
+    calGoal: toNum(gCal.text) == null ? null : Math.round(toKcal(Number(gCal.text), gCal.unit)),
     proteinGoal: toNum(gProtein),
     carbsGoal: toNum(gCarbs),
     fatGoal: toNum(gFat),
@@ -123,7 +145,7 @@ export function SettingsPage(): JSX.Element {
 
   const useSuggestion = async (): Promise<void> => {
     if (!suggestion) return
-    setGCal(String(suggestion.calories))
+    setGCalState({ text: String(suggestion.calories), unit: 'kcal' })
     setGProtein(String(suggestion.protein))
     setGCarbs(String(suggestion.carbs))
     setGFat(String(suggestion.fat))
@@ -158,6 +180,21 @@ export function SettingsPage(): JSX.Element {
           <span className="settings-chip">Signed in</span>
         </div>
         <div className="settings-row">
+          <span className="settings-row__label">Energy</span>
+          <div className="seg settings-unit" role="group" aria-label="Energy unit">
+            {(['kcal', 'kj'] as EnergyUnit[]).map((u) => (
+              <button
+                key={u}
+                className={`seg__btn seg__btn--small ${energy.unit === u ? 'seg__btn--active' : ''}`}
+                aria-pressed={energy.unit === u}
+                onClick={() => switchUnit(u)}
+              >
+                {u === 'kcal' ? 'kcal' : 'kJ'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="settings-row">
           <span className="settings-row__label">Theme</span>
           <span className="settings-row__value">Glass (light)</span>
         </div>
@@ -173,12 +210,12 @@ export function SettingsPage(): JSX.Element {
         <div className="settings-island__title">Daily goals</div>
         <div className="ffield-grid settings-goals">
           <label className="ffield">
-            <span className="ffield__label">Calories (kcal)</span>
+            <span className="ffield__label">Energy ({energy.label})</span>
             <input
               className="input-field"
               type="number"
               min="0"
-              value={gCal}
+              value={calText}
               onChange={(e) => setGCal(e.target.value)}
               onBlur={saveGoals}
             />
@@ -321,8 +358,8 @@ export function SettingsPage(): JSX.Element {
           <div className="settings-result">
             <div className="settings-result__note">Suggested (rough guide, not medical advice)</div>
             <div className="settings-result__line">
-              {suggestion.calories.toLocaleString()} kcal · P {suggestion.protein} · C{' '}
-              {suggestion.carbs} · F {suggestion.fat} · Fibre {suggestion.fibre}
+              {energy.fmt(suggestion.calories)} · P {suggestion.protein} · C {suggestion.carbs} · F{' '}
+              {suggestion.fat} · Fibre {suggestion.fibre}
             </div>
             <button className="btn-primary settings-result__use" onClick={useSuggestion}>
               Use these

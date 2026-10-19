@@ -5,6 +5,7 @@ import { CUISINES, CUISINE_LABEL, DIET_TAGS, DIET_LABEL } from '../../shared/typ
 import type { Cuisine, DietTag, RecipeSummary } from '../../shared/types'
 import { useHousehold } from '../hooks/useHousehold'
 import { recipeInitial, recipeTone } from '../lib/recipeTone'
+import { useEnergy } from '../components/EnergyUnit'
 
 type Tab = 'mine' | 'catalog'
 
@@ -31,6 +32,7 @@ export function LibraryPage(props: {
   onOpen: (id: number) => void
   onImport: () => void
 }): JSX.Element {
+  const energy = useEnergy()
   const [search, setSearch] = useState('')
   const [tab, setTab] = useState<Tab>('mine')
   const [cuisine, setCuisine] = useState<Cuisine | null>(null)
@@ -186,7 +188,7 @@ export function LibraryPage(props: {
       ) : (
         <div className="library__grid">
           {filtered.map((r) => {
-            const meta = [timeChip(r.totalMin), r.est ? `~${Math.round(r.est.calories)} kcal` : null]
+            const meta = [timeChip(r.totalMin), r.est ? `~${energy.fmt(r.est.calories)}` : null]
               .filter(Boolean)
               .join(' · ')
             const keeps = keepsChip(r)

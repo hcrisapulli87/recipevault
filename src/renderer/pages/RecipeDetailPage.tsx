@@ -16,6 +16,7 @@ import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
 import { RecipeReviewForm } from '../components/RecipeReviewForm'
 import { useToast } from '../components/Toast'
+import { useEnergy } from '../components/EnergyUnit'
 import { useHousehold } from '../hooks/useHousehold'
 import { recipeInitial, recipeTone } from '../lib/recipeTone'
 
@@ -51,6 +52,7 @@ export function RecipeDetailPage(props: {
   onToggleFavourite: (recipeId: number) => void
 }): JSX.Element {
   const toast = useToast()
+  const energy = useEnergy()
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState<number | null>(null)
   const [cooking, setCooking] = useState(false)
@@ -251,7 +253,7 @@ export function RecipeDetailPage(props: {
         <div className="rdetail__chips">
           {recipe.totalMin !== null && <span className="glass-chip">{recipe.totalMin} min</span>}
           {est && (
-            <span className="glass-chip">~{Math.round(est.calories)} kcal / serve · est.</span>
+            <span className="glass-chip">~{energy.fmt(est.calories)} / serve · est.</span>
           )}
           {recipe.isCatalog && recipe.cuisine && (
             <span className="glass-chip glass-chip--tint">{CUISINE_LABEL[recipe.cuisine]}</span>
@@ -420,7 +422,7 @@ export function RecipeDetailPage(props: {
             {estDetail.map((d, i) => (
               <li key={i} className={d.matched ? '' : 'rdetail__est-miss'}>
                 {d.matched
-                  ? `${d.name} — ${Math.round(d.grams ?? 0)} g · ${d.calories} kcal`
+                  ? `${d.name} — ${Math.round(d.grams ?? 0)} g · ${energy.fmt(d.calories)}`
                   : `${d.name} — not matched`}
               </li>
             ))}

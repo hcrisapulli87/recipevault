@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
 import type { PlanMeal, RecipeSummary } from '../../shared/types'
+import { useEnergy } from './EnergyUnit'
 
 /**
  * Search box + tappable list of recipes. Shared by the planner's slot editor and the
@@ -17,6 +18,7 @@ export function RecipePicker(props: {
   /** Cap on rendered rows; the search box is how you reach the rest. */
   limit?: number
 }): JSX.Element {
+  const energy = useEnergy()
   const [search, setSearch] = useState('')
   const term = search.trim().toLowerCase()
 
@@ -37,7 +39,7 @@ export function RecipePicker(props: {
         {matches.slice(0, props.limit ?? 40).map((r) => (
           <button key={r.id} className="plan-edit__recipe" onClick={() => props.onPick(r)}>
             <span>{r.title}</span>
-            {r.est && <span className="plan-edit__kcal">~{Math.round(r.est.calories)} kcal</span>}
+            {r.est && <span className="plan-edit__kcal">~{energy.fmt(r.est.calories)}</span>}
           </button>
         ))}
         {matches.length === 0 && <p className="addfood__note">No recipes match that search.</p>}

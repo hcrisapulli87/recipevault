@@ -15,6 +15,7 @@ import type { HitRate, Standout } from '../../shared/trends'
 import { getDailyLog, getDailyTotalsRange } from '../data/tracker'
 import { onTableChange } from '../data/realtime'
 import type { HouseholdUser } from '../data/users'
+import { useEnergy } from '../components/EnergyUnit'
 
 function isoToday(): string {
   const d = new Date()
@@ -96,6 +97,7 @@ function StandoutRow(props: {
  *  standout days and (on the longer ranges) a weekly breakdown. All read-only over food_log. */
 export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Element {
   const { current } = props
+  const energy = useEnergy()
   const [range, setRange] = useState<Range>(7)
   const [totals, setTotals] = useState<Map<string, DailyTotals> | null>(null)
   const [goals, setGoals] = useState<DailyLog['goals'] | null>(null)
@@ -129,7 +131,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
   const calGoal = goals?.calories ?? null
   const proteinGoal = goals?.protein ?? null
   const summary = summarizeWindow(data, today, range)
-  const avgKcal = summary.avg ? Math.round(summary.avg.calories) : 0
+  const avgKcal = summary.avg ? summary.avg.calories : 0
   const avgProtein = summary.avg ? Math.round(summary.avg.protein) : 0
   const calRate = calorieHitRate(data, today, range, calGoal)
   const proteinRate = proteinHitRate(data, today, range, proteinGoal)
@@ -159,7 +161,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
                   .toUpperCase(),
           caption:
             range === 7 && (b.logged || b.date === today)
-              ? `${(b.calories / 1000).toFixed(1)}k`
+              ? `${(energy.value(b.calories) / 1000).toFixed(1)}k`
               : range === 7
                 ? '–'
                 : null
@@ -174,12 +176,12 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
     const { verdict, daysUnder } = weekVerdict(data, today, calGoal)
     headline = VERDICT_LABEL[verdict]
     headlineSub = calGoal
-      ? `${daysUnder} of 7 days at or under goal (${Math.round(calGoal).toLocaleString()} kcal)`
-      : `No goal set — weekly average ${avgKcal.toLocaleString()} kcal`
+      ? `${daysUnder} of 7 days at or under goal (${energy.fmt(calGoal)})`
+      : `No goal set — weekly average ${energy.fmt(avgKcal)}`
   } else {
-    headline = summary.avg ? `${avgKcal.toLocaleString()} kcal a day` : 'Nothing logged yet'
+    headline = summary.avg ? `${energy.fmt(avgKcal)} a day` : 'Nothing logged yet'
     headlineSub = calGoal
-      ? `Average over ${summary.loggedDays} logged days · goal ${Math.round(calGoal).toLocaleString()} kcal`
+      ? `Average over ${summary.loggedDays} logged days · goal ${energy.fmt(calGoal)}`
       : `Average over ${summary.loggedDays} logged days`
   }
 
@@ -221,7 +223,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
                 {b.caption !== null && <span className="trends__bar-kcal">{b.caption}</span>}
                 <div
                   className="trends__bar"
-                  title={`${b.label} · ${Math.round(b.value).toLocaleString()} kcal`}
+                  title={`${b.label} · ${energy.fmt(b.value)}`}
                   style={{
                     height: b.logged ? `${Math.max(6, Math.round((b.value / maxK) * 100))}%` : '3%',
                     background: b.highlight
@@ -254,8 +256,8 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
 
       <div className="trends__stats">
         <div className="trends__stat glass-island">
-          <div className="trends__stat-label">Avg kcal</div>
-          <div className="trends__stat-value">{avgKcal.toLocaleString()}</div>
+          <div className="trends__stat-label">Avg {energy.label}</div>
+          <div className="trends__stat-value">{energy.value(avgKcal).toLocaleString('en-AU')}</div>
         </div>
         <div className="trends__stat glass-island">
           <div className="trends__stat-label">Avg protein</div>
@@ -277,7 +279,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
           unset="Set a protein goal in Settings"
         />
         <HitTile
-          label="At or under kcal goal"
+          label={`At or under ${energy.label} goal`}
           rate={calRate}
           unset="Set a calorie goal in Settings"
         />
@@ -289,7 +291,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
           <StandoutRow
             label="Closest to goal"
             day={standouts.closest}
-            value={`${Math.round(standouts.closest?.totals.calories ?? 0).toLocaleString()} kcal`}
+            value={energy.fmt(standouts.closest?.totals.calories ?? 0)}
           />
           <StandoutRow
             label="Most protein"
@@ -299,7 +301,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
           <StandoutRow
             label="Biggest day"
             day={standouts.biggest}
-            value={`${Math.round(standouts.biggest?.totals.calories ?? 0).toLocaleString()} kcal`}
+            value={energy.fmt(standouts.biggest?.totals.calories ?? 0)}
           />
         </div>
       )}
@@ -316,8 +318,7 @@ export function TrendsPage(props: { current: HouseholdUser | null }): JSX.Elemen
               </span>
               {w.avg ? (
                 <span className="trends__week-values">
-                  {Math.round(w.avg.calories).toLocaleString()} kcal · {Math.round(w.avg.protein)} g
-                  protein
+                  {energy.fmt(w.avg.calories)} · {Math.round(w.avg.protein)} g protein
                 </span>
               ) : (
                 <span className="trends__week-values trends__week-values--empty">

@@ -357,6 +357,11 @@ alter table public.food_log   add column if not exists base_fibre     real;
 alter table public.food_cache add column if not exists fibre_per_unit real;
 alter table public.food_cache add column if not exists fibre_per_100g real;
 
+-- Energy display unit (2026-10): 'kcal' or 'kj'. Display only — every energy figure is
+-- still stored in kcal and converted at the edge (shared/energy.ts).
+alter table public.profiles add column if not exists energy_unit text not null default 'kcal'
+  check (energy_unit in ('kcal', 'kj'));
+
 alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;
 alter table public.food_cache enable row level security;

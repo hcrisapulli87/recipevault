@@ -28,6 +28,7 @@ import {
   updateLogEntry
 } from '../data/tracker'
 import { useToast } from '../components/Toast'
+import { useEnergy } from '../components/EnergyUnit'
 import { getMealPlan } from '../data/mealPlan'
 import { loggingStreak, shiftDate as shiftIso } from '../../shared/trends'
 import { onTableChange } from '../data/realtime'
@@ -81,9 +82,10 @@ function EntryRow(props: {
   onDelete: () => void
 }): JSX.Element {
   const { entry } = props
+  const energy = useEnergy()
   const isGram = entry.unit === '100g'
   const step = isGram ? 0.1 : 0.5 // 10 g in gram mode, half-serve otherwise
-  const cals = Math.round(entry.baseCalories * entry.amount)
+  const cals = energy.value(entry.baseCalories * entry.amount)
   const sub = [
     entry.brand,
     portionText(entry),
@@ -186,6 +188,7 @@ export function MacroTrackerPage(props: {
   const [pastRows, setPastRows] = useState<DatedLogEntry[]>([])
   const [copying, setCopying] = useState(false)
   const toast = useToast()
+  const energy = useEnergy()
   const { users, current, readOnly } = props
 
   const isToday = date === todayStr()
@@ -321,15 +324,15 @@ export function MacroTrackerPage(props: {
   const pastMeals = canEdit ? latestMealsBefore(pastRows, date) : {}
   const pastDay = canEdit && dayEmpty ? latestDayBefore(pastRows, date) : null
   const summary = (p: PastMeal): string =>
-    `${p.entries.length} item${p.entries.length === 1 ? '' : 's'} · ${Math.round(p.calories).toLocaleString()} kcal`
+    `${p.entries.length} item${p.entries.length === 1 ? '' : 's'} · ${energy.fmt(p.calories)}`
 
   const heroSub = dayEmpty
     ? 'Nothing logged yet'
     : calGoal == null
       ? 'No goal set — showing energy share per macro'
       : calGoal - totals.calories >= 0
-        ? `${Math.round(calGoal - totals.calories).toLocaleString()} left`
-        : `${Math.round(totals.calories - calGoal).toLocaleString()} over — tomorrow is a new day`
+        ? `${energy.fmt(calGoal - totals.calories)} left`
+        : `${energy.fmt(totals.calories - calGoal)} over — tomorrow is a new day`
 
   return (
     <div className="tracker">
@@ -386,9 +389,11 @@ export function MacroTrackerPage(props: {
       <div className="tracker-hero glass-hero">
         <div className="tracker-hero__eyebrow">Eaten · estimates</div>
         <div className="tracker-hero__kcal-row">
-          <span className="tracker-hero__kcal">{Math.round(totals.calories).toLocaleString()}</span>
+          <span className="tracker-hero__kcal">
+            {energy.value(totals.calories).toLocaleString('en-AU')}
+          </span>
           <span className="tracker-hero__goal">
-            {calGoal != null ? `/ ${Math.round(calGoal).toLocaleString()} kcal` : 'kcal eaten'}
+            {calGoal != null ? `/ ${energy.fmt(calGoal)}` : `${energy.label} eaten`}
           </span>
         </div>
         {calGoal != null && (
@@ -474,12 +479,13 @@ export function MacroTrackerPage(props: {
       <div className="tracker-meals">
         {MEAL_TYPES.map((meal) => {
           const entries = log?.meals[meal] ?? []
-          const mealKcal = Math.round(entries.reduce((a, e) => a + e.baseCalories * e.amount, 0))
+          const mealKcal = entries.reduce((a, e) => a + e.baseCalories * e.amount, 0)
           return (
             <section key={meal} className="meal-card glass-island">
               <div className="meal-card__head">
                 <span className="meal-card__title">
-                  {MEAL_LABEL[meal]} <span className="meal-card__kcal">· {mealKcal} kcal</span>
+                  {MEAL_LABEL[meal]}{' '}
+                  <span className="meal-card__kcal">· {energy.fmt(mealKcal)}</span>
                 </span>
                 {canEdit && (
                   <button

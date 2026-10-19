@@ -3,6 +3,7 @@ import type { JSX } from 'react'
 import { ChevronLeft } from 'lucide-react'
 import { GlassDock } from './components/GlassDock'
 import { ToastProvider } from './components/Toast'
+import { EnergyUnitProvider } from './components/EnergyUnit'
 import { AddFoodModal } from './components/AddFoodModal'
 import { LibraryPage } from './pages/LibraryPage'
 import { ImportPage } from './pages/ImportPage'
@@ -187,7 +188,9 @@ function AppInner(): JSX.Element {
 export default function App(): JSX.Element {
   return (
     <ToastProvider>
-      <AppInner />
+      <EnergyUnitProvider>
+        <AppInner />
+      </EnergyUnitProvider>
     </ToastProvider>
   )
 }

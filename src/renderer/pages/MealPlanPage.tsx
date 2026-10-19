@@ -14,6 +14,7 @@ import { RecipePicker } from '../components/RecipePicker'
 import { getMealPlan, setMeal, clearWeek, applyGeneratedWeek } from '../data/mealPlan'
 import { onTableChange } from '../data/realtime'
 import type { HouseholdUser } from '../data/users'
+import { useEnergy } from '../components/EnergyUnit'
 
 const SLOT_KEY: Record<PlanMeal, string> = { breakfast: 'B', lunch: 'L', dinner: 'D' }
 
@@ -40,6 +41,7 @@ export function MealPlanPage(props: {
   onOpenRecipe: (id: number) => void
   onLogToTracker: (meal: MealType, planned: FoodItem) => void
 }): JSX.Element {
+  const energy = useEnergy()
   const { users, current, readOnly } = props
   const [plan, setPlan] = useState<MealPlanEntry[]>([])
   const [groceryOpen, setGroceryOpen] = useState(false)
@@ -232,7 +234,7 @@ export function MealPlanPage(props: {
             <strong>{filledSlots.length}</strong>/21 slots
           </span>
           {avgKcal !== null && (
-            <span className="plan-summary__kcal">~{avgKcal.toLocaleString()} kcal/day · est.</span>
+            <span className="plan-summary__kcal">~{energy.fmt(avgKcal)}/day · est.</span>
           )}
         </div>
         {!readOnly && (
@@ -328,7 +330,7 @@ export function MealPlanPage(props: {
                 <span className="suggest-card__title">{r.title}</span>
                 <span className="suggest-card__meta">
                   Add to {DAY_SHORT[suggestion.day]}
-                  {r.est ? ` · ~${Math.round(r.est.calories)} kcal` : ''}
+                  {r.est ? ` · ~${energy.fmt(r.est.calories)}` : ''}
                 </span>
               </button>
             ))}

@@ -11,6 +11,7 @@ import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
 import { BottomSheet } from './BottomSheet'
 import { useToast } from './Toast'
+import { useEnergy } from './EnergyUnit'
 
 type Tab = 'search' | 'scan' | 'manual'
 
@@ -27,8 +28,11 @@ const fmtG = (n: number): string => {
 /** What the row's kcal figure is actually per. Generics are per 100 g and branded
  *  products are usually per serve, so the bare number in the column was comparing two
  *  different things — 11 for a 5 g scrape of Vegemite sat next to 260 for 100 g of bread. */
-function kcalBasis(item: FoodItem): string {
-  return item.unit === '100g' ? '/100g' : '/serve'
+function kcalBasis(item: FoodItem, unitLabel: string): string {
+  // kcal has always been the column's silent default; a kJ figure says so, because the
+  // two can't be told apart by size alone.
+  const prefix = unitLabel === 'kJ' ? ' kJ' : ''
+  return `${prefix}${item.unit === '100g' ? '/100g' : '/serve'}`
 }
 
 /** A stable identity for a food row — index keys reorder wrongly as results change. */
@@ -66,6 +70,7 @@ function per100gOf(item: FoodItem): Per100g | null {
 /** One tappable food row: readable title + demoted detail, kcal right-aligned. */
 function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): JSX.Element {
   const label = foodLabel(props.item)
+  const energy = useEnergy()
   return (
     <button className="food-row" onClick={props.onPick}>
       <span className="food-row__main">
@@ -73,8 +78,8 @@ function FoodRow(props: { item: FoodItem; onPick: () => void; note?: string }): 
         <span className="food-row__sub">{props.note ?? label.detail}</span>
       </span>
       <span className="food-row__kcal">
-        {Math.round(props.item.calories)}
-        <span className="food-row__basis">{kcalBasis(props.item)}</span>
+        {energy.value(props.item.calories)}
+        <span className="food-row__basis">{kcalBasis(props.item, energy.label)}</span>
       </span>
     </button>
   )
@@ -95,6 +100,7 @@ function ConfirmStep(props: {
   recheckNote?: string | null
 }): JSX.Element {
   const p100 = per100gOf(props.item)
+  const energy = useEnergy()
   const measures = props.item.measures ?? []
   // Flexible when we have a per-100 g basis: the user can log by grams OR by any
   // known serving. Without a basis (legacy cache/manual serving items) we keep the
@@ -308,7 +314,7 @@ function ConfirmStep(props: {
       <div className="confirm__tiles">
         {(
           [
-            ['KCAL', Math.round(macros.calories).toLocaleString()],
+            [energy.label.toUpperCase(), energy.value(macros.calories).toLocaleString('en-AU')],
             ['P', fmtG(macros.protein)],
             ['C', fmtG(macros.carbs)],
             ['F', fmtG(macros.fat)]
@@ -356,6 +362,7 @@ export function AddFoodModal(props: {
   onLogged: () => void
 }): JSX.Element {
   const toast = useToast()
+  const energy = useEnergy()
   const [meal, setMeal] = useState<MealType>(props.mealType)
   const [tab, setTab] = useState<Tab>('search')
   const [selected, setSelected] = useState<FoodItem | null>(null)
@@ -567,7 +574,7 @@ export function AddFoodModal(props: {
         brand: null,
         amount: 1,
         unit: 'serving',
-        baseCalories: Number(mCal) || 0,
+        baseCalories: energy.toKcal(Number(mCal) || 0),
         baseProtein: Number(mProtein) || 0,
         baseCarbs: Number(mCarbs) || 0,
         baseFat: Number(mFat) || 0,
@@ -588,7 +595,8 @@ export function AddFoodModal(props: {
     if (!manualReady) return
     setSelectedFromCache(false)
     const serveG = Number(mServeG)
-    const cal = Number(mCal) || 0
+    // Typed in the display unit (kJ off an Australian label), stored in kcal.
+    const cal = energy.toKcal(Number(mCal) || 0)
     const protein = Number(mProtein) || 0
     const carbs = Number(mCarbs) || 0
     const fat = Number(mFat) || 0
@@ -730,8 +738,8 @@ export function AddFoodModal(props: {
                     <span className="food-row__sub">{props.planned.servingDesc}</span>
                   </span>
                   <span className="food-row__kcal">
-                    {Math.round(props.planned.calories)}
-                    <span className="food-row__basis">{kcalBasis(props.planned)}</span>
+                    {energy.value(props.planned.calories)}
+                    <span className="food-row__basis">{kcalBasis(props.planned, energy.label)}</span>
                   </span>
                 </button>
               )}
@@ -904,7 +912,7 @@ export function AddFoodModal(props: {
                   />
                 </label>
                 <label className="ffield">
-                  <span className="ffield__label">kcal / serve</span>
+                  <span className="ffield__label">{energy.label} / serve</span>
                   <input
                     className="input-field"
                     type="number"
@@ -955,7 +963,7 @@ export function AddFoodModal(props: {
                 </label>
               </div>
               {mName.trim() !== '' && mCal.trim() === '' && (
-                <p className="addfood__note">Add the kcal per serve to continue.</p>
+                <p className="addfood__note">Add the {energy.label} per serve to continue.</p>
               )}
               {quickReady ? (
                 <>
@@ -967,7 +975,7 @@ export function AddFoodModal(props: {
                   >
                     {logging
                       ? 'Adding…'
-                      : `Quick add ${Math.round(Number(mCal) || 0)} kcal to ${MEAL_LABEL[meal]}`}
+                      : `Quick add ${Math.round(Number(mCal) || 0)} ${energy.label} to ${MEAL_LABEL[meal]}`}
                   </button>
                 </>
               ) : (
