@@ -22,6 +22,7 @@ const row = (
   baseProtein: 0,
   baseCarbs: 0,
   baseFat: 0,
+  baseFibre: null,
   barcode: null,
   source: 'staple'
 })

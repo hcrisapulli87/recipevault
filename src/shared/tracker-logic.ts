@@ -1,5 +1,5 @@
 import { MEAL_TYPES } from './types'
-import type { DailyTotals, LogEntry, MealType } from './types'
+import type { DailyTotals, FibreSummary, LogEntry, MealType } from './types'
 
 /**
  * Each macro's share of the day's energy (protein/carbs 4 kcal/g, fat 9), as 0–100
@@ -30,6 +30,19 @@ export function computeTotals(entries: LogEntry[]): DailyTotals {
     }),
     { calories: 0, protein: 0, carbs: 0, fat: 0 }
   )
+}
+
+/** Fibre over the entries that HAVE a figure, and how many did — a day of 7 foods where 5
+ *  carry fibre reads "18 g from 5 of 7", never a falsely precise total. */
+export function computeFibre(entries: LogEntry[]): FibreSummary {
+  let total = 0
+  let known = 0
+  for (const e of entries) {
+    if (e.baseFibre === null || e.baseFibre === undefined) continue
+    total += e.baseFibre * e.amount
+    known++
+  }
+  return { total, known, entries: entries.length }
 }
 
 /** A log entry with the day it was logged on — the shape the repeat-a-meal lookups read. */

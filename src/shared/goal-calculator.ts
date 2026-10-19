@@ -17,7 +17,11 @@ export interface CalculatedGoals {
   protein: number
   carbs: number
   fat: number
+  fibre: number
 }
+
+/** NHMRC adequate intake for adults (Nutrient Reference Values for Australia and NZ). */
+const FIBRE_AI: Record<BodySex, number> = { female: 25, male: 30 }
 
 export const ACTIVITY_OPTIONS: { value: number; label: string }[] = [
   { value: 1.2, label: 'Mostly sitting' },
@@ -71,7 +75,7 @@ export function calculateGoalsSimple(i: SimpleGoalInputs): CalculatedGoals | nul
   const protein = Math.round(1.8 * i.weightKg)
   const fat = Math.round(0.9 * i.weightKg)
   const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4))
-  return { calories, protein, carbs, fat }
+  return { calories, protein, carbs, fat, fibre: FIBRE_AI[i.sex] }
 }
 
 /** The calculator's answers, remembered per person in `profiles.body_stats` so the form

@@ -104,6 +104,8 @@ export function estimateRecipeMacros(
   let pro = 0
   let carb = 0
   let fat = 0
+  // Fibre only from ingredients that carry a figure; null overall if none does.
+  let fibre: number | null = null
   let matched = 0
   const detail: EstimateDetail[] = ingredients.map((ing, i) => {
     const m = matches[i]
@@ -115,6 +117,7 @@ export function estimateRecipeMacros(
     pro += m.per100g.protein * f
     carb += m.per100g.carbs * f
     fat += m.per100g.fat * f
+    if (m.per100g.fibre != null) fibre = (fibre ?? 0) + m.per100g.fibre * f
     return { name: ing.name, grams, matched: true, calories: Math.round(m.per100g.calories * f) }
   })
   const serves = servings ?? 4
@@ -125,6 +128,7 @@ export function estimateRecipeMacros(
       protein: r1(pro / serves),
       carbs: r1(carb / serves),
       fat: r1(fat / serves),
+      fibre: fibre === null ? null : r1(fibre / serves),
       matched,
       total: ingredients.length,
       assumedServings: servings === null

@@ -30,6 +30,7 @@ export function SettingsPage(): JSX.Element {
   const [gProtein, setGProtein] = useState('')
   const [gCarbs, setGCarbs] = useState('')
   const [gFat, setGFat] = useState('')
+  const [gFibre, setGFibre] = useState('')
 
   // Goal calculator — answers come back from the profile, so it is fill-once.
   const [sex, setSex] = useState<BodySex | ''>('')
@@ -49,6 +50,7 @@ export function SettingsPage(): JSX.Element {
       setGProtein(toStr(p.proteinGoal))
       setGCarbs(toStr(p.carbsGoal))
       setGFat(toStr(p.fatGoal))
+      setGFibre(toStr(p.fibreGoal))
       setLoaded(true)
     })
     getBodyStats().then(
@@ -73,7 +75,8 @@ export function SettingsPage(): JSX.Element {
     calGoal: toNum(gCal),
     proteinGoal: toNum(gProtein),
     carbsGoal: toNum(gCarbs),
-    fatGoal: toNum(gFat)
+    fatGoal: toNum(gFat),
+    fibreGoal: toNum(gFibre)
   })
 
   const saveGoals = async (): Promise<void> => {
@@ -86,8 +89,9 @@ export function SettingsPage(): JSX.Element {
     setGProtein('')
     setGCarbs('')
     setGFat('')
+    setGFibre('')
     await updateProfile({
-      goals: { calGoal: null, proteinGoal: null, carbsGoal: null, fatGoal: null }
+      goals: { calGoal: null, proteinGoal: null, carbsGoal: null, fatGoal: null, fibreGoal: null }
     })
     toast('Goals cleared — tracker shows energy share instead')
   }
@@ -123,12 +127,14 @@ export function SettingsPage(): JSX.Element {
     setGProtein(String(suggestion.protein))
     setGCarbs(String(suggestion.carbs))
     setGFat(String(suggestion.fat))
+    setGFibre(String(suggestion.fibre))
     await updateProfile({
       goals: {
         calGoal: suggestion.calories,
         proteinGoal: suggestion.protein,
         carbsGoal: suggestion.carbs,
-        fatGoal: suggestion.fat
+        fatGoal: suggestion.fat,
+        fibreGoal: suggestion.fibre
       }
     })
     toast('Goals updated')
@@ -207,6 +213,17 @@ export function SettingsPage(): JSX.Element {
               min="0"
               value={gFat}
               onChange={(e) => setGFat(e.target.value)}
+              onBlur={saveGoals}
+            />
+          </label>
+          <label className="ffield">
+            <span className="ffield__label">Fibre (g)</span>
+            <input
+              className="input-field"
+              type="number"
+              min="0"
+              value={gFibre}
+              onChange={(e) => setGFibre(e.target.value)}
               onBlur={saveGoals}
             />
           </label>
@@ -305,7 +322,7 @@ export function SettingsPage(): JSX.Element {
             <div className="settings-result__note">Suggested (rough guide, not medical advice)</div>
             <div className="settings-result__line">
               {suggestion.calories.toLocaleString()} kcal · P {suggestion.protein} · C{' '}
-              {suggestion.carbs} · F {suggestion.fat}
+              {suggestion.carbs} · F {suggestion.fat} · Fibre {suggestion.fibre}
             </div>
             <button className="btn-primary settings-result__use" onClick={useSuggestion}>
               Use these

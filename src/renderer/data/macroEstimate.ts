@@ -38,7 +38,8 @@ async function lookupPer100g(name: string): Promise<Match> {
             calories: cal,
             protein: Number(n.proteins_100g) || 0,
             carbs: Number(n.carbohydrates_100g) || 0,
-            fat: Number(n.fat_100g) || 0
+            fat: Number(n.fat_100g) || 0,
+            fibre: fibreOrNull(n.fiber_100g)
           },
           servingGrams: null
         }
@@ -48,6 +49,13 @@ async function lookupPer100g(name: string): Promise<Match> {
     // offline — staples may still have matched other ingredients
   }
   return null
+}
+
+/** OFF's fibre figure, or null when it has none — an absent figure must not read as 0 g. */
+function fibreOrNull(v: number | string | undefined): number | null {
+  if (v === undefined || v === null || v === '') return null
+  const n = Number(v)
+  return Number.isFinite(n) && n >= 0 ? n : null
 }
 
 /** Match every ingredient (staples → proxy, sequential) and run the pure estimator. */
@@ -67,6 +75,7 @@ export async function saveRecipeEstimate(id: number, e: RecipeEstimate): Promise
       est_protein_serve: e.protein,
       est_carbs_serve: e.carbs,
       est_fat_serve: e.fat,
+      est_fibre_serve: e.fibre,
       est_matched: e.matched,
       est_total: e.total,
       est_computed_at: new Date().toISOString()

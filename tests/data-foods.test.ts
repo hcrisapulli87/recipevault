@@ -155,7 +155,7 @@ describe('lookupBarcode', () => {
     }
     vi.stubGlobal('fetch', vi.fn())
     const { item } = await lookupBarcode('9350177000152')
-    expect(item?.per100g).toEqual({ calories: 200, protein: 24, carbs: 0, fat: 11 })
+    expect(item?.per100g).toEqual({ calories: 200, protein: 24, carbs: 0, fat: 11, fibre: null })
     expect(item?.measures).toEqual([{ desc: '95g', grams: 95 }])
   })
 
@@ -397,10 +397,12 @@ describe('cacheFood', () => {
       protein_per_unit: 8,
       carbs_per_unit: 24,
       fat_per_unit: 5,
+      fibre_per_unit: null,
       cal_per_100g: null,
       protein_per_100g: null,
       carbs_per_100g: null,
       fat_per_100g: null,
+      fibre_per_100g: null,
       serving_grams: null
     })
     expect(state.upserted[0].options).toEqual({ onConflict: 'owner_id,barcode' })

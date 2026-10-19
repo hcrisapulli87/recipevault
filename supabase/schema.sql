@@ -53,6 +53,7 @@ alter table public.recipes add column if not exists est_cal_serve     real;
 alter table public.recipes add column if not exists est_protein_serve real;
 alter table public.recipes add column if not exists est_carbs_serve   real;
 alter table public.recipes add column if not exists est_fat_serve     real;
+alter table public.recipes add column if not exists est_fibre_serve   real; -- null: no matched ingredient had a fibre figure
 alter table public.recipes add column if not exists est_matched       integer;
 alter table public.recipes add column if not exists est_total         integer;
 alter table public.recipes add column if not exists est_computed_at   timestamptz;
@@ -348,6 +349,13 @@ alter table public.profiles add column if not exists plan_prefs jsonb;
 -- per person so the form comes back filled in. Client-owned shape (shared/goal-calculator.ts
 -- parseBodyStats), read defensively like plan_prefs.
 alter table public.profiles add column if not exists body_stats jsonb;
+
+-- Fibre (2026-10). Nullable everywhere on purpose: a food with no fibre figure stores NULL
+-- and is reported as unknown ("18 g from 5 of 7 foods") — never summed as 0 g.
+alter table public.profiles   add column if not exists fibre_goal     real;
+alter table public.food_log   add column if not exists base_fibre     real;
+alter table public.food_cache add column if not exists fibre_per_unit real;
+alter table public.food_cache add column if not exists fibre_per_100g real;
 
 alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;

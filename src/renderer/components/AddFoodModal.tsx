@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { JSX } from 'react'
-import type { FoodItem, FoodMeasure, MealType } from '../../shared/types'
+import type { FoodItem, FoodMeasure, MealType, Per100g } from '../../shared/types'
 import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
 import { foodLabel } from '../../shared/food-label'
@@ -43,14 +43,22 @@ export interface LogBasis {
   baseProtein: number
   baseCarbs: number
   baseFat: number
+  /** null = the food has no fibre figure (shown as unknown, never summed as 0) */
+  baseFibre: number | null
   amount: number
 }
 
 /** Per-100 g basis for an item, when one can be established (enables grams⇄serving). */
-function per100gOf(item: FoodItem): { calories: number; protein: number; carbs: number; fat: number } | null {
+function per100gOf(item: FoodItem): Per100g | null {
   if (item.per100g) return item.per100g
   if (item.unit === '100g') {
-    return { calories: item.calories, protein: item.protein, carbs: item.carbs, fat: item.fat }
+    return {
+      calories: item.calories,
+      protein: item.protein,
+      carbs: item.carbs,
+      fat: item.fat,
+      fibre: item.fibre ?? null
+    }
   }
   return null
 }
@@ -119,7 +127,7 @@ function ConfirmStep(props: {
   }
 
   // Resolve the effective macros + the basis to log.
-  let macros: { calories: number; protein: number; carbs: number; fat: number }
+  let macros: { calories: number; protein: number; carbs: number; fat: number; fibre: number | null }
   let basis: LogBasis
   let amountValid: boolean
   // The chosen measure can vanish if a re-check swaps in an item with fewer measures;
@@ -132,7 +140,8 @@ function ConfirmStep(props: {
       calories: p100.calories * f,
       protein: p100.protein * f,
       carbs: p100.carbs * f,
-      fat: p100.fat * f
+      fat: p100.fat * f,
+      fibre: p100.fibre == null ? null : p100.fibre * f
     }
     // Stored canonically as 100 g so history + edit steppers work unchanged.
     basis = {
@@ -141,6 +150,7 @@ function ConfirmStep(props: {
       baseProtein: p100.protein,
       baseCarbs: p100.carbs,
       baseFat: p100.fat,
+      baseFibre: p100.fibre ?? null,
       amount: g / 100
     }
     amountValid = g > 0
@@ -150,7 +160,8 @@ function ConfirmStep(props: {
       calories: props.item.calories * factor,
       protein: props.item.protein * factor,
       carbs: props.item.carbs * factor,
-      fat: props.item.fat * factor
+      fat: props.item.fat * factor,
+      fibre: props.item.fibre == null ? null : props.item.fibre * factor
     }
     basis = {
       unit: props.item.unit,
@@ -158,6 +169,7 @@ function ConfirmStep(props: {
       baseProtein: props.item.protein,
       baseCarbs: props.item.carbs,
       baseFat: props.item.fat,
+      baseFibre: props.item.fibre ?? null,
       amount: factor
     }
     amountValid = factor > 0
@@ -309,7 +321,9 @@ function ConfirmStep(props: {
         ))}
       </div>
       <div className="confirm__caption">
-        Best-guess from the database — close enough is the point.
+        {macros.fibre !== null
+          ? `Fibre ${fmtG(macros.fibre)} g · best-guess from the database — close enough is the point.`
+          : 'No fibre figure for this food · best-guess from the database — close enough is the point.'}
       </div>
 
       {props.onRecheck && (
@@ -389,6 +403,7 @@ export function AddFoodModal(props: {
   const [mProtein, setMProtein] = useState('')
   const [mCarbs, setMCarbs] = useState('')
   const [mFat, setMFat] = useState('')
+  const [mFibre, setMFibre] = useState('')
 
   // Guards against out-of-order responses: only the latest search may write
   // results (a slow earlier response must not overwrite a newer one).
@@ -556,6 +571,7 @@ export function AddFoodModal(props: {
         baseProtein: Number(mProtein) || 0,
         baseCarbs: Number(mCarbs) || 0,
         baseFat: Number(mFat) || 0,
+        baseFibre: mFibre.trim() === '' ? null : Number(mFibre) || 0,
         barcode: null,
         source: 'manual'
       })
@@ -576,6 +592,8 @@ export function AddFoodModal(props: {
     const protein = Number(mProtein) || 0
     const carbs = Number(mCarbs) || 0
     const fat = Number(mFat) || 0
+    // Blank fibre is unknown, not zero.
+    const fibre = mFibre.trim() === '' ? null : Number(mFibre) || 0
     // With a serving weight we can express a per-100 g basis, unlocking the
     // grams⇄serving picker; without one it's a per-serve-only entry.
     const hasServe = serveG > 0
@@ -590,9 +608,16 @@ export function AddFoodModal(props: {
       protein,
       carbs,
       fat,
+      fibre,
       source: 'manual',
       per100g: hasServe
-        ? { calories: to100(cal), protein: to100(protein), carbs: to100(carbs), fat: to100(fat) }
+        ? {
+            calories: to100(cal),
+            protein: to100(protein),
+            carbs: to100(carbs),
+            fat: to100(fat),
+            fibre: fibre === null ? null : to100(fibre)
+          }
         : undefined,
       measures: hasServe ? [{ desc: '1 serve', grams: serveG }] : []
     })
@@ -611,6 +636,7 @@ export function AddFoodModal(props: {
       baseProtein: basis.baseProtein,
       baseCarbs: basis.baseCarbs,
       baseFat: basis.baseFat,
+      baseFibre: basis.baseFibre,
       barcode: selected.barcode,
       source: selected.source
     }
@@ -915,6 +941,16 @@ export function AddFoodModal(props: {
                     min="0"
                     value={mFat}
                     onChange={(e) => setMFat(e.target.value)}
+                  />
+                </label>
+                <label className="ffield">
+                  <span className="ffield__label">Fibre (g, optional)</span>
+                  <input
+                    className="input-field"
+                    type="number"
+                    min="0"
+                    value={mFibre}
+                    onChange={(e) => setMFibre(e.target.value)}
                   />
                 </label>
               </div>

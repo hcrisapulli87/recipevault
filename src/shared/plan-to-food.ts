@@ -33,6 +33,7 @@ export function planItemToFood(
     protein: recipe.est.protein,
     carbs: recipe.est.carbs,
     fat: recipe.est.fat,
+    fibre: recipe.est.fibre,
     source: 'plan'
   }
 }

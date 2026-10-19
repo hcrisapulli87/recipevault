@@ -30,9 +30,10 @@ describe('mapOffProduct', () => {
       protein: 17,
       carbs: 6,
       fat: 0.7,
+      fibre: null, // the fixture has no fibre figure — unknown, not 0
       source: 'barcode',
       // Canonical per-100 g basis + serving measure enable the grams⇄serving picker.
-      per100g: { calories: 59, protein: 10, carbs: 3.6, fat: 0.4 },
+      per100g: { calories: 59, protein: 10, carbs: 3.6, fat: 0.4, fibre: null },
       measures: [{ desc: '170 g', grams: 170 }]
     })
   })

@@ -220,6 +220,7 @@ for (const { recipe, ingredients, estimate } of prepared) {
     est_protein_serve: estimate.protein,
     est_carbs_serve: estimate.carbs,
     est_fat_serve: estimate.fat,
+    est_fibre_serve: estimate.fibre ?? null,
     est_matched: estimate.matched,
     est_total: estimate.total,
     est_computed_at: new Date().toISOString()

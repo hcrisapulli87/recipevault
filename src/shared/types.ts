@@ -137,6 +137,9 @@ export interface Per100g {
   protein: number
   carbs: number
   fat: number
+  /** Dietary fibre. Optional and nullable on purpose: many foods have no fibre figure,
+   *  and an unknown must never be summed as 0 g. */
+  fibre?: number | null
 }
 
 /** Stored per-serving macro estimate summary (best guess from parsed ingredients). */
@@ -145,6 +148,8 @@ export interface RecipeEstimate {
   protein: number
   carbs: number
   fat: number
+  /** Fibre per serve from the ingredients that have a fibre figure; null when none do. */
+  fibre: number | null
   matched: number
   total: number
   assumedServings: boolean
@@ -261,9 +266,13 @@ export interface Profile {
   proteinGoal: number | null
   carbsGoal: number | null
   fatGoal: number | null
+  fibreGoal: number | null
 }
 
-export type ProfileGoals = Pick<Profile, 'calGoal' | 'proteinGoal' | 'carbsGoal' | 'fatGoal'>
+export type ProfileGoals = Pick<
+  Profile,
+  'calGoal' | 'proteinGoal' | 'carbsGoal' | 'fatGoal' | 'fibreGoal'
+>
 
 /** A known serving size: a human label plus its weight in grams. */
 export interface FoodMeasure {
@@ -282,6 +291,8 @@ export interface FoodItem {
   protein: number
   carbs: number
   fat: number
+  /** Fibre per ONE unit; null/absent = unknown (not zero). */
+  fibre?: number | null
   source: 'staple' | 'search' | 'barcode' | 'manual' | 'plan' | 'recent'
   /** Canonical per-100 g macros when known — lets the Add flow log in grams OR by
    *  serving regardless of `unit`. Absent for legacy/cache items with no basis. */
@@ -302,6 +313,8 @@ export interface LogEntry {
   baseProtein: number
   baseCarbs: number
   baseFat: number
+  /** Fibre per unit, null when the food had no fibre figure. */
+  baseFibre: number | null
   barcode: string | null
   source: string
 }
@@ -319,12 +332,22 @@ export interface DailyLog {
   date: string
   meals: Record<MealType, LogEntry[]>
   totals: DailyTotals
+  /** Fibre is reported apart from the macros because it is often unknown: `total` sums
+   *  only the entries that have a figure, and `known` of `entries` says how many did. */
+  fibre: FibreSummary
   goals: {
     calories: number | null
     protein: number | null
     carbs: number | null
     fat: number | null
+    fibre: number | null
   }
+}
+
+export interface FibreSummary {
+  total: number
+  known: number
+  entries: number
 }
 
 export interface AppSettings {

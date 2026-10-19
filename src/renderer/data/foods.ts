@@ -119,7 +119,7 @@ export interface BarcodeLookupResult {
 }
 
 const CACHE_COLS =
-  'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, serving_grams, last_fetched'
+  'barcode, name, brand, serving_desc, unit, cal_per_unit, protein_per_unit, carbs_per_unit, fat_per_unit, fibre_per_unit, cal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, fibre_per_100g, serving_grams, last_fetched'
 
 interface CacheRow {
   barcode: string
@@ -131,10 +131,12 @@ interface CacheRow {
   protein_per_unit: number
   carbs_per_unit: number
   fat_per_unit: number
+  fibre_per_unit?: number | null
   cal_per_100g?: number | null
   protein_per_100g?: number | null
   carbs_per_100g?: number | null
   fat_per_100g?: number | null
+  fibre_per_100g?: number | null
   serving_grams?: number | null
   last_fetched?: string | null
 }
@@ -149,7 +151,8 @@ function cacheRowToItem(cached: CacheRow): FoodItem {
           calories: cached.cal_per_100g,
           protein: cached.protein_per_100g ?? 0,
           carbs: cached.carbs_per_100g ?? 0,
-          fat: cached.fat_per_100g ?? 0
+          fat: cached.fat_per_100g ?? 0,
+          fibre: cached.fibre_per_100g ?? null
         }
       : undefined
   const grams = cached.serving_grams
@@ -163,6 +166,7 @@ function cacheRowToItem(cached: CacheRow): FoodItem {
     protein: cached.protein_per_unit,
     carbs: cached.carbs_per_unit,
     fat: cached.fat_per_unit,
+    fibre: cached.fibre_per_unit ?? null,
     source: 'barcode',
     per100g,
     measures:
@@ -272,7 +276,9 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
   // Over-fetch (recent days repeat the same foods heavily), dedupe client-side.
   const { data, error } = await supabase
     .from('food_log')
-    .select('name, brand, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source')
+    .select(
+      'name, brand, unit, base_calories, base_protein, base_carbs, base_fat, base_fibre, barcode, source'
+    )
     .eq('owner_id', user.id)
     .order('id', { ascending: false })
     .limit(100)
@@ -292,7 +298,8 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
             calories: r.base_calories,
             protein: r.base_protein,
             carbs: r.base_carbs,
-            fat: r.base_fat
+            fat: r.base_fat,
+            fibre: r.base_fibre ?? null
           }
         : undefined
     out.push({
@@ -305,6 +312,7 @@ export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
       protein: r.base_protein,
       carbs: r.base_carbs,
       fat: r.base_fat,
+      fibre: r.base_fibre ?? null,
       source: 'recent',
       per100g
     })
@@ -334,10 +342,12 @@ export async function cacheFood(item: FoodItem): Promise<void> {
       protein_per_unit: item.protein,
       carbs_per_unit: item.carbs,
       fat_per_unit: item.fat,
+      fibre_per_unit: item.fibre ?? null,
       cal_per_100g: item.per100g?.calories ?? null,
       protein_per_100g: item.per100g?.protein ?? null,
       carbs_per_100g: item.per100g?.carbs ?? null,
       fat_per_100g: item.per100g?.fat ?? null,
+      fibre_per_100g: item.per100g?.fibre ?? null,
       serving_grams: item.measures?.[0]?.grams ?? null,
       // Set explicitly: the column default only fires on INSERT, so an upsert over an
       // existing row would leave the original timestamp and the row could never come

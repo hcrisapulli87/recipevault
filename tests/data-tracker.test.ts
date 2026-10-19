@@ -82,7 +82,8 @@ describe('getProfile', () => {
       calGoal: null,
       proteinGoal: null,
       carbsGoal: null,
-      fatGoal: null
+      fatGoal: null,
+      fibreGoal: null
     })
     expect(state.upserted).toEqual([{ id: 'user-1', display_name: 'harrison@example.com' }])
   })
@@ -102,7 +103,8 @@ describe('getProfile', () => {
       calGoal: 2000,
       proteinGoal: 150,
       carbsGoal: 200,
-      fatGoal: 60
+      fatGoal: 60,
+      fibreGoal: null
     })
     expect(state.upserted).toHaveLength(0)
   })
@@ -112,7 +114,7 @@ describe('updateProfile', () => {
   it('upserts snake_case columns keyed by the auth user id', async () => {
     await updateProfile({
       name: 'Harrison',
-      goals: { calGoal: 1800, proteinGoal: 120, carbsGoal: null, fatGoal: null }
+      goals: { calGoal: 1800, proteinGoal: 120, carbsGoal: null, fatGoal: null, fibreGoal: 30 }
     })
     expect(state.upserted).toEqual([
       {
@@ -121,7 +123,8 @@ describe('updateProfile', () => {
         cal_goal: 1800,
         protein_goal: 120,
         carbs_goal: null,
-        fat_goal: null
+        fat_goal: null,
+        fibre_goal: 30
       }
     ])
   })
@@ -162,7 +165,7 @@ describe('getDailyLog', () => {
       fat_goal: null
     }
     const log = await getDailyLog('2026-07-02', { id: 'user-1', isMe: true })
-    expect(log.goals).toEqual({ calories: 1800, protein: 120, carbs: null, fat: null })
+    expect(log.goals).toEqual({ calories: 1800, protein: 120, carbs: null, fat: null, fibre: null })
   })
 
   it("reads the partner's goals without auto-creating a profile row", async () => {
@@ -175,7 +178,7 @@ describe('getDailyLog', () => {
       fat_goal: null
     }
     const log = await getDailyLog('2026-07-02', { id: 'user-2', isMe: false })
-    expect(log.goals).toEqual({ calories: 2200, protein: 100, carbs: null, fat: null })
+    expect(log.goals).toEqual({ calories: 2200, protein: 100, carbs: null, fat: null, fibre: null })
     expect(state.upserted).toHaveLength(0) // partner path never writes
   })
 })
@@ -227,6 +230,7 @@ describe('copyEntriesTo', () => {
     baseProtein: 4,
     baseCarbs: 15,
     baseFat: 2,
+    baseFibre: 1.5,
     barcode: null,
     source: 'staple',
     ...over

@@ -10,6 +10,11 @@
 // applied here from a small keyword→measure rules table (MEASURE_RULES). Foods
 // with no rule ship measures:[] and are logged in grams (the accepted fallback).
 //
+// Fibre (2026-10): "Total dietary fibre (g)" is located by its header text rather than a
+// fixed index, so a column shuffle in a later AFCD release can't silently read the wrong
+// nutrient. Foods with no fibre figure ship without the field — the app treats a missing
+// figure as unknown, never as 0 g.
+//
 // Run:  node scripts/build-au-foods.mjs
 import * as XLSX from 'xlsx'
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs'
@@ -99,9 +104,15 @@ function build() {
   if (!ws) throw new Error(`Sheet "${SHEET}" not found in ${SRC}`)
   const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false })
   const data = rows.slice(2) // header row is index 1
+  const header = rows[1] ?? []
+  const fibreCol = header.findIndex(
+    (h) => typeof h === 'string' && /^total dietary fibre/i.test(h.trim())
+  )
+  if (fibreCol < 0) console.warn('No "Total dietary fibre" column found — building without fibre')
 
   const foods = []
   let withMeasures = 0
+  let withFibre = 0
   for (const r of data) {
     const key = r[COL.key]
     const name = typeof r[COL.name] === 'string' ? r[COL.name].trim() : null
@@ -116,6 +127,10 @@ function build() {
     const nameLower = name.toLowerCase()
     const measures = measuresFor(nameLower)
     if (measures.length) withMeasures++
+    const fibreRaw = fibreCol >= 0 ? r[fibreCol] : null
+    const fibre = fibreRaw === null || fibreRaw === '' ? NaN : Number(fibreRaw)
+    const hasFibre = Number.isFinite(fibre) && fibre >= 0 && fibre <= 100
+    if (hasFibre) withFibre++
     foods.push({
       key: String(key),
       name,
@@ -123,6 +138,7 @@ function build() {
       protein: r1(protein),
       carbs: r1(carbs),
       fat: r1(fat),
+      ...(hasFibre ? { fibre: r1(fibre) } : {}),
       ...(measures.length ? { measures } : {})
     })
   }
@@ -141,7 +157,9 @@ function build() {
 
   mkdirSync(dirname(OUT), { recursive: true })
   writeFileSync(OUT, JSON.stringify(foods) + '\n')
-  console.log(`Wrote ${foods.length} foods (${withMeasures} with measures) → ${OUT}`)
+  console.log(
+    `Wrote ${foods.length} foods (${withMeasures} with measures, ${withFibre} with fibre) → ${OUT}`
+  )
 }
 
 build()

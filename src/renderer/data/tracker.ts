@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { computeTotals } from '../../shared/tracker-logic'
+import { computeFibre, computeTotals } from '../../shared/tracker-logic'
 import type { DatedLogEntry } from '../../shared/tracker-logic'
 import { MEAL_TYPES } from '../../shared/types'
 import type { DailyLog, DailyTotals, LogEntry, MealType, ProfileGoals } from '../../shared/types'
@@ -21,6 +21,7 @@ export interface NewLogEntry {
   baseProtein: number
   baseCarbs: number
   baseFat: number
+  baseFibre: number | null
   barcode: string | null
   source: string
 }
@@ -36,6 +37,7 @@ function rowToLogEntry(r: {
   base_protein: number
   base_carbs: number
   base_fat: number
+  base_fibre?: number | null
   barcode: string | null
   source: string
 }): LogEntry {
@@ -50,6 +52,7 @@ function rowToLogEntry(r: {
     baseProtein: r.base_protein,
     baseCarbs: r.base_carbs,
     baseFat: r.base_fat,
+    baseFibre: r.base_fibre ?? null,
     barcode: r.barcode,
     source: r.source
   }
@@ -83,14 +86,22 @@ export async function getProfile(): Promise<TrackerProfile> {
       calGoal: data.cal_goal,
       proteinGoal: data.protein_goal,
       carbsGoal: data.carbs_goal,
-      fatGoal: data.fat_goal
+      fatGoal: data.fat_goal,
+      fibreGoal: data.fibre_goal ?? null
     }
   }
 
   const name = user.email ?? 'Me'
   const { error: ue } = await supabase.from('profiles').upsert({ id: user.id, display_name: name })
   if (ue) throw new Error(ue.message)
-  return { name, calGoal: null, proteinGoal: null, carbsGoal: null, fatGoal: null }
+  return {
+    name,
+    calGoal: null,
+    proteinGoal: null,
+    carbsGoal: null,
+    fatGoal: null,
+    fibreGoal: null
+  }
 }
 
 export async function updateProfile(patch: { name?: string; goals?: ProfileGoals }): Promise<void> {
@@ -102,6 +113,7 @@ export async function updateProfile(patch: { name?: string; goals?: ProfileGoals
     update.protein_goal = patch.goals.proteinGoal
     update.carbs_goal = patch.goals.carbsGoal
     update.fat_goal = patch.goals.fatGoal
+    update.fibre_goal = patch.goals.fibreGoal
   }
   const { error } = await supabase.from('profiles').upsert(update)
   if (error) throw new Error(error.message)
@@ -111,7 +123,7 @@ export async function updateProfile(patch: { name?: string; goals?: ProfileGoals
 async function getGoalsOf(ownerId: string): Promise<ProfileGoals> {
   const { data, error } = await supabase
     .from('profiles')
-    .select('cal_goal, protein_goal, carbs_goal, fat_goal')
+    .select('cal_goal, protein_goal, carbs_goal, fat_goal, fibre_goal')
     .eq('id', ownerId)
     .maybeSingle()
   if (error) throw new Error(error.message)
@@ -119,7 +131,8 @@ async function getGoalsOf(ownerId: string): Promise<ProfileGoals> {
     calGoal: data?.cal_goal ?? null,
     proteinGoal: data?.protein_goal ?? null,
     carbsGoal: data?.carbs_goal ?? null,
-    fatGoal: data?.fat_goal ?? null
+    fatGoal: data?.fat_goal ?? null,
+    fibreGoal: data?.fibre_goal ?? null
   }
 }
 
@@ -138,13 +151,14 @@ export async function getDailyLog(
         calGoal: p.calGoal,
         proteinGoal: p.proteinGoal,
         carbsGoal: p.carbsGoal,
-        fatGoal: p.fatGoal
+        fatGoal: p.fatGoal,
+        fibreGoal: p.fibreGoal
       }))
     : await getGoalsOf(owner.id)
   const { data, error } = await supabase
     .from('food_log')
     .select(
-      'id, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source'
+      'id, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, base_fibre, barcode, source'
     )
     .eq('owner_id', owner.id)
     .eq('log_date', date)
@@ -162,11 +176,13 @@ export async function getDailyLog(
     date,
     meals,
     totals: computeTotals(entries),
+    fibre: computeFibre(entries),
     goals: {
       calories: goals.calGoal,
       protein: goals.proteinGoal,
       carbs: goals.carbsGoal,
-      fat: goals.fatGoal
+      fat: goals.fatGoal,
+      fibre: goals.fibreGoal
     }
   }
 }
@@ -207,7 +223,7 @@ export async function getLogEntriesRange(
   const { data, error } = await supabase
     .from('food_log')
     .select(
-      'id, log_date, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, barcode, source'
+      'id, log_date, meal_type, name, brand, amount, unit, base_calories, base_protein, base_carbs, base_fat, base_fibre, barcode, source'
     )
     .eq('owner_id', ownerId)
     .gte('log_date', from)
@@ -244,6 +260,7 @@ function toRow(entry: NewLogEntry): Record<string, unknown> {
     base_protein: entry.baseProtein,
     base_carbs: entry.baseCarbs,
     base_fat: entry.baseFat,
+    base_fibre: entry.baseFibre,
     barcode: entry.barcode,
     source: entry.source
   }

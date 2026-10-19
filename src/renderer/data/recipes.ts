@@ -18,7 +18,7 @@ import type {
 // below never set it explicitly. Postgres snake_case ↔ app camelCase is mapped here.
 
 const EST_COLS =
-  'servings, est_cal_serve, est_protein_serve, est_carbs_serve, est_fat_serve, est_matched, est_total, est_computed_at'
+  'servings, est_cal_serve, est_protein_serve, est_carbs_serve, est_fat_serve, est_fibre_serve, est_matched, est_total, est_computed_at'
 
 const META_COLS =
   'is_catalog, catalog_slug, cuisine, diet_tags, meal_slots, effort, keeps_days, batch_friendly, reheat'
@@ -54,6 +54,7 @@ function mapEst(r: {
   est_protein_serve: number | null
   est_carbs_serve: number | null
   est_fat_serve: number | null
+  est_fibre_serve?: number | null
   est_matched: number | null
   est_total: number | null
   est_computed_at: string | null
@@ -65,6 +66,7 @@ function mapEst(r: {
     protein: r.est_protein_serve ?? 0,
     carbs: r.est_carbs_serve ?? 0,
     fat: r.est_fat_serve ?? 0,
+    fibre: r.est_fibre_serve ?? null,
     matched: r.est_matched ?? 0,
     total: r.est_total ?? 0,
     assumedServings: (r.servings ?? null) === null
@@ -231,6 +233,7 @@ export async function copyToLibrary(id: number): Promise<number> {
       est_protein_serve: src.est?.protein ?? null,
       est_carbs_serve: src.est?.carbs ?? null,
       est_fat_serve: src.est?.fat ?? null,
+      est_fibre_serve: src.est?.fibre ?? null,
       est_matched: src.est?.matched ?? null,
       est_total: src.est?.total ?? null,
       est_computed_at: src.est ? new Date().toISOString() : null

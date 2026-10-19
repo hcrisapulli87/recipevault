@@ -35,6 +35,7 @@
   --protein: #34c759;
   --carbs: #5e9bfd;
   --fat: #a78bdf;
+  --fibre: #b08d57;
   --over-bar: #f0a35e; /* over-goal: gentle amber, never red-alarm */
   --over-text: #b45309;
   --over-trend: #f3c48f;
@@ -2884,6 +2885,44 @@ select.input-field {
   height: 100%;
   border-radius: 999px;
   transition: width 0.2s;
+}
+
+/* Fibre: one slim row under the macro tiles — often partial, so it says how partial */
+.tracker-fibre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 10px;
+  padding: 0 4px;
+  font-size: 12px;
+}
+.tracker-fibre__label {
+  font-weight: 600;
+  color: var(--muted);
+}
+.tracker-fibre__value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.tracker-fibre__track {
+  flex: 1;
+  min-width: 60px;
+  height: 5px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  overflow: hidden;
+}
+.tracker-fibre__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--fibre);
+}
+.tracker-fibre__note {
+  flex-basis: 100%;
+  font-size: 11px;
+  color: var(--muted-2);
 }
 
 /* Empty-day nudge island */

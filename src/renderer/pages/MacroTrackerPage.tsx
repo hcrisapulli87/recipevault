@@ -295,7 +295,24 @@ export function MacroTrackerPage(props: {
   }
 
   const totals = log?.totals ?? { calories: 0, protein: 0, carbs: 0, fat: 0 }
-  const goals = log?.goals ?? { calories: null, protein: null, carbs: null, fat: null }
+  const goals = log?.goals ?? {
+    calories: null,
+    protein: null,
+    carbs: null,
+    fat: null,
+    fibre: null
+  }
+  const fibre = log?.fibre ?? { total: 0, known: 0, entries: 0 }
+  // Shown once there is a goal or anything to report; an empty day with no goal skips it.
+  const showFibre = goals.fibre != null || fibre.entries > 0
+  const fibreNote =
+    fibre.entries === 0
+      ? null
+      : fibre.known === 0
+        ? 'none of today’s foods has a fibre figure'
+        : fibre.known < fibre.entries
+          ? `from ${fibre.known} of ${fibre.entries} foods`
+          : null
   const shares = macroCalorieShares(totals)
   const calGoal = goals.calories
   const streak = rangeTotals ? loggingStreak(rangeTotals, todayStr()) : 0
@@ -406,6 +423,26 @@ export function MacroTrackerPage(props: {
             color="var(--fat)"
           />
         </div>
+        {showFibre && (
+          <div className="tracker-fibre">
+            <span className="tracker-fibre__label">Fibre</span>
+            <span className="tracker-fibre__value">
+              {fibre.known > 0 ? `${fmtG(fibre.total)} g` : '–'}
+              {goals.fibre != null && ` / ${Math.round(goals.fibre)} g`}
+            </span>
+            {goals.fibre != null && (
+              <span className="tracker-fibre__track">
+                <span
+                  className="tracker-fibre__fill"
+                  style={{
+                    width: `${Math.min(100, Math.round((fibre.total / goals.fibre) * 100))}%`
+                  }}
+                />
+              </span>
+            )}
+            {fibreNote && <span className="tracker-fibre__note">{fibreNote}</span>}
+          </div>
+        )}
       </div>
 
       {/* Empty-day nudge (own log only) */}

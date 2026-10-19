@@ -17,7 +17,8 @@ describe('calculateGoalsSimple', () => {
       calories: 2750,
       protein: 148, // 1.8 g/kg
       fat: 74, // 0.9 g/kg
-      carbs: Math.round((2750 - 148 * 4 - 74 * 9) / 4)
+      carbs: Math.round((2750 - 148 * 4 - 74 * 9) / 4),
+      fibre: 30 // NHMRC adequate intake, men
     })
   })
 
@@ -56,6 +57,7 @@ describe('calculateGoalsSimple', () => {
       direction: 'maintain'
     })!
     expect(her.calories).toBe(1850)
+    expect(her.fibre).toBe(25) // NHMRC adequate intake, women
     // The old fixed 176 cm man gave 10*60 + 1100 - 140 + 5 = 1565 × 1.4 = 2191 → 2200.
     expect(2200 - her.calories).toBeGreaterThanOrEqual(300)
   })

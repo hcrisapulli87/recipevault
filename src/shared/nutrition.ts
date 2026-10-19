@@ -12,6 +12,8 @@ interface AuFood {
   protein: number
   carbs: number
   fat: number
+  /** Dietary fibre per 100 g — present once au-foods.json is rebuilt with it. */
+  fibre?: number
   measures?: FoodMeasure[]
 }
 
@@ -36,7 +38,8 @@ function auToFoodItem(f: AuFood): FoodItem {
     calories: f.calories,
     protein: f.protein,
     carbs: f.carbs,
-    fat: f.fat
+    fat: f.fat,
+    fibre: f.fibre ?? null
   }
   return {
     name: f.name,
@@ -48,6 +51,7 @@ function auToFoodItem(f: AuFood): FoodItem {
     protein: f.protein,
     carbs: f.carbs,
     fat: f.fat,
+    fibre: f.fibre ?? null,
     source: 'staple',
     per100g,
     measures: f.measures ?? []
@@ -600,7 +604,8 @@ export function staplePer100g(
       calories: food.calories,
       protein: food.protein,
       carbs: food.carbs,
-      fat: food.fat
+      fat: food.fat,
+      fibre: food.fibre ?? null
     },
     servingGrams: food.measures?.[0]?.grams ?? null
   }
@@ -612,11 +617,13 @@ interface OffNutriments {
   proteins_100g?: number | string
   carbohydrates_100g?: number | string
   fat_100g?: number | string
+  fiber_100g?: number | string
   'energy-kcal_serving'?: number | string
   'energy-kj_serving'?: number | string
   proteins_serving?: number | string
   carbohydrates_serving?: number | string
   fat_serving?: number | string
+  fiber_serving?: number | string
 }
 
 interface OffProduct {
@@ -701,6 +708,7 @@ function plausiblePer100g(p: Per100g): boolean {
   if (vals.some((v) => v < 0)) return false
   if (p.calories > 950) return false
   if (p.protein > 100 || p.carbs > 100 || p.fat > 100) return false
+  if (p.fibre != null && (p.fibre < 0 || p.fibre > 100)) return false
   return p.protein + p.carbs + p.fat <= 105
 }
 
@@ -721,6 +729,8 @@ export function mapOffProduct(
   const proS = num(n.proteins_serving)
   const carbS = num(n.carbohydrates_serving)
   const fatS = num(n.fat_serving)
+  const fib100d = num(n.fiber_100g)
+  const fibS = num(n.fiber_serving)
   const hasServing = servingCal !== null && !!p.serving_size
   const grams = num(p.serving_quantity)
   const hasGrams = grams !== null && grams > 0
@@ -753,6 +763,7 @@ export function mapOffProduct(
   const pro100 = pro100d ?? to100(proS)
   const carb100 = carb100d ?? to100(carbS)
   const fat100 = fat100d ?? to100(fatS)
+  const fib100 = fib100d ?? to100(fibS)
 
   let per100g: Per100g | undefined =
     cal100 !== null
@@ -760,7 +771,9 @@ export function mapOffProduct(
           calories: round0(cal100),
           protein: round1(pro100 ?? 0),
           carbs: round1(carb100 ?? 0),
-          fat: round1(fat100 ?? 0)
+          fat: round1(fat100 ?? 0),
+          // Unlike the macros, a missing fibre figure stays missing rather than 0.
+          fibre: fib100 === null ? null : round1(fib100)
         }
       : undefined
   if (per100g && !plausiblePer100g(per100g)) {
@@ -788,6 +801,12 @@ export function mapOffProduct(
       protein: round1(perServing(proS, pro100d)),
       carbs: round1(perServing(carbS, carb100d)),
       fat: round1(perServing(fatS, fat100d)),
+      fibre:
+        fibS !== null
+          ? round1(fibS)
+          : fib100d !== null && grams !== null
+            ? round1((fib100d * grams) / 100)
+            : null,
       source,
       per100g,
       measures
@@ -805,6 +824,7 @@ export function mapOffProduct(
     protein: per100g.protein,
     carbs: per100g.carbs,
     fat: per100g.fat,
+    fibre: per100g.fibre ?? null,
     source,
     per100g,
     measures
