@@ -1,12 +1,18 @@
 import { describe, it, expect } from 'vitest'
-import { calculateGoalsSimple } from '../src/shared/goal-calculator'
+import {
+  calculateGoalsSimple,
+  parseBodyStats,
+  DEFAULT_BODY_STATS
+} from '../src/shared/goal-calculator'
 import { macroCalorieShares } from '../src/shared/tracker-logic'
 
 describe('calculateGoalsSimple', () => {
-  it('computes maintenance goals from the spec formula (82 kg, 31 y, active)', () => {
+  const man = { sex: 'male', heightCm: 176 } as const
+
+  it('computes maintenance goals from Mifflin-St Jeor (man, 176 cm, 82 kg, 31 y, active)', () => {
     // BMR = 10*82 + 6.25*176 - 5*31 + 5 = 1770; ×1.55 = 2743.5 → round to 50 = 2750
     expect(
-      calculateGoalsSimple({ age: 31, weightKg: 82, activity: 1.55, direction: 'maintain' })
+      calculateGoalsSimple({ ...man, age: 31, weightKg: 82, activity: 1.55, direction: 'maintain' })
     ).toEqual({
       calories: 2750,
       protein: 148, // 1.8 g/kg
@@ -16,7 +22,7 @@ describe('calculateGoalsSimple', () => {
   })
 
   it('applies −450 for losing and +300 for building, rounded to 50', () => {
-    const base = { age: 31, weightKg: 82, activity: 1.55 } as const
+    const base = { ...man, age: 31, weightKg: 82, activity: 1.55 } as const
     const maintain = calculateGoalsSimple({ ...base, direction: 'maintain' })!
     const lose = calculateGoalsSimple({ ...base, direction: 'lose' })!
     const gain = calculateGoalsSimple({ ...base, direction: 'gain' })!
@@ -27,16 +33,69 @@ describe('calculateGoalsSimple', () => {
   })
 
   it('keeps protein and fat per-kg regardless of direction', () => {
-    const lose = calculateGoalsSimple({ age: 28, weightKg: 60, activity: 1.4, direction: 'lose' })!
+    const lose = calculateGoalsSimple({
+      sex: 'female',
+      heightCm: 165,
+      age: 28,
+      weightKg: 60,
+      activity: 1.4,
+      direction: 'lose'
+    })!
     expect(lose.protein).toBe(108) // 1.8 × 60
     expect(lose.fat).toBe(54) // 0.9 × 60
   })
 
+  it('uses the woman’s equation and her real height', () => {
+    // BMR = 10*60 + 6.25*165 - 5*28 - 161 = 1330.25; ×1.4 = 1862.35 → 1850
+    const her = calculateGoalsSimple({
+      sex: 'female',
+      heightCm: 165,
+      age: 28,
+      weightKg: 60,
+      activity: 1.4,
+      direction: 'maintain'
+    })!
+    expect(her.calories).toBe(1850)
+    // The old fixed 176 cm man gave 10*60 + 1100 - 140 + 5 = 1565 × 1.4 = 2191 → 2200.
+    expect(2200 - her.calories).toBeGreaterThanOrEqual(300)
+  })
+
   it('rejects implausible inputs', () => {
-    const base = { age: 31, weightKg: 82, activity: 1.55, direction: 'maintain' as const }
+    const base = { ...man, age: 31, weightKg: 82, activity: 1.55, direction: 'maintain' as const }
+    expect(calculateGoalsSimple({ ...base, heightCm: 0 })).toBeNull()
+    expect(calculateGoalsSimple({ ...base, heightCm: 400 })).toBeNull()
     expect(calculateGoalsSimple({ ...base, age: 0 })).toBeNull()
     expect(calculateGoalsSimple({ ...base, weightKg: 0 })).toBeNull()
     expect(calculateGoalsSimple({ ...base, activity: 9 })).toBeNull()
+  })
+})
+
+describe('parseBodyStats', () => {
+  it('reads stored answers back', () => {
+    expect(
+      parseBodyStats({
+        sex: 'female',
+        age: 30,
+        heightCm: 165,
+        weightKg: 62,
+        activity: 1.4,
+        direction: 'lose'
+      })
+    ).toEqual({
+      sex: 'female',
+      age: 30,
+      heightCm: 165,
+      weightKg: 62,
+      activity: 1.4,
+      direction: 'lose'
+    })
+  })
+
+  it('falls back field by field on missing or garbled values', () => {
+    expect(parseBodyStats(null)).toEqual(DEFAULT_BODY_STATS)
+    expect(parseBodyStats({ sex: 'x', age: -3, activity: 7, direction: 'sideways' })).toEqual(
+      DEFAULT_BODY_STATS
+    )
   })
 })
 

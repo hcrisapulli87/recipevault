@@ -344,6 +344,11 @@ alter table public.profiles add column if not exists is_bot boolean not null def
 -- migration.
 alter table public.profiles add column if not exists plan_prefs jsonb;
 
+-- The goal calculator's answers (sex, height, age, weight, activity, goal) — remembered
+-- per person so the form comes back filled in. Client-owned shape (shared/goal-calculator.ts
+-- parseBodyStats), read defensively like plan_prefs.
+alter table public.profiles add column if not exists body_stats jsonb;
+
 alter table public.profiles   enable row level security;
 alter table public.food_log   enable row level security;
 alter table public.food_cache enable row level security;

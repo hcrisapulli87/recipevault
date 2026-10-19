@@ -6,9 +6,11 @@ import type { ProfileGoals } from '../../shared/types'
 import {
   ACTIVITY_OPTIONS,
   DIRECTION_OPTIONS,
+  SEX_OPTIONS,
   calculateGoalsSimple
 } from '../../shared/goal-calculator'
-import type { CalculatedGoals, GoalDirection } from '../../shared/goal-calculator'
+import type { BodySex, CalculatedGoals, GoalDirection } from '../../shared/goal-calculator'
+import { getBodyStats, saveBodyStats } from '../data/bodyStats'
 import { useToast } from '../components/Toast'
 
 const toNum = (s: string): number | null => {
@@ -29,8 +31,10 @@ export function SettingsPage(): JSX.Element {
   const [gCarbs, setGCarbs] = useState('')
   const [gFat, setGFat] = useState('')
 
-  // Goal calculator
+  // Goal calculator — answers come back from the profile, so it is fill-once.
+  const [sex, setSex] = useState<BodySex | ''>('')
   const [age, setAge] = useState('')
+  const [height, setHeight] = useState('')
   const [weight, setWeight] = useState('')
   const [activity, setActivity] = useState(1.55)
   const [direction, setDirection] = useState<GoalDirection>('maintain')
@@ -47,6 +51,17 @@ export function SettingsPage(): JSX.Element {
       setGFat(toStr(p.fatGoal))
       setLoaded(true)
     })
+    getBodyStats().then(
+      (b) => {
+        setSex(b.sex ?? '')
+        setAge(toStr(b.age))
+        setHeight(toStr(b.heightCm))
+        setWeight(b.weightKg == null ? '' : String(b.weightKg))
+        setActivity(b.activity)
+        setDirection(b.direction)
+      },
+      () => undefined // not migrated yet / offline — the form just starts empty
+    )
   }, [])
 
   const saveName = async (): Promise<void> => {
@@ -79,14 +94,27 @@ export function SettingsPage(): JSX.Element {
 
   const suggest = (): void => {
     setAttempted(true)
-    setSuggestion(
-      calculateGoalsSimple({
-        age: Number(age) || 0,
-        weightKg: Number(weight) || 0,
+    const result =
+      sex === ''
+        ? null
+        : calculateGoalsSimple({
+            sex,
+            age: Number(age) || 0,
+            heightCm: Number(height) || 0,
+            weightKg: Number(weight) || 0,
+            activity,
+            direction
+          })
+    setSuggestion(result)
+    if (result)
+      void saveBodyStats({
+        sex: sex === '' ? null : sex,
+        age: toNum(age),
+        heightCm: toNum(height),
+        weightKg: toNum(weight),
         activity,
         direction
-      })
-    )
+      }).catch(() => undefined)
   }
 
   const useSuggestion = async (): Promise<void> => {
@@ -193,6 +221,23 @@ export function SettingsPage(): JSX.Element {
         <div className="settings-island__title">Goal calculator</div>
         <div className="ffield-grid settings-goals">
           <label className="ffield">
+            <span className="ffield__label">Sex</span>
+            <select
+              className="input-field"
+              value={sex}
+              onChange={(e) => setSex(e.target.value as BodySex | '')}
+            >
+              <option value="" disabled>
+                Choose…
+              </option>
+              {SEX_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ffield">
             <span className="ffield__label">Age</span>
             <input
               className="input-field"
@@ -200,6 +245,17 @@ export function SettingsPage(): JSX.Element {
               min="0"
               value={age}
               onChange={(e) => setAge(e.target.value)}
+            />
+          </label>
+          <label className="ffield">
+            <span className="ffield__label">Height (cm)</span>
+            <input
+              className="input-field"
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={height}
+              onChange={(e) => setHeight(e.target.value)}
             />
           </label>
           <label className="ffield">
@@ -258,7 +314,7 @@ export function SettingsPage(): JSX.Element {
         )}
         {attempted && suggestion === null && (
           <p className="settings-calc-note">
-            Enter a plausible age and weight, then tap Suggest goals.
+            Choose sex and enter a plausible age, height and weight, then tap Suggest goals.
           </p>
         )}
       </section>
