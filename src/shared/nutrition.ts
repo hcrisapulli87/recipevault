@@ -19,6 +19,15 @@ interface AuFood {
 
 const AU_FOODS = auFoodsData as AuFood[]
 
+const AU_BY_NAME = new Map(AU_FOODS.map((f) => [f.name.toLowerCase(), f]))
+
+/** The household serving sizes of a generic food, found by its exact AFCD name. The food
+ *  log stores names, not measures, so a staple logged again from history gets its
+ *  "1 slice" / "1 cup" options back from here. */
+export function stapleMeasures(name: string): FoodMeasure[] {
+  return AU_BY_NAME.get(name.toLowerCase())?.measures ?? []
+}
+
 const round0 = (n: number): number => Math.round(n)
 const round1 = (n: number): number => Math.round(n * 10) / 10
 

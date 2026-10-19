@@ -5,13 +5,30 @@ import { MEAL_LABEL, MEAL_TYPES } from '../../shared/types'
 import { searchStaples } from '../../shared/nutrition'
 import { foodLabel } from '../../shared/food-label'
 import { isValidGtin } from '../../shared/barcode'
-import { lookupBarcode, searchFoods, cacheFood, getRecentFoods } from '../data/foods'
+import { lookupBarcode, searchFoods, cacheFood, getFoodHistory } from '../data/foods'
 import { addLogEntry } from '../data/tracker'
 import type { NewLogEntry } from '../data/tracker'
 import { BarcodeScanner } from './BarcodeScanner'
 import { BottomSheet } from './BottomSheet'
 import { useToast } from './Toast'
 import { useEnergy } from './EnergyUnit'
+import { Heart, X } from 'lucide-react'
+import {
+  foodKey as historyKey,
+  rememberedLabel,
+  searchHistory,
+  startingAmount,
+  suggestFoods
+} from '../../shared/food-history'
+import type { HistoryFood } from '../../shared/food-history'
+import {
+  addFavourite,
+  favouriteAsItem,
+  favouriteToEntry,
+  listFavourites,
+  removeFavourite
+} from '../data/favourites'
+import type { FoodFavourite } from '../data/favourites'
 
 type Tab = 'search' | 'scan' | 'manual'
 
@@ -98,6 +115,11 @@ function ConfirmStep(props: {
   onRecheck?: (() => void) | null
   recheckBusy?: boolean
   recheckNote?: string | null
+  /** What you logged of this food last time — the amount picker starts there. */
+  remembered?: { unit: string; amount: number } | null
+  /** Is this exact food + serving already a favourite? */
+  isFavourite?: (basis: LogBasis) => boolean
+  onFavourite?: (basis: LogBasis, label: string) => void
 }): JSX.Element {
   const p100 = per100gOf(props.item)
   const energy = useEnergy()
@@ -109,15 +131,24 @@ function ConfirmStep(props: {
 
   // Flexible state: grams is the single source of truth; serving mode drives it
   // through a chosen measure × count.
-  const [mode, setMode] = useState<'g' | 'serving'>(measures.length ? 'serving' : 'g')
-  const [grams, setGrams] = useState<number>(measures[0]?.grams ?? 100)
-  const [measureIdx, setMeasureIdx] = useState(0)
-  const [count, setCount] = useState(1)
+  // Starts at what you had last time (shared/food-history startingAmount), so a staple
+  // logs without re-adjusting.
+  const [start] = useState(() => startingAmount(props.item, props.remembered ?? null))
+  const [mode, setMode] = useState<'g' | 'serving'>(
+    start.kind === 'flexible' ? start.mode : measures.length ? 'serving' : 'g'
+  )
+  const [grams, setGrams] = useState<number>(
+    start.kind === 'flexible' ? start.grams : (measures[0]?.grams ?? 100)
+  )
+  const [measureIdx, setMeasureIdx] = useState(start.kind === 'flexible' ? start.measureIdx : 0)
+  const [count, setCount] = useState(start.kind === 'flexible' ? start.count : 1)
 
   // Legacy state: serves (or grams for a bare 100 g item with no basis — unreachable
   // here since 100 g always yields a basis, but kept for safety).
   const legacyIsGram = props.item.unit === '100g'
-  const [legacyValue, setLegacyValue] = useState(legacyIsGram ? 100 : 1)
+  const [legacyValue, setLegacyValue] = useState(
+    start.kind === 'legacy' ? start.value : legacyIsGram ? 100 : 1
+  )
 
   const pickMeasure = (i: number): void => {
     setMeasureIdx(i)
@@ -180,6 +211,17 @@ function ConfirmStep(props: {
     }
     amountValid = factor > 0
   }
+
+  // The serving in words — the favourite tile's label.
+  const servingLabel =
+    flexible && p100
+      ? mode === 'serving' && measure
+        ? `${count % 1 === 0 ? count : count.toFixed(1)} × ${measure.desc}`
+        : `${Math.round(grams)} g`
+      : legacyIsGram
+        ? `${Math.round(legacyValue)} g`
+        : `${legacyValue % 1 === 0 ? legacyValue : legacyValue.toFixed(1)} serve${legacyValue === 1 ? '' : 's'}`
+  const favourited = props.isFavourite?.(basis) ?? false
 
   return (
     <div className="confirm">
@@ -311,6 +353,10 @@ function ConfirmStep(props: {
         </>
       )}
 
+      {props.remembered && (
+        <div className="confirm__remembered">Last time: {rememberedLabel(props.remembered)}</div>
+      )}
+
       <div className="confirm__tiles">
         {(
           [
@@ -331,6 +377,17 @@ function ConfirmStep(props: {
           ? `Fibre ${fmtG(macros.fibre)} g · best-guess from the database — close enough is the point.`
           : 'No fibre figure for this food · best-guess from the database — close enough is the point.'}
       </div>
+
+      {props.onFavourite && (
+        <button
+          className={`confirm__fav ${favourited ? 'confirm__fav--on' : ''}`}
+          disabled={!amountValid || favourited}
+          onClick={() => props.onFavourite?.(basis, servingLabel)}
+        >
+          <Heart size={15} strokeWidth={2.4} fill={favourited ? 'currentColor' : 'none'} />
+          {favourited ? `Favourite · ${servingLabel}` : `Save ${servingLabel} as a favourite`}
+        </button>
+      )}
 
       {props.onRecheck && (
         <div className="info-banner">
@@ -381,12 +438,21 @@ export function AddFoodModal(props: {
   const [searchError, setSearchError] = useState<string | null>(null)
   const [searched, setSearched] = useState(false)
   const [searchOnline, setSearchOnline] = useState(true)
-  // Recently logged foods (own entries), shown before a query is typed —
-  // everyday items are one tap instead of a network search. Best-effort.
-  const [recents, setRecents] = useState<FoodItem[]>([])
+  // My food history (what I've logged, folded per food) and my favourites — the fast
+  // paths: favourites log in one tap, "usual" foods lead before typing, my own foods lead
+  // while typing, and any food I pick starts at the amount I had last time. Best-effort:
+  // without them the sheet is simply the plain search.
+  const [history, setHistory] = useState<HistoryFood[]>([])
+  const [favourites, setFavourites] = useState<FoodFavourite[]>([])
+  const [editingFavs, setEditingFavs] = useState(false)
+  const reloadFavourites = (): void => {
+    listFavourites().then(setFavourites, () => undefined)
+  }
   useEffect(() => {
-    getRecentFoods().then(setRecents, () => {})
+    getFoodHistory().then(setHistory, () => undefined)
+    listFavourites().then(setFavourites, () => undefined)
   }, [])
+  const historyByKey = new Map(history.map((h) => [h.key, h]))
 
   // scan tab — the camera starts as soon as the tab opens (see switchTab)
   const [scanning, setScanning] = useState(false)
@@ -668,18 +734,94 @@ export function AddFoodModal(props: {
     }
   }
 
-  // Generic AFCD foods and branded OpenFoodFacts products are two different kinds of
-  // answer measured on two different bases (per 100 g against per serve), so they get
-  // their own labelled blocks rather than one flat list that silently changes basis.
-  const BASIC_CAP = 6
-  const basic = results.filter((r) => r.source === 'staple')
-  const packaged = results.filter((r) => r.source !== 'staple')
-  const basicShown = showAllBasic ? basic : basic.slice(0, BASIC_CAP)
 
   const pick = (item: FoodItem, fromCache = false): void => {
     setSelectedFromCache(fromCache)
     setSelected(item)
   }
+
+  const favKeys = new Set(favourites.map((f) => f.foodKey))
+  const { usual, recent } = suggestFoods(history, meal, { exclude: favKeys })
+  const yourFoods = query.trim() ? searchHistory(history, query) : []
+  // Your own foods lead the results; the same food isn't listed again below them.
+  const shownKeys = new Set(yourFoods.map((h) => h.key))
+  const notYours = (item: FoodItem): boolean => !shownKeys.has(historyKey(item))
+
+  // Generic AFCD foods and branded OpenFoodFacts products are two different kinds of
+  // answer measured on two different bases (per 100 g against per serve), so they get
+  // their own labelled blocks rather than one flat list that silently changes basis.
+  const BASIC_CAP = 6
+  const basic = results.filter((r) => r.source === 'staple' && notYours(r))
+  const packaged = results.filter((r) => r.source !== 'staple' && notYours(r))
+  const basicShown = showAllBasic ? basic : basic.slice(0, BASIC_CAP)
+
+  /** One tap: a favourite is a food AND its serving, so it logs straight away. */
+  const logFavourite = async (f: FoodFavourite): Promise<void> => {
+    if (logging) return
+    setLogging(true)
+    try {
+      await addLogEntry(favouriteToEntry(f, props.date, meal))
+      toast(`Added to ${MEAL_LABEL[meal]}`)
+      props.onLogged()
+      props.onClose()
+    } catch {
+      toast("Couldn't add — check your connection.")
+      setLogging(false)
+    }
+  }
+
+  const deleteFavourite = async (id: number): Promise<void> => {
+    setFavourites((cur) => cur.filter((f) => f.id !== id))
+    try {
+      await removeFavourite(id)
+    } catch {
+      reloadFavourites()
+    }
+  }
+
+  const saveFavourite = async (basis: LogBasis, label: string): Promise<void> => {
+    if (!selected) return
+    try {
+      await addFavourite({
+        foodKey: historyKey(selected),
+        name: selected.name,
+        brand: selected.brand,
+        barcode: selected.barcode,
+        unit: basis.unit,
+        amount: basis.amount,
+        baseCalories: basis.baseCalories,
+        baseProtein: basis.baseProtein,
+        baseCarbs: basis.baseCarbs,
+        baseFat: basis.baseFat,
+        baseFibre: basis.baseFibre,
+        source: selected.source,
+        label
+      })
+      toast('Saved to favourites')
+      reloadFavourites()
+    } catch {
+      toast("Couldn't save the favourite — check your connection.")
+    }
+  }
+
+  const isFavouriteBasis = (basis: LogBasis): boolean =>
+    selected !== null &&
+    favourites.some(
+      (f) =>
+        f.foodKey === historyKey(selected) &&
+        f.unit === basis.unit &&
+        Math.abs(f.amount - basis.amount) < 1e-6
+    )
+
+  /** A history row: the food, with how you usually have it. */
+  const historyRow = (h: HistoryFood, why: string): JSX.Element => (
+    <FoodRow
+      key={h.key}
+      item={h.item}
+      note={`${why} · last ${rememberedLabel(h.last)}`}
+      onPick={() => pick(h.item)}
+    />
+  )
 
   return (
     <BottomSheet title="Add food" tall onClose={props.onClose}>
@@ -703,6 +845,9 @@ export function AddFoodModal(props: {
             setRecheckNote(null)
           }}
           onAdd={log}
+          remembered={historyByKey.get(historyKey(selected))?.last ?? null}
+          isFavourite={isFavouriteBasis}
+          onFavourite={(basis, label) => void saveFavourite(basis, label)}
         />
       ) : (
         <div className="addfood">
@@ -744,17 +889,66 @@ export function AddFoodModal(props: {
                 </button>
               )}
 
-              {query.trim() === '' && recents.length > 0 && (
+              {query.trim() === '' && favourites.length > 0 && (
                 <>
-                  <div className="addfood__head eyebrow">Recents</div>
-                  {recents.map((item) => (
-                    <FoodRow key={foodKey(item)} item={item} onPick={() => pick(item)} />
-                  ))}
+                  <div className="addfood__head addfood__head--row eyebrow">
+                    <span>Favourites · one tap adds to {MEAL_LABEL[meal]}</span>
+                    <button className="addfood__link" onClick={() => setEditingFavs(!editingFavs)}>
+                      {editingFavs ? 'Done' : 'Edit'}
+                    </button>
+                  </div>
+                  <div className="fav-strip">
+                    {favourites.map((f) => (
+                      <div key={f.id} className="fav-tile">
+                        <button
+                          className="fav-tile__main"
+                          disabled={logging || editingFavs}
+                          onClick={() => void logFavourite(f)}
+                        >
+                          <span className="fav-tile__name">
+                            {foodLabel(favouriteAsItem(f)).title}
+                          </span>
+                          <span className="fav-tile__meta">
+                            {f.label ?? rememberedLabel(f)} · {energy.fmt(f.baseCalories * f.amount)}
+                          </span>
+                        </button>
+                        {editingFavs && (
+                          <button
+                            className="fav-tile__remove"
+                            aria-label={`Remove ${f.name} from favourites`}
+                            onClick={() => void deleteFavourite(f.id)}
+                          >
+                            <X size={13} strokeWidth={2.6} />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {query.trim() === '' && usual.length > 0 && (
+                <>
+                  <div className="addfood__head eyebrow">Usually at {MEAL_LABEL[meal].toLowerCase()}</div>
+                  {usual.map((h) => historyRow(h, `${h.countByMeal[meal]}× at ${MEAL_LABEL[meal].toLowerCase()}`))}
+                </>
+              )}
+
+              {query.trim() === '' && recent.length > 0 && (
+                <>
+                  <div className="addfood__head eyebrow">Recent</div>
+                  {recent.map((h) => historyRow(h, h.count === 1 ? 'once' : `${h.count}×`))}
                 </>
               )}
 
               {query.trim() !== '' && (
                 <>
+                  {yourFoods.length > 0 && (
+                    <>
+                      <div className="addfood__head eyebrow">Your foods</div>
+                      {yourFoods.map((h) => historyRow(h, `${h.count}×`))}
+                    </>
+                  )}
                   {basic.length > 0 && (
                     <>
                       <div className="addfood__head eyebrow">Basic foods</div>

@@ -1,5 +1,12 @@
 import { supabase } from './supabase'
-import { searchStaples, mapOffProduct, offProductIdentity } from '../../shared/nutrition'
+import {
+  searchStaples,
+  mapOffProduct,
+  offProductIdentity,
+  stapleMeasures
+} from '../../shared/nutrition'
+import { buildFoodHistory } from '../../shared/food-history'
+import type { HistoryFood } from '../../shared/food-history'
 import { barcodeCandidates } from '../../shared/barcode'
 import { OFF_PRODUCT_FIELDS, rankPackagedResults } from '../../shared/food-search'
 import type { FoodItem } from '../../shared/types'
@@ -290,58 +297,49 @@ export async function lookupBarcode(
  * Add Food modal before a search is typed, so everyday items are one tap
  * instead of a network search. Own entries only (recents are personal).
  */
-export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
+/** My food history — every recent log folded into one entry per food, newest first.
+ *  The last ~600 entries cover a couple of months of normal logging, plenty for "usual"
+ *  and "remember my serving", and keep this to one quick query. */
+export async function getFoodHistory(): Promise<HistoryFood[]> {
   const {
     data: { user }
   } = await supabase.auth.getUser()
   if (!user) return []
 
-  // Over-fetch (recent days repeat the same foods heavily), dedupe client-side.
   const { data, error } = await supabase
     .from('food_log')
     .select(
-      'name, brand, unit, base_calories, base_protein, base_carbs, base_fat, base_fibre, barcode, source'
+      'id, log_date, meal_type, name, brand, unit, amount, base_calories, base_protein, base_carbs, base_fat, base_fibre, barcode, source'
     )
     .eq('owner_id', user.id)
     .order('id', { ascending: false })
-    .limit(100)
+    .limit(600)
   if (error || !data) return []
 
-  const seen = new Set<string>()
-  const out: FoodItem[] = []
-  for (const r of data) {
-    const key = `${r.name.toLowerCase()}|${(r.brand ?? '').toLowerCase()}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    // 100 g entries carry a per-100 g basis, so recents re-logged from them keep
-    // the grams⇄serving flexibility (new logs are stored as 100 g).
-    const per100g =
-      r.unit === '100g'
-        ? {
-            calories: r.base_calories,
-            protein: r.base_protein,
-            carbs: r.base_carbs,
-            fat: r.base_fat,
-            fibre: r.base_fibre ?? null
-          }
-        : undefined
-    out.push({
+  return buildFoodHistory(
+    data.map((r) => ({
+      id: r.id,
+      date: r.log_date,
+      mealType: r.meal_type,
       name: r.name,
       brand: r.brand,
       barcode: r.barcode,
-      servingDesc: r.unit === '100g' ? 'per 100 g' : null,
       unit: r.unit,
-      calories: r.base_calories,
-      protein: r.base_protein,
-      carbs: r.base_carbs,
-      fat: r.base_fat,
-      fibre: r.base_fibre ?? null,
-      source: 'recent',
-      per100g
-    })
-    if (out.length >= limit) break
-  }
-  return out
+      amount: r.amount ?? 1,
+      baseCalories: r.base_calories,
+      baseProtein: r.base_protein,
+      baseCarbs: r.base_carbs,
+      baseFat: r.base_fat,
+      baseFibre: r.base_fibre ?? null,
+      source: r.source
+    })),
+    stapleMeasures
+  )
+}
+
+/** Recently logged foods, deduped, newest first. */
+export async function getRecentFoods(limit = 8): Promise<FoodItem[]> {
+  return (await getFoodHistory()).slice(0, limit).map((h) => h.item)
 }
 
 /**

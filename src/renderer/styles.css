@@ -1058,6 +1058,75 @@ body::before {
   padding-bottom: 6px;
   border-bottom: 1px solid rgba(27, 36, 48, 0.1);
 }
+/* Favourites header: label left, Edit right */
+.addfood__head--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.addfood__head--row .addfood__link {
+  padding: 0 0 0 8px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+/* Favourites: a wrap of one-tap tiles */
+.fav-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 0 4px;
+}
+.fav-tile {
+  position: relative;
+  max-width: 100%;
+}
+.fav-tile__main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 220px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(43, 100, 224, 0.25);
+  background: var(--accent-tint);
+  color: var(--ink);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.fav-tile__main:disabled {
+  cursor: default;
+}
+.fav-tile__name {
+  font-size: 13px;
+  font-weight: 700;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fav-tile__meta {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+.fav-tile__remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: none;
+  background: var(--ink);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
 .addfood__note {
   padding: 10px 0;
   font-size: 13px;
@@ -1309,6 +1378,34 @@ body::before {
 .confirm__tile-value {
   font-size: 18px;
   font-weight: 800;
+}
+.confirm__remembered {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: 8px;
+  text-align: center;
+}
+.confirm__fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(27, 36, 48, 0.12);
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.confirm__fav--on {
+  color: var(--favourite);
+  border-color: rgba(229, 72, 109, 0.35);
+  cursor: default;
 }
 .confirm__caption {
   font-size: 11px;

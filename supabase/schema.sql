@@ -452,6 +452,47 @@ create policy "recipe_prefs: owner delete" on public.recipe_prefs
   for delete to authenticated using (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Favourite foods (2026-10). A favourite is a food AND a serving — the exact thing to log
+-- — so the Add Food sheet can log it in one tap, and one food can have several presets
+-- ("Flat white · small", "· large"). Macros are stored per unit exactly like food_log, so
+-- a favourite logs the same row the original did. Household-readable, owner-writable,
+-- like everything else; the app only ever shows you your own.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.food_favourites (
+  id            bigint generated always as identity primary key,
+  owner_id      uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  food_key      text not null,
+  name          text not null,
+  brand         text,
+  barcode       text,
+  unit          text not null,
+  amount        real not null check (amount > 0),
+  base_calories real not null default 0,
+  base_protein  real not null default 0,
+  base_carbs    real not null default 0,
+  base_fat      real not null default 0,
+  base_fibre    real,
+  source        text not null default 'manual',
+  label         text,
+  created_at    timestamptz not null default now(),
+  unique (owner_id, food_key, unit, amount)
+);
+
+alter table public.food_favourites enable row level security;
+drop policy if exists "food_favourites: household read" on public.food_favourites;
+drop policy if exists "food_favourites: owner insert"   on public.food_favourites;
+drop policy if exists "food_favourites: owner update"   on public.food_favourites;
+drop policy if exists "food_favourites: owner delete"   on public.food_favourites;
+create policy "food_favourites: household read" on public.food_favourites
+  for select to authenticated using (true);
+create policy "food_favourites: owner insert" on public.food_favourites
+  for insert to authenticated with check (owner_id = auth.uid());
+create policy "food_favourites: owner update" on public.food_favourites
+  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "food_favourites: owner delete" on public.food_favourites
+  for delete to authenticated using (owner_id = auth.uid());
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Realtime: broadcast changes so the PWA (phone) and the Electron app (desktop) update
 -- live off the same backend. Guarded so re-runs don't error.
 -- (The Discord bot does NOT use realtime — it reads meal_plan via REST on demand.)
