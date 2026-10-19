@@ -1,4 +1,6 @@
 import { supabase } from './supabase'
+import { myId } from './users'
+import { planLabel } from '../../shared/plan-generator'
 import type {
   Cuisine,
   DietTag,
@@ -269,6 +271,114 @@ export async function copyToLibrary(id: number): Promise<number> {
     if (se) await childError(se.message)
   }
   return newId
+}
+
+/**
+ * Save edits to one of my own recipes. Ingredients and steps are replaced wholesale (the
+ * edit form re-parses every line), but never delete-first: the new rows go in, THEN the
+ * old ones come out by id. Any failure removes only what this call added, so a dropped
+ * connection leaves the recipe as it was rather than with an empty method.
+ */
+export async function updateRecipe(id: number, draft: DraftRecipe): Promise<void> {
+  const [oldIng, oldSteps] = await Promise.all([
+    supabase.from('ingredients').select('id').eq('recipe_id', id),
+    supabase.from('steps').select('id').eq('recipe_id', id)
+  ])
+  if (oldIng.error) throw new Error(oldIng.error.message)
+  if (oldSteps.error) throw new Error(oldSteps.error.message)
+  const oldIngIds = (oldIng.data ?? []).map((r) => r.id as number)
+  const oldStepIds = (oldSteps.data ?? []).map((r) => r.id as number)
+
+  const added = { ingredients: [] as number[], steps: [] as number[] }
+  const undo = async (message: string): Promise<never> => {
+    if (added.ingredients.length > 0)
+      await supabase.from('ingredients').delete().in('id', added.ingredients)
+    if (added.steps.length > 0) await supabase.from('steps').delete().in('id', added.steps)
+    throw new Error(message)
+  }
+
+  if (draft.ingredients.length > 0) {
+    const { data, error } = await supabase
+      .from('ingredients')
+      .insert(
+        draft.ingredients.map((i) => ({
+          recipe_id: id,
+          position: i.position,
+          raw_text: i.raw,
+          quantity: i.quantity,
+          quantity_max: i.quantityMax,
+          unit: i.unit,
+          name: i.name
+        }))
+      )
+      .select('id')
+    if (error) await undo(error.message)
+    added.ingredients = (data ?? []).map((r) => r.id as number)
+  }
+  if (draft.steps.length > 0) {
+    const { data, error } = await supabase
+      .from('steps')
+      .insert(
+        draft.steps.map((s) => ({
+          recipe_id: id,
+          position: s.position,
+          section: s.section,
+          text: s.text
+        }))
+      )
+      .select('id')
+    if (error) await undo(error.message)
+    added.steps = (data ?? []).map((r) => r.id as number)
+  }
+
+  const { error: re } = await supabase
+    .from('recipes')
+    .update({
+      title: draft.title,
+      description: draft.description,
+      servings: draft.servings,
+      prep_min: draft.prepMin,
+      cook_min: draft.cookMin,
+      total_min: draft.totalMin
+    })
+    .eq('id', id)
+  if (re) await undo(re.message)
+
+  // Point of no return: from here a failure leaves duplicate rows, not missing ones, and
+  // a retry of the save clears them (it deletes every row it did not just insert).
+  if (oldIngIds.length > 0) {
+    const { error } = await supabase.from('ingredients').delete().in('id', oldIngIds)
+    if (error) throw new Error(error.message)
+  }
+  if (oldStepIds.length > 0) {
+    const { error } = await supabase.from('steps').delete().in('id', oldStepIds)
+    if (error) throw new Error(error.message)
+  }
+
+  await relabelPlanSlots(id, draft.title)
+}
+
+/** A renamed recipe must not leave its old title in `meal_text`, the label the Discord
+ *  bot reads. RLS limits this to my own week; the partner's slots pick the new title up
+ *  the next time they edit them. */
+async function relabelPlanSlots(recipeId: number, title: string): Promise<void> {
+  const ownerId = await myId()
+  const { data, error } = await supabase
+    .from('meal_plan')
+    .select('day, meal, free_text, is_leftover')
+    .eq('owner_id', ownerId)
+    .eq('recipe_id', recipeId)
+  if (error) throw new Error(error.message)
+  for (const row of data ?? []) {
+    const label = planLabel({ freeText: row.free_text, isLeftover: row.is_leftover }, title)
+    const { error: ue } = await supabase
+      .from('meal_plan')
+      .update({ meal_text: label })
+      .eq('owner_id', ownerId)
+      .eq('day', row.day)
+      .eq('meal', row.meal)
+    if (ue) throw new Error(ue.message)
+  }
 }
 
 export async function deleteRecipe(id: number): Promise<void> {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { JSX } from 'react'
+import { Heart } from 'lucide-react'
 import { CUISINES, CUISINE_LABEL, DIET_TAGS, DIET_LABEL } from '../../shared/types'
 import type { Cuisine, DietTag, RecipeSummary } from '../../shared/types'
 import { useHousehold } from '../hooks/useHousehold'
@@ -26,6 +27,7 @@ function keepsChip(r: RecipeSummary): string | null {
 
 export function LibraryPage(props: {
   recipes: RecipeSummary[]
+  isFavourite: (recipeId: number) => boolean
   onOpen: (id: number) => void
   onImport: () => void
 }): JSX.Element {
@@ -34,6 +36,9 @@ export function LibraryPage(props: {
   const [cuisine, setCuisine] = useState<Cuisine | null>(null)
   const [diet, setDiet] = useState<DietTag | null>(null)
   const [quickOnly, setQuickOnly] = useState(false)
+  // Favourites work on both tabs — hearting a catalog recipe is the lightweight
+  // alternative to forking a copy into Mine.
+  const [favOnly, setFavOnly] = useState(false)
 
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
@@ -55,6 +60,7 @@ export function LibraryPage(props: {
 
   const filtered = pool.filter((r) => {
     if (!r.title.toLowerCase().includes(search.toLowerCase())) return false
+    if (favOnly && !props.isFavourite(r.id)) return false
     if (tab === 'catalog') {
       if (cuisine !== null && r.cuisine !== cuisine) return false
       if (diet !== null && !r.dietTags.includes(diet)) return false
@@ -67,11 +73,13 @@ export function LibraryPage(props: {
     setCuisine(null)
     setDiet(null)
     setQuickOnly(false)
+    setFavOnly(false)
   }
-  const anyFilter = cuisine !== null || diet !== null || quickOnly
+  const anyFilter = cuisine !== null || diet !== null || quickOnly || favOnly
 
-  const emptyMessage =
-    tab === 'mine'
+  const emptyMessage = favOnly
+    ? 'No favourites here yet — tap the heart on a recipe to add it.'
+    : tab === 'mine'
       ? mine.length === 0
         ? 'No recipes of your own yet. Import one, or save something from the catalog.'
         : 'No recipes match your search.'
@@ -114,6 +122,20 @@ export function LibraryPage(props: {
         onChange={(e) => setSearch(e.target.value)}
       />
 
+      {tab === 'mine' && (
+        <div className="filter-rows">
+          <div className="chip-row">
+            <button
+              className={`filter-chip ${favOnly ? 'filter-chip--on' : ''}`}
+              aria-pressed={favOnly}
+              onClick={() => setFavOnly(!favOnly)}
+            >
+              ♥ Favourites
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab === 'catalog' && (
         <div className="filter-rows">
           <div className="chip-row">
@@ -142,6 +164,13 @@ export function LibraryPage(props: {
               onClick={() => setQuickOnly(!quickOnly)}
             >
               Quick
+            </button>
+            <button
+              className={`filter-chip ${favOnly ? 'filter-chip--on' : ''}`}
+              aria-pressed={favOnly}
+              onClick={() => setFavOnly(!favOnly)}
+            >
+              ♥ Favourites
             </button>
             {anyFilter && (
               <button className="filter-chip filter-chip--clear" onClick={clearFilters}>
@@ -185,6 +214,15 @@ export function LibraryPage(props: {
                   <div className="recipe-card__title">{r.title}</div>
                   <div className="recipe-card__meta-row">
                     <span className="recipe-card__meta">{meta}</span>
+                    {props.isFavourite(r.id) && (
+                      <Heart
+                        className="recipe-card__fav"
+                        size={13}
+                        strokeWidth={2.4}
+                        fill="currentColor"
+                        aria-label="Favourite"
+                      />
+                    )}
                     {partnerInitial(r.ownerId) && !r.isCatalog && (
                       <span className="recipe-card__by">{partnerInitial(r.ownerId)}</span>
                     )}

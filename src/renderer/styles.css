@@ -40,6 +40,7 @@
   --over-trend: #f3c48f;
   --flame: #c2410c;
   --destructive: #c2410c;
+  --favourite: #e5486d;
   --dark-surface: #101418; /* scanner / toast */
 
   /* Glass recipes */
@@ -632,6 +633,11 @@ body::before {
 .recipe-card__meta {
   font-size: 11px;
   color: var(--muted-2);
+}
+.recipe-card__fav {
+  color: var(--favourite);
+  flex-shrink: 0;
+  margin-left: auto;
 }
 .recipe-card__by {
   font-size: 9px;
@@ -1457,6 +1463,25 @@ body::before {
   place-items: center;
   cursor: pointer;
 }
+.rdetail__fav {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.65);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.rdetail__fav--on {
+  color: var(--favourite);
+}
 .rdetail__body {
   padding: 18px 4px 32px;
 }
@@ -1585,6 +1610,24 @@ body::before {
   flex-direction: column;
   align-items: flex-start;
   margin-top: 10px;
+}
+.rdetail__notes {
+  margin-top: 10px;
+  width: 100%;
+  resize: vertical;
+}
+.rdetail__partner-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: pre-wrap;
+}
+.rdetail__partner-note-by {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 2px;
 }
 .rdetail__est-meta {
   font-size: 11px;

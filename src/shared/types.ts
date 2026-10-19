@@ -122,6 +122,15 @@ export interface RecipeSummary extends RecipeMeta {
   est: RecipeEstimate | null
 }
 
+/** One person's favourite flag and notes on one recipe (`recipe_prefs`). Per person, not
+ *  per recipe — both household members can heart or annotate the same dish. */
+export interface RecipePref {
+  ownerId: string
+  recipeId: number
+  favourite: boolean
+  notes: string
+}
+
 /** Per-100g macro values used by the estimator. */
 export interface Per100g {
   calories: number

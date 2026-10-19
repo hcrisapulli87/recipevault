@@ -390,6 +390,38 @@ create policy "food_cache: own rows" on public.food_cache
   using (owner_id = auth.uid()) with check (owner_id = auth.uid());
 
 -- ─────────────────────────────────────────────────────────────────────────────
+-- Per-person recipe favourites and notes (2026-10). A side table rather than columns on
+-- `recipes`: a favourite and a note belong to the PERSON, not the recipe — both of you
+-- can heart the same dinner, and either can note a catalog recipe or the partner's
+-- import, neither of which you may write to. Same household-read / owner-write loop as
+-- everything else, so the partner's note shows read-only under their name. Deleting a
+-- recipe cascades its prefs away.
+-- ─────────────────────────────────────────────────────────────────────────────
+create table if not exists public.recipe_prefs (
+  owner_id   uuid not null default auth.uid() references auth.users (id) on delete cascade,
+  recipe_id  bigint not null references public.recipes (id) on delete cascade,
+  favourite  boolean not null default false,
+  notes      text not null default '' check (length(notes) <= 4000),
+  updated_at timestamptz not null default now(),
+  primary key (owner_id, recipe_id)
+);
+create index if not exists recipe_prefs_recipe_idx on public.recipe_prefs (recipe_id);
+
+alter table public.recipe_prefs enable row level security;
+drop policy if exists "recipe_prefs: household read" on public.recipe_prefs;
+drop policy if exists "recipe_prefs: owner insert"   on public.recipe_prefs;
+drop policy if exists "recipe_prefs: owner update"   on public.recipe_prefs;
+drop policy if exists "recipe_prefs: owner delete"   on public.recipe_prefs;
+create policy "recipe_prefs: household read" on public.recipe_prefs
+  for select to authenticated using (true);
+create policy "recipe_prefs: owner insert" on public.recipe_prefs
+  for insert to authenticated with check (owner_id = auth.uid());
+create policy "recipe_prefs: owner update" on public.recipe_prefs
+  for update to authenticated using (owner_id = auth.uid()) with check (owner_id = auth.uid());
+create policy "recipe_prefs: owner delete" on public.recipe_prefs
+  for delete to authenticated using (owner_id = auth.uid());
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- Realtime: broadcast changes so the PWA (phone) and the Electron app (desktop) update
 -- live off the same backend. Guarded so re-runs don't error.
 -- (The Discord bot does NOT use realtime — it reads meal_plan via REST on demand.)
@@ -398,7 +430,7 @@ do $$
 declare
   t text;
 begin
-  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log','profiles','import_queue']
+  foreach t in array array['recipes','ingredients','steps','meal_plan','grocery_items','food_log','profiles','import_queue','recipe_prefs']
   loop
     if not exists (
       select 1 from pg_publication_tables

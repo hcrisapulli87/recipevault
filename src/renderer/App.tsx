@@ -13,6 +13,7 @@ import { MacroTrackerPage } from './pages/MacroTrackerPage'
 import { TrendsPage } from './pages/TrendsPage'
 import { GroceriesPage } from './pages/GroceriesPage'
 import { useRecipes } from './hooks/useRecipes'
+import { useRecipePrefs } from './hooks/useRecipePrefs'
 import { useHousehold } from './hooks/useHousehold'
 import { useImportQueueWorker } from './hooks/useImportQueueWorker'
 import type { HouseholdUser } from './data/users'
@@ -50,6 +51,8 @@ function AppInner(): JSX.Element {
   const [viewer, setViewer] = useState<HouseholdUser | null>(null)
   const current = viewer ?? users[0] ?? null
   const readOnly = current !== null && !current.isMe
+  // Favourites/notes are always MY hearts, whoever the viewer switcher points at.
+  const recipePrefs = useRecipePrefs(users.find((u) => u.isMe)?.id ?? null)
 
   // Add Food is app-wide (FAB anywhere, quick-add from a meal card).
   const [addFood, setAddFood] = useState<{ meal: MealType; planned: FoodItem | null } | null>(null)
@@ -96,6 +99,8 @@ function AppInner(): JSX.Element {
           )}
           {page === 'library' && selectedRecipeId !== null ? (
             <RecipeDetailPage
+              // Keyed by recipe so opening another one starts with a fresh edit/note state.
+              key={selectedRecipeId}
               recipeId={selectedRecipeId}
               onBack={closeRecipe}
               onDeleted={() => {
@@ -106,10 +111,15 @@ function AppInner(): JSX.Element {
                 recipes.reload()
                 openRecipe(newId)
               }}
+              onEdited={recipes.reload}
+              prefs={recipePrefs.prefs}
+              isFavourite={recipePrefs.isFavourite}
+              onToggleFavourite={(id) => void recipePrefs.toggleFavourite(id)}
             />
           ) : page === 'library' ? (
             <LibraryPage
               recipes={recipes.recipes}
+              isFavourite={recipePrefs.isFavourite}
               onOpen={openRecipe}
               onImport={() => navigate('import')}
             />

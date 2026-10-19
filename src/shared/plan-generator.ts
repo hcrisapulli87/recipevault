@@ -340,7 +340,10 @@ export function setCookSlot(
  * The label the Discord bot reads out of `meal_plan.meal_text`. Leftover slots must carry
  * one too — without it the bot's nightly post goes blank on every leftover night.
  */
-export function planLabel(entry: MealPlanEntry, title: string | null): string | null {
+export function planLabel(
+  entry: Pick<MealPlanEntry, 'freeText' | 'isLeftover'>,
+  title: string | null
+): string | null {
   if (entry.freeText !== null) return entry.freeText
   if (title === null) return null
   return entry.isLeftover ? `Leftovers · ${title}` : title

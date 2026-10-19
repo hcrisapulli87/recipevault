@@ -3,7 +3,7 @@ import type { JSX } from 'react'
 import { ArrowUp, ArrowDown, X } from 'lucide-react'
 import type { DraftRecipe, RecipeStep } from '../../shared/types'
 import { parseIngredient } from '../../shared/ingredient-parser'
-import { saveRecipe } from '../data/recipes'
+import { saveRecipe, updateRecipe } from '../data/recipes'
 import { estimateAndSave } from '../data/macroEstimate'
 import { convertDraftToMetric } from '../../shared/unit-convert'
 import { useToast } from './Toast'
@@ -22,13 +22,19 @@ const CONFIDENCE_NOTE: Record<DraftRecipe['confidence'], { text: string; warm: b
 
 export function RecipeReviewForm(props: {
   draft: DraftRecipe
+  /** Set when editing a saved recipe: the same form, saving over it instead of adding. */
+  editingId?: number
   onCancel: () => void
   onSaved: (id: number) => void
 }): JSX.Element {
   const toast = useToast()
+  const editing = props.editingId !== undefined
   // American imports read in Australian units: oz/lb → g, °F → °C (exact conversions
-  // only — cups/spoons stay). Runs once; the banner below says what changed.
-  const [converted] = useState(() => convertDraftToMetric(props.draft))
+  // only — cups/spoons stay). Runs once; the banner below says what changed. Not on an
+  // edit: a saved recipe converts only when its owner taps "Convert to metric".
+  const [converted] = useState(() =>
+    editing ? { draft: props.draft, measurements: 0, temps: 0 } : convertDraftToMetric(props.draft)
+  )
   const [title, setTitle] = useState(props.draft.title)
   const [description, setDescription] = useState(props.draft.description)
   const [servings, setServings] = useState(props.draft.servings?.toString() ?? '')
@@ -96,9 +102,17 @@ export function RecipeReviewForm(props: {
     }
     setSaveError(null)
     try {
-      const id = await saveRecipe(draft)
-      void estimateAndSave(id) // background best-guess macros; the detail page can redo it
-      toast('Saved to recipes')
+      let id: number
+      if (props.editingId !== undefined) {
+        id = props.editingId
+        await updateRecipe(id, draft)
+      } else {
+        id = await saveRecipe(draft)
+      }
+      // background best-guess macros (ingredients or serves may have changed on an edit);
+      // the detail page can redo it
+      void estimateAndSave(id)
+      toast(editing ? 'Recipe updated' : 'Saved to recipes')
       props.onSaved(id)
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Could not save — try again.')
@@ -108,7 +122,7 @@ export function RecipeReviewForm(props: {
 
   return (
     <div className="review-form">
-      <h2 className="review-form__title">Review recipe</h2>
+      <h2 className="review-form__title">{editing ? 'Edit recipe' : 'Review recipe'}</h2>
       {note && (
         <div className={`info-banner ${note.warm ? 'info-banner--warm' : ''}`}>{note.text}</div>
       )}
@@ -221,10 +235,10 @@ export function RecipeReviewForm(props: {
       {saveError && <div className="info-banner info-banner--warm">{saveError}</div>}
       <div className="review-form__actions">
         <button className="btn-secondary" onClick={props.onCancel} disabled={saving}>
-          Back
+          {editing ? 'Cancel' : 'Back'}
         </button>
         <button className="btn-primary" onClick={save} disabled={saving || !title.trim()}>
-          {saving ? 'Saving…' : 'Save recipe'}
+          {saving ? 'Saving…' : editing ? 'Save changes' : 'Save recipe'}
         </button>
       </div>
     </div>

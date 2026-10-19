@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { JSX } from 'react'
-import { ChevronLeft } from 'lucide-react'
-import type { Recipe, RecipeEstimate } from '../../shared/types'
+import { ChevronLeft, Heart } from 'lucide-react'
+import type { DraftRecipe, Recipe, RecipeEstimate, RecipePref } from '../../shared/types'
 import { scaleIngredient, formatQuantity } from '../../shared/ingredient-parser'
 import type { EstimateDetail } from '../../shared/macro-estimator'
 import { getRecipe, deleteRecipe, copyToLibrary } from '../data/recipes'
@@ -9,9 +9,13 @@ import { CUISINE_LABEL, DIET_LABEL } from '../../shared/types'
 import { computeRecipeEstimate, saveRecipeEstimate } from '../data/macroEstimate'
 import { convertRecipeToMetric } from '../data/metricConvert'
 import { hasImperialUnits } from '../../shared/unit-convert'
+import { setRecipeNotes } from '../data/recipePrefs'
+import { onTableChange } from '../data/realtime'
 import { ConfirmSheet } from '../components/ConfirmSheet'
 import { CookingMode } from '../components/CookingMode'
 import { GroceryPreviewModal } from '../components/GroceryPreviewModal'
+import { RecipeReviewForm } from '../components/RecipeReviewForm'
+import { useToast } from '../components/Toast'
 import { useHousehold } from '../hooks/useHousehold'
 import { recipeInitial, recipeTone } from '../lib/recipeTone'
 
@@ -23,13 +27,38 @@ function formatIngredient(ing: Recipe['ingredients'][number], factor: number): s
   return [qty, scaled.unit, scaled.name].filter(Boolean).join(' ')
 }
 
+/** A saved recipe as the edit form's starting draft. `manual` confidence keeps the
+ *  "check everything" scrape banner off — the owner already reviewed this once. */
+function toDraft(r: Recipe): DraftRecipe {
+  return {
+    title: r.title,
+    sourceUrl: r.sourceUrl,
+    imageUrl: r.imageUrl,
+    description: r.description,
+    servings: r.servings,
+    prepMin: r.prepMin,
+    cookMin: r.cookMin,
+    totalMin: r.totalMin,
+    ingredients: r.ingredients,
+    steps: r.steps,
+    confidence: 'manual'
+  }
+}
+
 export function RecipeDetailPage(props: {
   recipeId: number
   onBack: () => void
   onDeleted: () => void
   /** A catalog recipe was forked into the user's own library; opens the copy. */
   onCopied: (newId: number) => void
+  /** Saved edits changed the title/servings/time the library cards show. */
+  onEdited: () => void
+  /** Household favourites + notes (useRecipePrefs, owned by App). */
+  prefs: RecipePref[]
+  isFavourite: (recipeId: number) => boolean
+  onToggleFavourite: (recipeId: number) => void
 }): JSX.Element {
+  const toast = useToast()
   const [recipe, setRecipe] = useState<Recipe | null>(null)
   const [servings, setServings] = useState<number | null>(null)
   const [cooking, setCooking] = useState(false)
@@ -45,6 +74,11 @@ export function RecipeDetailPage(props: {
   // A deleted recipe (e.g. removed on the partner's device) or a failed fetch used to
   // leave the page on "Loading…" forever with no way to tell it apart from slowness.
   const [loadProblem, setLoadProblem] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  // My note as typed; null until touched, so the saved value shows (and realtime-updates)
+  // until I start typing.
+  const [noteDraft, setNoteDraft] = useState<string | null>(null)
+  const [savingNote, setSavingNote] = useState(false)
   const users = useHousehold()
   const me = users.find((u) => u.isMe)
   const ownerName =
@@ -65,6 +99,23 @@ export function RecipeDetailPage(props: {
     )
   }, [props.recipeId])
 
+  // Live refresh: an edit saved here (its macro estimate lands a moment later, in the
+  // background) or on the other device. Leaves the serving scaler where the cook set it.
+  useEffect(
+    () =>
+      onTableChange(['recipes'], () => {
+        getRecipe(props.recipeId).then(
+          (r) => {
+            if (!r) return
+            setRecipe(r)
+            setEst(r.est)
+          },
+          () => undefined
+        )
+      }),
+    [props.recipeId]
+  )
+
   if (loadProblem) {
     return (
       <div className="library__empty">
@@ -77,10 +128,57 @@ export function RecipeDetailPage(props: {
   }
   if (!recipe || servings === null) return <p className="library__empty">Loading…</p>
 
+  if (editing) {
+    return (
+      <RecipeReviewForm
+        draft={toDraft(recipe)}
+        editingId={recipe.id}
+        onCancel={() => setEditing(false)}
+        onSaved={async () => {
+          const fresh = await getRecipe(recipe.id)
+          if (fresh) {
+            setRecipe(fresh)
+            setServings(fresh.servings ?? 1)
+            setEst(fresh.est)
+            setEstDetail(null)
+          }
+          setEditing(false)
+          props.onEdited()
+        }}
+      />
+    )
+  }
+
   const baseServings = recipe.servings ?? 1
   const factor = servings / baseServings
   const isOwner = me != null && recipe.ownerId === me.id
   const canEdit = isOwner && !recipe.isCatalog
+  const favourite = props.isFavourite(recipe.id)
+  const myPref = me
+    ? props.prefs.find((p) => p.ownerId === me.id && p.recipeId === recipe.id)
+    : null
+  const savedNote = myPref?.notes ?? ''
+  const note = noteDraft ?? savedNote
+  const partnerNotes = props.prefs
+    .filter((p) => p.recipeId === recipe.id && p.ownerId !== me?.id && p.notes.trim() !== '')
+    .map((p) => ({
+      ownerId: p.ownerId,
+      name: users.find((u) => u.id === p.ownerId)?.name ?? 'Partner',
+      notes: p.notes
+    }))
+
+  const saveNote = async (): Promise<void> => {
+    if (noteDraft === null || noteDraft.trim() === savedNote.trim()) return
+    setSavingNote(true)
+    try {
+      await setRecipeNotes(recipe.id, noteDraft)
+      toast('Note saved')
+    } catch {
+      toast("Couldn't save your note — check your connection.")
+    } finally {
+      setSavingNote(false)
+    }
+  }
 
   const convertMetric = async (): Promise<void> => {
     if (!recipe) return
@@ -143,6 +241,14 @@ export function RecipeDetailPage(props: {
         )}
         <button className="rdetail__back" aria-label="Back" onClick={props.onBack}>
           <ChevronLeft size={18} strokeWidth={2.4} />
+        </button>
+        <button
+          className={`rdetail__fav ${favourite ? 'rdetail__fav--on' : ''}`}
+          aria-label={favourite ? 'Remove from favourites' : 'Add to favourites'}
+          aria-pressed={favourite}
+          onClick={() => props.onToggleFavourite(recipe.id)}
+        >
+          <Heart size={18} strokeWidth={2.4} fill={favourite ? 'currentColor' : 'none'} />
         </button>
       </div>
 
@@ -246,6 +352,26 @@ export function RecipeDetailPage(props: {
           )}
         </section>
 
+        <section className="rdetail__island glass-island">
+          <div className="rdetail__island-title">Notes</div>
+          <textarea
+            className="input-field input-field--area rdetail__notes"
+            rows={Math.max(2, note.split('\n').length)}
+            maxLength={4000}
+            placeholder="Your tweaks — “double the garlic”, “kids loved it”…"
+            value={note}
+            onChange={(e) => setNoteDraft(e.target.value)}
+            onBlur={saveNote}
+            disabled={savingNote || !me}
+          />
+          {partnerNotes.map((p) => (
+            <div key={p.ownerId} className="rdetail__partner-note">
+              <span className="rdetail__partner-note-by">{p.name}’s notes</span>
+              <p>{p.notes}</p>
+            </div>
+          ))}
+        </section>
+
         <button
           className="btn-primary rdetail__cook"
           onClick={() => setCooking(true)}
@@ -262,6 +388,11 @@ export function RecipeDetailPage(props: {
           <button className="btn-ghost" onClick={() => setGroceryOpen(true)}>
             Send ingredients to groceries
           </button>
+          {canEdit && (
+            <button className="btn-ghost" onClick={() => setEditing(true)}>
+              Edit recipe
+            </button>
+          )}
           {recipe.isCatalog && (
             <button className="btn-ghost" onClick={saveToLibrary} disabled={copying}>
               {copying ? 'Saving…' : 'Save to my recipes'}
