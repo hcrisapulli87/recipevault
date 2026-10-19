@@ -2888,6 +2888,13 @@ select.input-field {
 }
 
 /* Fibre: one slim row under the macro tiles — often partial, so it says how partial */
+/* kcal | kJ switch in the Settings account card — a fixed width so the row can't squash it */
+.settings-unit {
+  width: 132px;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
 .tracker-fibre {
   display: flex;
   flex-wrap: wrap;

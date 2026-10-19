@@ -107,7 +107,7 @@ function EntryRow(props: {
           <div className="tracker-entry__name">{entry.name}</div>
           <div className="tracker-entry__sub">{sub}</div>
         </div>
-        <span className="tracker-entry__kcal">{cals}</span>
+        <span className="tracker-entry__kcal">{cals.toLocaleString('en-AU')}</span>
       </div>
       {props.editing && (
         <div className="tracker-entry__edit">
