@@ -940,6 +940,90 @@ body::before {
   color: var(--muted-2);
   margin: 14px 6px 0;
 }
+/* Deeper trends: 30/90-day density, goal hit tiles, standouts, weekly list */
+.trends__chart--dense {
+  gap: 3px;
+}
+.trends__chart--dense .trends__bar {
+  border-radius: 4px;
+}
+.trends__days--dense {
+  gap: 3px;
+}
+.trends__days--dense .trends__day {
+  overflow: visible;
+  white-space: nowrap; /* a label centres over its bar and may spill onto its neighbours */
+}
+.trends__stat-of {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.trends__stat-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-2);
+  margin-top: 4px;
+}
+.trends__hit-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(27, 36, 48, 0.08);
+  margin-top: 8px;
+  overflow: hidden;
+}
+.trends__hit-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--protein);
+}
+.trends__standouts,
+.trends__weeks {
+  margin-top: 12px;
+  padding: 14px 16px;
+}
+.trends__section-title {
+  font-size: 14px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.trends__standout,
+.trends__week {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--divider);
+  font-size: 13px;
+}
+.trends__standout-label {
+  flex: 1;
+  font-weight: 700;
+}
+.trends__standout-day {
+  color: var(--muted);
+}
+.trends__standout-value,
+.trends__week-days {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.trends__week-label {
+  flex: 1;
+  font-weight: 700;
+}
+.trends__week-values {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.trends__week-values--empty {
+  color: var(--muted-3);
+}
+.trends__week-days {
+  min-width: 30px;
+  text-align: right;
+  color: var(--muted-2);
+}
 
 /* ── Add Food sheet ─────────────────────────────────────────────────────── */
 .sheet__body {

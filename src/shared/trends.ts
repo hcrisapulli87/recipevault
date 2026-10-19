@@ -96,3 +96,129 @@ export function dayBars(
   }
   return out
 }
+
+/** Logged days in the window, newest first — the base every window stat reads. */
+function loggedDays(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  days: number
+): { date: string; t: DailyTotals }[] {
+  const out: { date: string; t: DailyTotals }[] = []
+  for (let i = 0; i < days; i++) {
+    const date = shiftDate(today, -i)
+    const t = totalsByDate.get(date)
+    if (t) out.push({ date, t })
+  }
+  return out
+}
+
+export interface HitRate {
+  hit: number
+  /** logged days in the window — unlogged days are unknown, so they count neither way */
+  of: number
+}
+
+/** Logged days with protein at or above 90% of the goal — "close enough" counts, the
+ *  same forgiving rule the tracker's tiles use. Null without a goal. */
+export function proteinHitRate(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  days: number,
+  proteinGoal: number | null
+): HitRate | null {
+  if (!proteinGoal) return null
+  const logged = loggedDays(totalsByDate, today, days)
+  return { hit: logged.filter((d) => d.t.protein >= proteinGoal * 0.9).length, of: logged.length }
+}
+
+/** Logged days at or under the calorie goal ×1.05 (the verdict's tolerance). */
+export function calorieHitRate(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  days: number,
+  calGoal: number | null
+): HitRate | null {
+  if (!calGoal) return null
+  const logged = loggedDays(totalsByDate, today, days)
+  return { hit: logged.filter((d) => d.t.calories <= calGoal * 1.05).length, of: logged.length }
+}
+
+export interface Standout {
+  date: string
+  totals: DailyTotals
+}
+
+/** The days worth naming in a window: most protein, biggest intake, and — with a calorie
+ *  goal — the day that landed closest to it. Today is left out while it is still going. */
+export function standoutDays(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  days: number,
+  calGoal: number | null
+): { mostProtein: Standout | null; biggest: Standout | null; closest: Standout | null } {
+  const logged = loggedDays(totalsByDate, today, days).filter((d) => d.date !== today)
+  if (logged.length === 0) return { mostProtein: null, biggest: null, closest: null }
+  const pick = (score: (t: DailyTotals) => number): Standout => {
+    const best = logged.reduce((a, d) => (score(d.t) > score(a.t) ? d : a))
+    return { date: best.date, totals: best.t }
+  }
+  return {
+    mostProtein: pick((t) => t.protein),
+    biggest: pick((t) => t.calories),
+    closest: calGoal ? pick((t) => -Math.abs(t.calories - calGoal)) : null
+  }
+}
+
+export interface WeekAverage {
+  /** Monday of the week */
+  weekStart: string
+  avg: DailyTotals | null
+  loggedDays: number
+}
+
+/** Monday of the week `date` falls in. */
+export function weekStartOf(date: string): string {
+  const jsDay = new Date(`${date}T00:00:00`).getDay() // 0 = Sunday
+  return shiftDate(date, -((jsDay + 6) % 7))
+}
+
+/** The last `weeks` Monday-to-Sunday weeks, oldest first, each averaged over its LOGGED
+ *  days up to today. The current week is partial and says so through `loggedDays`. */
+export function weeklyAverages(
+  totalsByDate: Map<string, DailyTotals>,
+  today: string,
+  weeks: number
+): WeekAverage[] {
+  const thisMonday = weekStartOf(today)
+  const out: WeekAverage[] = []
+  for (let w = weeks - 1; w >= 0; w--) {
+    const weekStart = shiftDate(thisMonday, -7 * w)
+    const sum = { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    let n = 0
+    for (let i = 0; i < 7; i++) {
+      const date = shiftDate(weekStart, i)
+      if (date > today) break
+      const t = totalsByDate.get(date)
+      if (!t) continue
+      n++
+      sum.calories += t.calories
+      sum.protein += t.protein
+      sum.carbs += t.carbs
+      sum.fat += t.fat
+    }
+    out.push({
+      weekStart,
+      loggedDays: n,
+      avg:
+        n === 0
+          ? null
+          : {
+              calories: sum.calories / n,
+              protein: sum.protein / n,
+              carbs: sum.carbs / n,
+              fat: sum.fat / n
+            }
+    })
+  }
+  return out
+}
